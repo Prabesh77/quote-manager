@@ -613,7 +613,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                           </button>
                         )}
                         
-                        {status === 'completed' && onMarkAsOrdered && (
+                        {status === 'completed' && onMarkAsOrderedWithParts && (
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
@@ -1112,7 +1112,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                             </button>
                           )}
                           
-                          {status === 'completed' && onMarkAsOrdered && (
+                          {status === 'completed' && onMarkAsOrderedWithParts && (
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
@@ -1416,13 +1416,19 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
               if (!quote) return null;
               const quoteParts = getQuoteParts(quote.partRequested);
               
+              // Filter out parts with no price or zero price
+              const orderableParts = quoteParts.filter(part => part.price && part.price > 0);
+              const nonOrderableParts = quoteParts.filter(part => !part.price || part.price === 0);
+              
               return (
                 <div className="mb-6">
                   <label className="block text-sm font-medium text-gray-700 mb-3">
                     Select Parts to Order *
                   </label>
+                  
+                  {/* Orderable Parts */}
                   <div className="space-y-2 max-h-48 overflow-y-auto border border-gray-200 rounded-lg p-3">
-                    {quoteParts.map((part) => (
+                    {orderableParts.map((part) => (
                       <label key={part.id} className="flex items-center space-x-3 p-2 hover:bg-gray-50 rounded cursor-pointer">
                         <input
                           type="checkbox"
@@ -1441,14 +1447,40 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                         <div className="flex-1">
                           <div className="font-medium text-gray-900">{part.name}</div>
                           <div className="text-sm text-gray-500">
-                            {part.number} • ${part.price || 0}
+                            {part.number} • ${part.price?.toFixed(2) || 0}
                           </div>
                         </div>
                       </label>
                     ))}
                   </div>
+                  
+                  {/* Non-Orderable Parts Warning */}
+                  {nonOrderableParts.length > 0 && (
+                    <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                      <div className="flex items-center space-x-2 mb-2">
+                        <div className="w-4 h-4 bg-yellow-400 rounded-full flex items-center justify-center">
+                          <span className="text-xs text-white font-bold">!</span>
+                        </div>
+                        <span className="text-sm font-medium text-yellow-800">
+                          Parts with no price cannot be ordered
+                        </span>
+                      </div>
+                      <div className="text-xs text-yellow-700 space-y-1">
+                        {nonOrderableParts.map((part) => (
+                          <div key={part.id} className="flex items-center space-x-2">
+                            <span>•</span>
+                            <span>{part.name} ({part.number})</span>
+                            <span className="text-yellow-600">
+                              {!part.price ? 'No price set' : 'Price is $0'}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  
                   <p className="text-xs text-gray-500 mt-2">
-                    Selected {selectedPartsForOrder.size} of {quoteParts.length} parts
+                    Selected {selectedPartsForOrder.size} of {orderableParts.length} orderable parts
                   </p>
                 </div>
               );

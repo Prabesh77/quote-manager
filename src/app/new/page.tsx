@@ -9,6 +9,7 @@ export default function NewQuotePage() {
     quotes, 
     parts, 
     addQuote,
+    addPart,
     updateQuote, 
     deleteQuote, 
     updatePart, 
@@ -49,7 +50,33 @@ export default function NewQuotePage() {
   };
 
   const handleSubmit = async (fields: Record<string, string>, parts: any[]) => {
-    await addQuote(fields, parts);
+    try {
+      // First, create all the parts in the database
+      const partIds: string[] = [];
+      
+      for (const part of parts) {
+        const { data: newPart, error } = await addPart({
+          name: part.name,
+          number: part.number,
+          price: part.price,
+          note: part.note
+        });
+        
+        if (error) {
+          console.error('Error adding part:', error);
+          return;
+        }
+        
+        if (newPart && newPart[0]) {
+          partIds.push(newPart[0].id);
+        }
+      }
+      
+      // Then create the quote with the part IDs
+      await addQuote(fields, partIds);
+    } catch (error) {
+      console.error('Error creating quote:', error);
+    }
   };
 
   return (

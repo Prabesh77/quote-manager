@@ -2,11 +2,13 @@
 
 import { useQuotes } from '@/components/ui/useQuotes';
 import QuoteTable from '@/components/ui/QuoteTable';
+import { QuoteForm } from '@/components/ui/QuoteForm';
 
 export default function NewQuotePage() {
   const { 
     quotes, 
     parts, 
+    addQuote,
     updateQuote, 
     deleteQuote, 
     updatePart, 
@@ -46,12 +48,20 @@ export default function NewQuotePage() {
     return { error: result.error as Error | null };
   };
 
+  const handleSubmit = async (fields: Record<string, string>, parts: any[]) => {
+    await addQuote(fields, parts);
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="container mx-auto px-4 py-8">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900">Add Quote</h1>
           <p className="text-gray-600 mt-2">Create and manage new quotes</p>
+        </div>
+        
+        <div className="mb-8">
+          <QuoteForm onSubmit={handleSubmit} />
         </div>
         
         <QuoteTable

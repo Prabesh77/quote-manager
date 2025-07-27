@@ -967,7 +967,17 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                         <ChevronDown className="h-4 w-4 text-gray-400 flex-shrink-0" />
                         <div className="flex flex-col">
                           <span className="text-xs font-medium text-gray-500">Quote Ref</span>
-                          <span className="font-semibold text-gray-900">{quote.quoteRef}</span>
+                          {editingQuote === quote.id ? (
+                            <input
+                              type="text"
+                              value={editData.quoteRef || quote.quoteRef || ''}
+                              onChange={(e) => handleQuoteEditChange('quoteRef', e.target.value)}
+                              className="px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                              onClick={(e) => e.stopPropagation()}
+                            />
+                          ) : (
+                            <span className="font-semibold text-gray-900">{quote.quoteRef}</span>
+                          )}
                         </div>
                         <button
                           onClick={(e) => {
@@ -997,13 +1007,125 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                             className="h-6 w-6" 
                           />
                         </span>
-                        <span className="text-sm font-medium text-gray-900">{quote.make} {quote.model}</span>
+                        {editingQuote === quote.id ? (
+                          <div className="flex flex-col space-y-1">
+                            <input
+                              type="text"
+                              value={editData.make || quote.make || ''}
+                              onChange={(e) => handleQuoteEditChange('make', e.target.value)}
+                              className="px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                              onClick={(e) => e.stopPropagation()}
+                              placeholder="Make"
+                            />
+                            <input
+                              type="text"
+                              value={editData.model || quote.model || ''}
+                              onChange={(e) => handleQuoteEditChange('model', e.target.value)}
+                              className="px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                              onClick={(e) => e.stopPropagation()}
+                              placeholder="Model"
+                            />
+                          </div>
+                        ) : (
+                          <span className="text-sm font-medium text-gray-900">{quote.make} {quote.model}</span>
+                        )}
                       </div>
                       
                       <div className="flex items-center space-x-2">
                         <span className="text-xs font-medium text-gray-500">VIN:</span>
-                        <span className="text-sm font-mono text-gray-900">{quote.vin || '-'}</span>
+                        {editingQuote === quote.id ? (
+                          <input
+                            type="text"
+                            value={editData.vin || quote.vin || ''}
+                            onChange={(e) => handleQuoteEditChange('vin', e.target.value)}
+                            className="px-2 py-1 text-sm font-mono border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            onClick={(e) => e.stopPropagation()}
+                            placeholder="Enter VIN"
+                          />
+                        ) : (
+                          <span className="text-sm font-mono text-gray-900">{quote.vin || '-'}</span>
+                        )}
                       </div>
+                      
+                      {/* Action Buttons for Mobile */}
+                      {(quote.status !== 'completed' || showCompleted) && (
+                        <div className="flex items-center space-x-2 pt-2">
+                          {editingQuote === quote.id ? (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleSave();
+                              }}
+                              className="p-2 text-green-600 hover:text-green-700 hover:bg-green-100 rounded transition-colors cursor-pointer"
+                              title="Save changes"
+                            >
+                              <Save className="h-4 w-4" />
+                            </button>
+                          ) : (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                startEditingQuote(quote);
+                              }}
+                              className="p-2 text-blue-600 hover:text-blue-700 hover:bg-blue-100 rounded transition-colors cursor-pointer"
+                              title="Edit quote"
+                            >
+                              <Edit className="h-4 w-4" />
+                            </button>
+                          )}
+                          
+                          {editingQuote === quote.id ? (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setEditingQuote(null);
+                                setEditData({});
+                              }}
+                              className="p-2 text-gray-600 hover:text-gray-700 hover:bg-gray-100 rounded transition-colors cursor-pointer"
+                              title="Cancel editing"
+                            >
+                              <X className="h-4 w-4" />
+                            </button>
+                          ) : (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteWithConfirm(quote.id);
+                              }}
+                              className="p-2 text-red-600 hover:text-red-700 hover:bg-red-100 rounded transition-colors cursor-pointer"
+                              title="Delete quote"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          )}
+                          
+                          {status === 'priced' && onMarkCompleted && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onMarkCompleted(quote.id);
+                              }}
+                              className="p-2 text-green-600 hover:text-green-700 hover:bg-green-100 rounded transition-colors cursor-pointer"
+                              title="Mark as completed"
+                            >
+                              <CheckCircle className="h-4 w-4" />
+                            </button>
+                          )}
+                          
+                          {status === 'completed' && onMarkAsOrdered && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleMarkAsOrder(quote.id);
+                              }}
+                              className="p-2 text-purple-600 hover:text-purple-700 hover:bg-purple-100 rounded transition-colors cursor-pointer"
+                              title="Mark as order"
+                            >
+                              <ShoppingCart className="h-4 w-4" />
+                            </button>
+                          )}
+                        </div>
+                      )}
                       
                       {quote.status === 'ordered' && quote.taxInvoiceNumber && (
                         <div className="flex items-center justify-between p-2 bg-purple-50 border border-purple-200 rounded">

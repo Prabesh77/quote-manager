@@ -30,8 +30,8 @@ type QuoteStatus = 'unpriced' | 'priced' | 'completed' | 'ordered';
 
 export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote, onUpdatePart, onUpdateMultipleParts, onMarkCompleted, onMarkAsOrdered, onMarkAsOrderedWithParts, showCompleted = false, defaultFilter = 'all' }: QuoteTableProps) {
   const [editingQuote, setEditingQuote] = useState<string | null>(null);
-  const [editingParts, setEditingParts] = useState<Set<string>>(new Set());
   const [editData, setEditData] = useState<Record<string, any>>({});
+  const [editingParts, setEditingParts] = useState<string | null>(null); // Changed from Set to string | null
   const [partsEditData, setPartsEditData] = useState<Record<string, Record<string, any>>>({});
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedQuote, setSelectedQuote] = useState<string | null>(null);
@@ -56,10 +56,10 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         setEditingQuote(null);
-        setEditingParts(new Set());
+        setEditingParts(null);
       }
       
-      if (e.key === 'Enter' && (editingQuote || editingParts.size > 0)) {
+      if (e.key === 'Enter' && (editingQuote || editingParts)) {
         handleSave();
       }
       
@@ -79,13 +79,13 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
       setEditingQuote(null);
       setEditData({});
     }
-    if (editingParts.size > 0) {
-      const updates = Array.from(editingParts).map(id => ({
+    if (editingParts) {
+      const updates = Object.keys(partsEditData).map(id => ({
         id,
         updates: partsEditData[id] || {}
       }));
       await onUpdateMultipleParts(updates);
-      setEditingParts(new Set());
+      setEditingParts(null);
       setPartsEditData({});
     }
   };
@@ -105,22 +105,18 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
     });
   };
 
-  const startEditingParts = (quoteParts: Part[]) => {
-    const newEditingParts = new Set<string>();
+  const startEditingParts = (quoteParts: Part[], quoteId: string) => {
     const newPartsEditData: Record<string, Record<string, any>> = {};
-    
     quoteParts.forEach(part => {
-      newEditingParts.add(part.id);
       newPartsEditData[part.id] = {
         name: part.name,
         number: part.number,
         price: part.price,
-        note: part.note,
+        note: part.note
       };
     });
-    
-    setEditingParts(newEditingParts);
     setPartsEditData(newPartsEditData);
+    setEditingParts(quoteId);
   };
 
   const handleQuoteEditChange = (field: string, value: any) => {
@@ -404,7 +400,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
           </div>
 
           {/* Quotes List */}
-          <Accordion type="multiple" className="w-full" defaultValue={allQuoteIds}>
+          <Accordion type="multiple" className="w-full">
           {filteredQuotes.map((quote) => {
             const quoteParts = getQuoteParts(quote.partRequested);
             const status = getQuoteStatus(quoteParts, quote.status);
@@ -413,6 +409,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
               <AccordionItem key={quote.id} value={quote.id} className="border-b border-gray-100 last:border-b-0">
                 <AccordionTrigger className="grid grid-cols-6 gap-4 w-full px-6 hover:bg-gray-50 transition-colors cursor-pointer" style={{ gridTemplateColumns: '1fr 1fr 2fr 1fr 0.5fr 0.5fr' }}>
                   {/* Quote Ref */}
+                  <div>
                   <div className="flex items-center space-x-2">
                     <ChevronDown className="h-4 w-4 text-gray-400 flex-shrink-0" />
                     {editingQuote === quote.id ? (
@@ -436,8 +433,29 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                         >
                           <Copy className="h-4 w-4" />
                         </button>
+                        
                       </>
                     )}
+                  </div>
+                   {/* Tax Invoice Number for Ordered Quotes - Main Row Display */}
+                   {quote.status === 'ordered' && quote.taxInvoiceNumber && (
+                        <div className="flex items-center space-x-1 border-t border-gray-100 pt-1">
+                          <div className="flex items-center space-x-1 px-2 py-1 bg-purple-100 border border-purple-200 rounded text-xs">
+                            <span className="text-purple-800 font-medium text-xs">Invoice:</span>
+                            <span className="text-purple-900 font-mono text-[14px]">{quote.taxInvoiceNumber}</span>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                copyToClipboard(quote.taxInvoiceNumber || '');
+                              }}
+                              className="p-0.5 text-purple-600 hover:text-purple-700 hover:bg-purple-200 rounded transition-colors cursor-pointer"
+                              title="Copy tax invoice number"
+                            >
+                              <Copy className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        </div>
+                      )}
                   </div>
 
                   {/* VIN */}
@@ -518,26 +536,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                   <div>
                     <div className="flex space-y-1">
                       {getStatusChip(status)}
-                      {/* Tax Invoice Number for Ordered Quotes - Main Row Display */}
-                      {quote.status === 'ordered' && quote.taxInvoiceNumber && (
-                        <div className="flex items-center space-x-1">
-                          <div className="flex items-center space-x-1 px-2 py-1 bg-purple-100 border border-purple-200 rounded text-xs">
-                            <ShoppingCart className="h-3 w-3 text-purple-600" />
-                            <span className="text-purple-800 font-medium">Tax:</span>
-                            <span className="text-purple-900 font-mono">{quote.taxInvoiceNumber}</span>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                copyToClipboard(quote.taxInvoiceNumber || '');
-                              }}
-                              className="p-0.5 text-purple-600 hover:text-purple-700 hover:bg-purple-200 rounded transition-colors cursor-pointer"
-                              title="Copy tax invoice number"
-                            >
-                              <Copy className="h-2.5 w-2.5" />
-                            </button>
-                          </div>
-                        </div>
-                      )}
+                     
                     </div>
                   </div>
 
@@ -642,20 +641,20 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                         {quoteParts.length === 0 && (
                           <span className="text-sm text-gray-500">No parts linked to this quote</span>
                         )}
-                        {quoteParts.length > 0 && !editingParts.size && quote.status !== 'completed' && (
+                        {quoteParts.length > 0 && editingParts !== quote.id && quote.status !== 'completed' && (
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              startEditingParts(quoteParts);
+                              startEditingParts(quoteParts, quote.id);
                             }}
                             className="px-3 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700 transition-colors cursor-pointer flex items-center space-x-1"
                             title="Edit all parts in this quote"
                           >
                             <Edit className="h-3 w-3" />
-                            <span>Edit All Parts</span>
+                            <span>Edit Parts</span>
                           </button>
                         )}
-                        {editingParts.size > 0 && (
+                        {editingParts === quote.id && (
                           <div className="flex space-x-1">
                             <button
                               onClick={(e) => {
@@ -671,7 +670,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
-                                setEditingParts(new Set());
+                                setEditingParts(null);
                                 setPartsEditData({});
                               }}
                               className="px-3 py-1 text-xs bg-gray-600 text-white rounded hover:bg-gray-700 transition-colors cursor-pointer flex items-center space-x-1"
@@ -685,118 +684,242 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                       </div>
                       
                       {quoteParts.length > 0 && (
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                          {quoteParts.map((part) => {
-                            const isPartEditing = editingParts.has(part.id);
-                            
-                            return (
-                              <div key={part.id} className="bg-white rounded-lg border border-gray-200 p-4 shadow-sm">
-                                <div className="relative">
-                                  {getPartIcon(part.name) && (
-                                    <div className="absolute top-2 right-2 bg-white rounded-full p-1.5 shadow-sm border border-gray-200">
-                                      <img src={getPartIcon(part.name)!} alt={part.name} className="h-7 w-7 object-contain" />
-                                    </div>
-                                  )}
-                                <div className="space-y-3">
-                                  <div>
-                                    <label className="block text-xs font-medium text-gray-500 mb-1">Part Name</label>
-                                    {isPartEditing ? (
-                                      <input
-                                        type="text"
-                                        value={partsEditData[part.id]?.name || ''}
-                                        onChange={(e) => handlePartEditChange(part.id, 'name', e.target.value)}
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-1 focus:ring-red-500 focus:border-transparent"
-                                        autoFocus
-                                      />
-                                    ) : (
-                                      <span className="text-sm font-medium text-gray-900">{part.name}</span>
-                                    )}
-                                  </div>
-                                  
-                                  <div className="grid grid-cols-2 gap-3">
-                                    <div>
-                                      <label className="block text-xs font-medium text-gray-500 mb-1">Part Number</label>
-                                      <div className="flex items-center space-x-1">
-                                        {isPartEditing ? (
-                                          <input
-                                            type="text"
-                                            value={partsEditData[part.id]?.number || ''}
-                                            onChange={(e) => handlePartEditChange(part.id, 'number', e.target.value)}
-                                            className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-1 focus:ring-red-500 focus:border-transparent"
-                                          />
-                                        ) : (
-                                          <>
-                                            <span className="text-sm text-gray-600 font-mono">{part.number || '-'}</span>
-                                            <button
-                                              onClick={() => copyToClipboard(part.number || '')}
-                                              className="p-1 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
-                                              title="Copy to clipboard"
-                                            >
-                                              <Copy className="h-3 w-3" />
-                                            </button>
-                                          </>
-                                        )}
-                                      </div>
-                                    </div>
+                        <>
+                          {/* Desktop Table View */}
+                          <div className="hidden lg:block">
+                            <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+                              <table className="w-full">
+                                <thead className="bg-gray-50">
+                                  <tr>
+                                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Part</th>
+                                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Part Number</th>
+                                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Price</th>
+                                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Notes</th>
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-200">
+                                  {quoteParts.map((part) => {
+                                    const isPartEditing = editingParts === quote.id;
                                     
-                                    <div>
-                                      <label className="block text-xs font-medium text-gray-500 mb-1">Price</label>
-                                      <div className="flex items-center space-x-1">
-                                        {isPartEditing ? (
-                                          <input
-                                            type="number"
-                                            value={partsEditData[part.id]?.price || ''}
-                                            onChange={(e) => handlePartEditChange(part.id, 'price', e.target.value ? Number(e.target.value) : null)}
-                                            className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-1 focus:ring-red-500 focus:border-transparent"
-                                          />
-                                        ) : (
-                                          <>
-                                            <span className="text-sm font-medium text-gray-900">
-                                              {part.price ? `$${part.price.toFixed(2)}` : '-'}
-                                            </span>
-                                            <button
-                                              onClick={() => copyToClipboard(part.price ? part.price.toString() : '')}
-                                              className="p-1 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
-                                              title="Copy to clipboard"
-                                            >
-                                              <Copy className="h-3 w-3" />
-                                            </button>
-                                          </>
-                                        )}
+                                    return (
+                                      <tr key={part.id} className="hover:bg-gray-50">
+                                        <td className="px-4 py-3">
+                                          <div className="flex items-center space-x-3">
+                                            {getPartIcon(part.name) && (
+                                              <div className="bg-white rounded-full p-1 shadow-sm border border-gray-200">
+                                                <img src={getPartIcon(part.name)!} alt={part.name} className="h-6 w-6 object-contain" />
+                                              </div>
+                                            )}
+                                            <div>
+                                              {isPartEditing ? (
+                                                <input
+                                                  type="text"
+                                                  value={partsEditData[part.id]?.name || ''}
+                                                  onChange={(e) => handlePartEditChange(part.id, 'name', e.target.value)}
+                                                  className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:ring-1 focus:ring-red-500 focus:border-transparent"
+                                                  autoFocus
+                                                />
+                                              ) : (
+                                                <span className="text-sm font-medium text-gray-900">{part.name}</span>
+                                              )}
+                                            </div>
+                                          </div>
+                                        </td>
+                                        <td className="px-4 py-3">
+                                          <div className="flex items-center space-x-1">
+                                            {isPartEditing ? (
+                                              <input
+                                                type="text"
+                                                value={partsEditData[part.id]?.number || ''}
+                                                onChange={(e) => handlePartEditChange(part.id, 'number', e.target.value)}
+                                                className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:ring-1 focus:ring-red-500 focus:border-transparent"
+                                              />
+                                            ) : (
+                                              <>
+                                                <span className="text-sm text-gray-600 font-mono">{part.number || '-'}</span>
+                                                <button
+                                                  onClick={() => copyToClipboard(part.number || '')}
+                                                  className="p-1 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
+                                                  title="Copy to clipboard"
+                                                >
+                                                  <Copy className="h-3 w-3" />
+                                                </button>
+                                              </>
+                                            )}
+                                          </div>
+                                        </td>
+                                        <td className="px-4 py-3">
+                                          <div className="flex items-center space-x-1">
+                                            {isPartEditing ? (
+                                              <input
+                                                type="number"
+                                                value={partsEditData[part.id]?.price || ''}
+                                                onChange={(e) => handlePartEditChange(part.id, 'price', e.target.value ? Number(e.target.value) : null)}
+                                                className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:ring-1 focus:ring-red-500 focus:border-transparent"
+                                              />
+                                            ) : (
+                                              <>
+                                                <span className="text-sm font-medium text-gray-900">
+                                                  {part.price ? `$${part.price.toFixed(2)}` : '-'}
+                                                </span>
+                                                <button
+                                                  onClick={() => copyToClipboard(part.price ? part.price.toString() : '')}
+                                                  className="p-1 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
+                                                  title="Copy to clipboard"
+                                                >
+                                                  <Copy className="h-3 w-3" />
+                                                </button>
+                                              </>
+                                            )}
+                                          </div>
+                                        </td>
+                                        <td className="px-4 py-3">
+                                          <div className="flex items-center space-x-1">
+                                            {isPartEditing ? (
+                                              <input
+                                                type="text"
+                                                value={partsEditData[part.id]?.note || ''}
+                                                onChange={(e) => handlePartEditChange(part.id, 'note', e.target.value)}
+                                                className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:ring-1 focus:ring-red-500 focus:border-transparent"
+                                              />
+                                            ) : (
+                                              <>
+                                                <span className="text-sm text-gray-600">{part.note || '-'}</span>
+                                                <button
+                                                  onClick={() => copyToClipboard(part.note || '')}
+                                                  className="p-1 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
+                                                  title="Copy to clipboard"
+                                                >
+                                                  <Copy className="h-3 w-3" />
+                                                </button>
+                                              </>
+                                            )}
+                                          </div>
+                                        </td>
+                                      </tr>
+                                    );
+                                  })}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+
+                          {/* Mobile Card View */}
+                          <div className="lg:hidden space-y-3">
+                            {quoteParts.map((part) => {
+                              const isPartEditing = editingParts === quote.id;
+                              
+                              return (
+                                <div key={part.id} className="bg-white rounded-lg border border-gray-200 p-3 shadow-sm">
+                                  <div className="relative">
+                                    {getPartIcon(part.name) && (
+                                      <div className="absolute top-2 right-2 bg-white rounded-full p-1.5 shadow-sm border border-gray-200">
+                                        <img src={getPartIcon(part.name)!} alt={part.name} className="h-7 w-7 object-contain" />
                                       </div>
-                                    </div>
-                                  </div>
-                                  
-                                  <div>
-                                    <label className="block text-xs font-medium text-gray-500 mb-1">Notes</label>
-                                    <div className="flex items-center space-x-1">
-                                      {isPartEditing ? (
-                                        <input
-                                          type="text"
-                                          value={partsEditData[part.id]?.note || ''}
-                                          onChange={(e) => handlePartEditChange(part.id, 'note', e.target.value)}
-                                          className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-1 focus:ring-red-500 focus:border-transparent"
-                                        />
-                                      ) : (
-                                        <>
-                                          <span className="text-sm text-gray-600">{part.note || '-'}</span>
-                                          <button
-                                            onClick={() => copyToClipboard(part.note || '')}
-                                            className="p-1 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
-                                            title="Copy to clipboard"
-                                          >
-                                            <Copy className="h-3 w-3" />
-                                          </button>
-                                        </>
-                                      )}
+                                    )}
+                                    <div className="space-y-3 pr-12">
+                                      <div className="grid grid-cols-2 gap-3">
+                                        <div>
+                                          <label className="block text-xs font-medium text-gray-500 mb-1">Part Name</label>
+                                          {isPartEditing ? (
+                                            <input
+                                              type="text"
+                                              value={partsEditData[part.id]?.name || ''}
+                                              onChange={(e) => handlePartEditChange(part.id, 'name', e.target.value)}
+                                              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-1 focus:ring-red-500 focus:border-transparent"
+                                              autoFocus
+                                            />
+                                          ) : (
+                                            <span className="text-sm font-medium text-gray-900">{part.name}</span>
+                                          )}
+                                        </div>
+                                        
+                                        <div>
+                                          <label className="block text-xs font-medium text-gray-500 mb-1">Part Number</label>
+                                          <div className="flex items-center space-x-1">
+                                            {isPartEditing ? (
+                                              <input
+                                                type="text"
+                                                value={partsEditData[part.id]?.number || ''}
+                                                onChange={(e) => handlePartEditChange(part.id, 'number', e.target.value)}
+                                                className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-1 focus:ring-red-500 focus:border-transparent"
+                                              />
+                                            ) : (
+                                              <>
+                                                <span className="text-sm text-gray-600 font-mono">{part.number || '-'}</span>
+                                                <button
+                                                  onClick={() => copyToClipboard(part.number || '')}
+                                                  className="p-1 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
+                                                  title="Copy to clipboard"
+                                                >
+                                                  <Copy className="h-3 w-3" />
+                                                </button>
+                                              </>
+                                            )}
+                                          </div>
+                                        </div>
+                                      </div>
+                                      
+                                      <div className="grid grid-cols-2 gap-3">
+                                        <div>
+                                          <label className="block text-xs font-medium text-gray-500 mb-1">Price</label>
+                                          <div className="flex items-center space-x-1">
+                                            {isPartEditing ? (
+                                              <input
+                                                type="number"
+                                                value={partsEditData[part.id]?.price || ''}
+                                                onChange={(e) => handlePartEditChange(part.id, 'price', e.target.value ? Number(e.target.value) : null)}
+                                                className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-1 focus:ring-red-500 focus:border-transparent"
+                                              />
+                                            ) : (
+                                              <>
+                                                <span className="text-sm font-medium text-gray-900">
+                                                  {part.price ? `$${part.price.toFixed(2)}` : '-'}
+                                                </span>
+                                                <button
+                                                  onClick={() => copyToClipboard(part.price ? part.price.toString() : '')}
+                                                  className="p-1 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
+                                                  title="Copy to clipboard"
+                                                >
+                                                  <Copy className="h-3 w-3" />
+                                                </button>
+                                              </>
+                                            )}
+                                          </div>
+                                        </div>
+                                        
+                                        <div>
+                                          <label className="block text-xs font-medium text-gray-500 mb-1">Notes</label>
+                                          <div className="flex items-center space-x-1">
+                                            {isPartEditing ? (
+                                              <input
+                                                type="text"
+                                                value={partsEditData[part.id]?.note || ''}
+                                                onChange={(e) => handlePartEditChange(part.id, 'note', e.target.value)}
+                                                className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-1 focus:ring-red-500 focus:border-transparent"
+                                              />
+                                            ) : (
+                                              <>
+                                                <span className="text-sm text-gray-600">{part.note || '-'}</span>
+                                                <button
+                                                  onClick={() => copyToClipboard(part.note || '')}
+                                                  className="p-1 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
+                                                  title="Copy to clipboard"
+                                                >
+                                                  <Copy className="h-3 w-3" />
+                                                </button>
+                                              </>
+                                            )}
+                                          </div>
+                                        </div>
+                                      </div>
                                     </div>
                                   </div>
                                 </div>
-                              </div>
-                              </div>
-                            );
-                          })}
-                        </div>
+                              );
+                            })}
+                          </div>
+                        </>
                       )}
                     </div>
                   </div>
@@ -809,7 +932,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
         )}
       </div>
 
-      {/* Mobile Card View */}
+      {/* Mobile View */}
       <div className="lg:hidden space-y-4">
         {filteredQuotes.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 px-4">
@@ -831,253 +954,254 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
             </div>
           </div>
         ) : (
-        <Accordion type="multiple" className="w-full" defaultValue={allQuoteIds}>
-          {filteredQuotes.map((quote) => {
-            const quoteParts = getQuoteParts(quote.partRequested);
-            const status = getQuoteStatus(quoteParts, quote.status);
-            console.log({quoteParts})
-
-            return (
-              <AccordionItem key={quote.id} value={quote.id} className="bg-white rounded-lg border border-gray-200 shadow-sm">
-                <AccordionTrigger className="p-4 hover:bg-gray-50 transition-colors cursor-pointer">
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center space-x-2">
-                      <ChevronDown className="h-4 w-4 text-gray-400 flex-shrink-0" />
-                      <div className="flex flex-col">
-                        <span className="text-xs font-medium text-gray-500">Quote Ref</span>
-                        <span className="font-semibold text-gray-900">{quote.quoteRef}</span>
-                      </div>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          copyToClipboard(quote.quoteRef || '');
-                        }}
-                        className="p-1 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
-                        title="Copy quote ref"
-                      >
-                        <Copy className="h-4 w-4" />
-                      </button>
-                    </div>
-                    <div className="flex flex-col items-end space-y-1">
-                      {getStatusChip(status)}
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                        {quoteParts.length} {quoteParts.length === 1 ? 'part' : 'parts'}
-                      </span>
-                    </div>
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <div className="flex items-center space-x-2">
-                      <span className="text-lg">
-                        <img 
-                          src={getVehicleLogo(editingQuote === quote.id ? (editData.make || quote.make) : quote.make)} 
-                          alt={editingQuote === quote.id ? (editData.make || quote.make) : quote.make} 
-                          className="h-6 w-6" 
-                        />
-                      </span>
-                      <span className="text-sm font-medium text-gray-900">{quote.make} {quote.model}</span>
-                    </div>
-                    
-                    <div className="flex items-center space-x-2">
-                      <span className="text-xs font-medium text-gray-500">VIN:</span>
-                      <span className="text-sm font-mono text-gray-900">{quote.vin || '-'}</span>
-                    </div>
-                    
-                    {quote.status === 'ordered' && quote.taxInvoiceNumber && (
-                      <div className="flex items-center justify-between p-2 bg-purple-50 border border-purple-200 rounded">
-                        <div className="flex items-center space-x-2">
-                          <span className="text-xs font-medium text-purple-800">Invoice:</span>
-                          <span className="text-sm font-mono text-purple-900">{quote.taxInvoiceNumber}</span>
+          <Accordion type="multiple" className="w-full">
+            {filteredQuotes.map((quote) => {
+              const quoteParts = getQuoteParts(quote.partRequested);
+              const status = getQuoteStatus(quoteParts, quote.status);
+              
+              return (
+                <AccordionItem key={quote.id} value={quote.id} className="bg-white rounded-lg border border-gray-200 shadow-sm">
+                  <AccordionTrigger className="p-4 hover:bg-gray-50 transition-colors cursor-pointer">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center space-x-2">
+                        <ChevronDown className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                        <div className="flex flex-col">
+                          <span className="text-xs font-medium text-gray-500">Quote Ref</span>
+                          <span className="font-semibold text-gray-900">{quote.quoteRef}</span>
                         </div>
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            copyToClipboard(quote.taxInvoiceNumber || '');
+                            copyToClipboard(quote.quoteRef || '');
                           }}
-                          className="p-1 text-purple-600 hover:text-purple-700 hover:bg-purple-200 rounded transition-colors cursor-pointer"
-                          title="Copy tax invoice number"
+                          className="p-1 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
+                          title="Copy quote ref"
                         >
-                          <Copy className="h-3 w-3" />
+                          <Copy className="h-4 w-4" />
                         </button>
                       </div>
-                    )}
-                  </div>
-                </AccordionTrigger>
-                
-                <AccordionContent className="px-4 pb-4 bg-gray-50">
-                  <div className="animate-in slide-in-from-top-2 duration-300">
-                    <div className="space-y-4">
-                      <div className="flex items-center justify-between">
-                        <h4 className="text-sm font-semibold text-gray-900 flex items-center space-x-2">
-                          <Eye className="h-4 w-4" />
-                          <span>Parts Details ({quoteParts.length})</span>
-                        </h4>
-                        {quoteParts.length === 0 && (
-                          <span className="text-sm text-gray-500">No parts linked to this quote</span>
-                        )}
-                        {quoteParts.length > 0 && !editingParts.size && quote.status !== 'completed' && (
+                      <div className="flex flex-col items-end space-y-1">
+                        {getStatusChip(status)}
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                          {quoteParts.length} {quoteParts.length === 1 ? 'part' : 'parts'}
+                        </span>
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <div className="flex items-center space-x-2">
+                        <span className="text-lg">
+                          <img 
+                            src={getVehicleLogo(editingQuote === quote.id ? (editData.make || quote.make) : quote.make)} 
+                            alt={editingQuote === quote.id ? (editData.make || quote.make) : quote.make} 
+                            className="h-6 w-6" 
+                          />
+                        </span>
+                        <span className="text-sm font-medium text-gray-900">{quote.make} {quote.model}</span>
+                      </div>
+                      
+                      <div className="flex items-center space-x-2">
+                        <span className="text-xs font-medium text-gray-500">VIN:</span>
+                        <span className="text-sm font-mono text-gray-900">{quote.vin || '-'}</span>
+                      </div>
+                      
+                      {quote.status === 'ordered' && quote.taxInvoiceNumber && (
+                        <div className="flex items-center justify-between p-2 bg-purple-50 border border-purple-200 rounded">
+                          <div className="flex items-center space-x-2">
+                            <span className="text-xs font-medium text-purple-800">Invoice:</span>
+                            <span className="text-sm font-mono text-purple-900">{quote.taxInvoiceNumber}</span>
+                          </div>
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              startEditingParts(quoteParts);
+                              copyToClipboard(quote.taxInvoiceNumber || '');
                             }}
-                            className="px-3 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700 transition-colors cursor-pointer flex items-center space-x-1"
-                            title="Edit all parts in this quote"
+                            className="p-1 text-purple-600 hover:text-purple-700 hover:bg-purple-200 rounded transition-colors cursor-pointer"
+                            title="Copy tax invoice number"
                           >
-                            <Edit className="h-3 w-3" />
-                            <span>Edit All Parts</span>
+                            <Copy className="h-3 w-3" />
                           </button>
-                        )}
-                        {editingParts.size > 0 && (
-                          <div className="flex space-x-1">
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleSave();
-                              }}
-                              className="px-3 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700 transition-colors cursor-pointer flex items-center space-x-1"
-                              title="Save all part changes"
-                            >
-                              <Save className="h-3 w-3" />
-                              <span>Save All</span>
-                            </button>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setEditingParts(new Set());
-                                setPartsEditData({});
-                              }}
-                              className="px-3 py-1 text-xs bg-gray-600 text-white rounded hover:bg-gray-700 transition-colors cursor-pointer flex items-center space-x-1"
-                              title="Cancel editing and discard changes"
-                            >
-                              <X className="h-3 w-3" />
-                              <span>Cancel</span>
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                      
-                      {quoteParts.length > 0 && (
-                        <div className="space-y-3">
-                          {quoteParts.map((part) => {
-                            const isPartEditing = editingParts.has(part.id);
-                            
-                            return (
-                              <div key={part.id} className="bg-white rounded-lg border border-gray-200 p-3 shadow-sm">
-                                <div className="relative">
-                                  {getPartIcon(part.name) && (
-                                    <div className="absolute top-2 right-2 bg-white rounded-full p-1.5 shadow-sm border border-gray-200">
-                                      <img src={getPartIcon(part.name)!} alt={part.name} className="h-7 w-7 object-contain" />
-                                    </div>
-                                  )}
-                                <div className="space-y-2">
-                                  <div>
-                                    <label className="block text-xs font-medium text-gray-500 mb-1">Part Name</label>
-                                    {isPartEditing ? (
-                                      <input
-                                        type="text"
-                                        value={partsEditData[part.id]?.name || ''}
-                                        onChange={(e) => handlePartEditChange(part.id, 'name', e.target.value)}
-                                        className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:ring-1 focus:ring-red-500 focus:border-transparent"
-                                        autoFocus
-                                      />
-                                    ) : (
-                                      <span className="text-sm font-medium text-gray-900">{part.name}</span>
-                                    )}
-                                  </div>
-                                  
-                                  <div className="grid grid-cols-2 gap-2">
-                                    <div>
-                                      <label className="block text-xs font-medium text-gray-500 mb-1">Part Number</label>
-                                      <div className="flex items-center space-x-1">
-                                        {isPartEditing ? (
-                                          <input
-                                            type="text"
-                                            value={partsEditData[part.id]?.number || ''}
-                                            onChange={(e) => handlePartEditChange(part.id, 'number', e.target.value)}
-                                            className="flex-1 px-2 py-1 border border-gray-300 rounded text-sm focus:ring-1 focus:ring-red-500 focus:border-transparent"
-                                          />
-                                        ) : (
-                                          <>
-                                            <span className="text-sm text-gray-600 font-mono">{part.number || '-'}</span>
-                                            <button
-                                              onClick={() => copyToClipboard(part.number || '')}
-                                              className="p-1 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
-                                              title="Copy to clipboard"
-                                            >
-                                              <Copy className="h-3 w-3" />
-                                            </button>
-                                          </>
-                                        )}
-                                      </div>
-                                    </div>
-                                    
-                                    <div>
-                                      <label className="block text-xs font-medium text-gray-500 mb-1">Price</label>
-                                      <div className="flex items-center space-x-1">
-                                        {isPartEditing ? (
-                                          <input
-                                            type="number"
-                                            value={partsEditData[part.id]?.price || ''}
-                                            onChange={(e) => handlePartEditChange(part.id, 'price', e.target.value ? Number(e.target.value) : null)}
-                                            className="flex-1 px-2 py-1 border border-gray-300 rounded text-sm focus:ring-1 focus:ring-red-500 focus:border-transparent"
-                                          />
-                                        ) : (
-                                          <>
-                                            <span className="text-sm font-medium text-gray-900">
-                                              {part.price ? `$${part.price.toFixed(2)}` : '-'}
-                                            </span>
-                                            <button
-                                              onClick={() => copyToClipboard(part.price ? part.price.toString() : '')}
-                                              className="p-1 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
-                                              title="Copy to clipboard"
-                                            >
-                                              <Copy className="h-3 w-3" />
-                                            </button>
-                                          </>
-                                        )}
-                                      </div>
-                                    </div>
-                                  </div>
-                                  
-                                  <div>
-                                    <label className="block text-xs font-medium text-gray-500 mb-1">Notes</label>
-                                    <div className="flex items-center space-x-1">
-                                      {isPartEditing ? (
-                                        <input
-                                          type="text"
-                                          value={partsEditData[part.id]?.note || ''}
-                                          onChange={(e) => handlePartEditChange(part.id, 'note', e.target.value)}
-                                          className="flex-1 px-2 py-1 border border-gray-300 rounded text-sm focus:ring-1 focus:ring-red-500 focus:border-transparent"
-                                        />
-                                      ) : (
-                                        <>
-                                          <span className="text-sm text-gray-600">{part.note || '-'}</span>
-                                          <button
-                                            onClick={() => copyToClipboard(part.note || '')}
-                                            className="p-1 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
-                                            title="Copy to clipboard"
-                                          >
-                                            <Copy className="h-3 w-3" />
-                                          </button>
-                                        </>
-                                      )}
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
-                              </div>
-                            );
-                          })}
                         </div>
                       )}
                     </div>
-                  </div>
-                </AccordionContent>
-              </AccordionItem>
-            );
-          })}
-        </Accordion>
+                  </AccordionTrigger>
+                  
+                  <AccordionContent className="px-4 pb-4 bg-gray-50">
+                    <div className="animate-in slide-in-from-top-2 duration-300">
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between">
+                          <h4 className="text-sm font-semibold text-gray-900 flex items-center space-x-2">
+                            <Eye className="h-4 w-4" />
+                            <span>Parts Details ({quoteParts.length})</span>
+                          </h4>
+                          {quoteParts.length === 0 && (
+                            <span className="text-sm text-gray-500">No parts linked to this quote</span>
+                          )}
+                          {quoteParts.length > 0 && editingParts !== quote.id && quote.status !== 'completed' && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                startEditingParts(quoteParts, quote.id);
+                              }}
+                              className="px-3 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700 transition-colors cursor-pointer flex items-center space-x-1"
+                              title="Edit all parts in this quote"
+                            >
+                              <Edit className="h-3 w-3" />
+                              <span>Edit Parts</span>
+                            </button>
+                          )}
+                          {editingParts === quote.id && (
+                            <div className="flex space-x-1">
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleSave();
+                                }}
+                                className="px-3 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700 transition-colors cursor-pointer flex items-center space-x-1"
+                                title="Save all part changes"
+                              >
+                                <Save className="h-3 w-3" />
+                                <span>Save All</span>
+                              </button>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setEditingParts(null);
+                                  setPartsEditData({});
+                                }}
+                                className="px-3 py-1 text-xs bg-gray-600 text-white rounded hover:bg-gray-700 transition-colors cursor-pointer flex items-center space-x-1"
+                                title="Cancel editing and discard changes"
+                              >
+                                <X className="h-3 w-3" />
+                                <span>Cancel</span>
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                        
+                        {quoteParts.length > 0 && (
+                          <div className="space-y-3">
+                            {quoteParts.map((part) => {
+                              const isPartEditing = editingParts === quote.id;
+                              
+                              return (
+                                <div key={part.id} className="bg-white rounded-lg border border-gray-200 p-3 shadow-sm">
+                                  <div className="relative">
+                                    {getPartIcon(part.name) && (
+                                      <div className="absolute top-2 right-2 bg-white rounded-full p-1.5 shadow-sm border border-gray-200">
+                                        <img src={getPartIcon(part.name)!} alt={part.name} className="h-7 w-7 object-contain" />
+                                      </div>
+                                    )}
+                                    <div className="space-y-3 pr-12">
+                                      <div className="grid grid-cols-2 gap-3">
+                                        <div>
+                                          <label className="block text-xs font-medium text-gray-500 mb-1">Part Name</label>
+                                          {isPartEditing ? (
+                                            <input
+                                              type="text"
+                                              value={partsEditData[part.id]?.name || ''}
+                                              onChange={(e) => handlePartEditChange(part.id, 'name', e.target.value)}
+                                              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-1 focus:ring-red-500 focus:border-transparent"
+                                              autoFocus
+                                            />
+                                          ) : (
+                                            <span className="text-sm font-medium text-gray-900">{part.name}</span>
+                                          )}
+                                        </div>
+                                        
+                                        <div>
+                                          <label className="block text-xs font-medium text-gray-500 mb-1">Part Number</label>
+                                          <div className="flex items-center space-x-1">
+                                            {isPartEditing ? (
+                                              <input
+                                                type="text"
+                                                value={partsEditData[part.id]?.number || ''}
+                                                onChange={(e) => handlePartEditChange(part.id, 'number', e.target.value)}
+                                                className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-1 focus:ring-red-500 focus:border-transparent"
+                                              />
+                                            ) : (
+                                              <>
+                                                <span className="text-sm text-gray-600 font-mono">{part.number || '-'}</span>
+                                                <button
+                                                  onClick={() => copyToClipboard(part.number || '')}
+                                                  className="p-1 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
+                                                  title="Copy to clipboard"
+                                                >
+                                                  <Copy className="h-3 w-3" />
+                                                </button>
+                                              </>
+                                            )}
+                                          </div>
+                                        </div>
+                                      </div>
+                                      
+                                      <div className="grid grid-cols-2 gap-3">
+                                        <div>
+                                          <label className="block text-xs font-medium text-gray-500 mb-1">Price</label>
+                                          <div className="flex items-center space-x-1">
+                                            {isPartEditing ? (
+                                              <input
+                                                type="number"
+                                                value={partsEditData[part.id]?.price || ''}
+                                                onChange={(e) => handlePartEditChange(part.id, 'price', e.target.value ? Number(e.target.value) : null)}
+                                                className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-1 focus:ring-red-500 focus:border-transparent"
+                                              />
+                                            ) : (
+                                              <>
+                                                <span className="text-sm font-medium text-gray-900">
+                                                  {part.price ? `$${part.price.toFixed(2)}` : '-'}
+                                                </span>
+                                                <button
+                                                  onClick={() => copyToClipboard(part.price ? part.price.toString() : '')}
+                                                  className="p-1 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
+                                                  title="Copy to clipboard"
+                                                >
+                                                  <Copy className="h-3 w-3" />
+                                                </button>
+                                              </>
+                                            )}
+                                          </div>
+                                        </div>
+                                        
+                                        <div>
+                                          <label className="block text-xs font-medium text-gray-500 mb-1">Notes</label>
+                                          <div className="flex items-center space-x-1">
+                                            {isPartEditing ? (
+                                              <input
+                                                type="text"
+                                                value={partsEditData[part.id]?.note || ''}
+                                                onChange={(e) => handlePartEditChange(part.id, 'note', e.target.value)}
+                                                className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-1 focus:ring-red-500 focus:border-transparent"
+                                              />
+                                            ) : (
+                                              <>
+                                                <span className="text-sm text-gray-600">{part.note || '-'}</span>
+                                                <button
+                                                  onClick={() => copyToClipboard(part.note || '')}
+                                                  className="p-1 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
+                                                  title="Copy to clipboard"
+                                                >
+                                                  <Copy className="h-3 w-3" />
+                                                </button>
+                                              </>
+                                            )}
+                                          </div>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </AccordionContent>
+                </AccordionItem>
+              );
+            })}
+          </Accordion>
         )}
       </div>
 

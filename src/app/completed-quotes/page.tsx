@@ -1,119 +1,72 @@
 'use client';
 
-import { useState } from 'react';
-import { ConnectionStatus } from '@/components/ui/ConnectionStatus';
-import QuoteTable from '@/components/ui/QuoteTable';
 import { useQuotes } from '@/components/ui/useQuotes';
-import { ArrowLeft, Archive } from 'lucide-react';
-import Link from 'next/link';
+import QuoteTable from '@/components/ui/QuoteTable';
+import Navigation from '@/components/ui/Navigation';
 
 export default function CompletedQuotesPage() {
-  const {
-    quotes,
-    parts,
-    connectionStatus,
-    updateQuote,
-    deleteQuote,
-    updatePart,
-    updateMultipleParts,
+  const { 
+    quotes, 
+    parts, 
+    updateQuote, 
+    deleteQuote, 
+    updatePart, 
+    updateMultipleParts, 
     markQuoteCompleted,
-    markQuoteAsOrdered,
-    markQuoteAsOrderedWithParts,
+    markQuoteAsOrderedWithParts
   } = useQuotes();
 
-  const handleUpdateQuote = async (id: string, fields: Record<string, any>) => {
-    try {
-      return await updateQuote(id, fields);
-    } catch (error) {
-      console.error('Error updating quote:', error);
-      return { error };
-    }
+  const completedQuotes = quotes.filter(quote => quote.status === 'completed');
+
+  // Wrapper functions to match QuoteTableProps interface
+  const onUpdateQuote = async (id: string, fields: Record<string, any>) => {
+    const result = await updateQuote(id, fields);
+    return { error: result.error as Error | null };
   };
 
-  const handleDeleteQuote = async (id: string) => {
-    try {
-      return await deleteQuote(id);
-    } catch (error) {
-      console.error('Error deleting quote:', error);
-      return { error };
-    }
+  const onDeleteQuote = async (id: string) => {
+    const result = await deleteQuote(id);
+    return { error: result.error as Error | null };
   };
 
-  const handleUpdatePart = async (id: string, updates: any) => {
-    try {
-      return await updatePart(id, updates);
-    } catch (error) {
-      console.error('Error updating part:', error);
-      return { data: null, error };
-    }
+  const onUpdatePart = async (id: string, updates: any) => {
+    return await updatePart(id, updates);
   };
 
-  const handleUpdateMultipleParts = async (updates: Array<{ id: string; updates: any }>) => {
-    try {
-      await updateMultipleParts(updates);
-    } catch (error) {
-      console.error('Error updating multiple parts:', error);
-    }
+  const onUpdateMultipleParts = async (updates: any) => {
+    await updateMultipleParts(updates);
   };
 
-  const handleMarkCompleted = async (id: string) => {
-    try {
-      return await markQuoteCompleted(id);
-    } catch (error) {
-      console.error('Error marking quote as completed:', error);
-      return { error };
-    }
+  const onMarkCompleted = async (id: string) => {
+    const result = await markQuoteCompleted(id);
+    return { error: result.error as Error | null };
   };
 
-  const handleMarkAsOrdered = async (id: string, taxInvoiceNumber: string) => {
-    try {
-      return await markQuoteAsOrdered(id, taxInvoiceNumber);
-    } catch (error) {
-      console.error('Error marking quote as ordered:', error);
-      return { error };
-    }
-  };
-
-  const handleMarkAsOrderedWithParts = async (id: string, taxInvoiceNumber: string, partIds: string[]) => {
-    try {
-      return await markQuoteAsOrderedWithParts(id, taxInvoiceNumber, partIds);
-    } catch (error) {
-      console.error('Error marking quote as ordered with parts:', error);
-      return { error };
-    }
+  const onMarkAsOrderedWithParts = async (id: string, taxInvoiceNumber: string, partIds: string[]) => {
+    const result = await markQuoteAsOrderedWithParts(id, taxInvoiceNumber, partIds);
+    return { error: result.error as Error | null };
   };
 
   return (
     <div className="min-h-screen bg-gray-50">
-
-      {/* Main Content */}
+      <Navigation />
       <div className="container mx-auto px-4 py-8">
         <div className="mb-8">
-          
-          <div className="flex items-center space-x-3">
-            <Archive className="h-8 w-8 text-red-600" />
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900">Completed Quotes</h1>
-              <p className="text-gray-600">View all completed and delivered quotes</p>
-            </div>
-          </div>
+          <h1 className="text-3xl font-bold text-gray-900">Completed Quotes</h1>
+          <p className="text-gray-600 mt-2">View and manage completed quotes</p>
         </div>
-
-        <div className="space-y-8">
-          {/* Completed Quotes Table */}
-          <QuoteTable
-            quotes={quotes}
-            parts={parts}
-            onUpdateQuote={handleUpdateQuote}
-            onDeleteQuote={handleDeleteQuote}
-            onUpdatePart={handleUpdatePart}
-            onUpdateMultipleParts={handleUpdateMultipleParts}
-            onMarkCompleted={handleMarkCompleted}
-            onMarkAsOrdered={handleMarkAsOrdered}
-            onMarkAsOrderedWithParts={handleMarkAsOrderedWithParts}
-            showCompleted={true}
-          />
-        </div>
+        
+        <QuoteTable
+          quotes={completedQuotes}
+          parts={parts}
+          onUpdateQuote={onUpdateQuote}
+          onDeleteQuote={onDeleteQuote}
+          onUpdatePart={onUpdatePart}
+          onUpdateMultipleParts={onUpdateMultipleParts}
+          onMarkCompleted={onMarkCompleted}
+          onMarkAsOrderedWithParts={onMarkAsOrderedWithParts}
+          showCompleted={true}
+        />
       </div>
     </div>
   );

@@ -13,13 +13,13 @@ import {
 interface QuoteTableProps {
   quotes: Quote[];
   parts: Part[];
-  onUpdateQuote: (id: string, fields: Record<string, any>) => Promise<{ error: any }>;
-  onDeleteQuote: (id: string) => Promise<{ error: any }>;
-  onUpdatePart: (id: string, updates: Partial<Part>) => Promise<{ data: any; error: any }>;
+  onUpdateQuote: (id: string, fields: Record<string, any>) => Promise<{ error: Error | null }>;
+  onDeleteQuote: (id: string) => Promise<{ error: Error | null }>;
+  onUpdatePart: (id: string, updates: Partial<Part>) => Promise<{ data: Part; error: Error | null }>;
   onUpdateMultipleParts: (updates: Array<{ id: string; updates: Partial<Part> }>) => Promise<void>;
-  onMarkCompleted?: (id: string) => Promise<{ error: any }>;
-  onMarkAsOrdered?: (id: string, taxInvoiceNumber: string) => Promise<{ error: any }>;
-  onMarkAsOrderedWithParts?: (id: string, taxInvoiceNumber: string, partIds: string[]) => Promise<{ error: any }>;
+  onMarkCompleted?: (id: string) => Promise<{ error: Error | null }>;
+  onMarkAsOrdered?: (id: string, taxInvoiceNumber: string) => Promise<{ error: Error | null }>;
+  onMarkAsOrderedWithParts?: (id: string, taxInvoiceNumber: string, partIds: string[]) => Promise<{ error: Error | null }>;
   showCompleted?: boolean;
   defaultFilter?: FilterType;
 }
@@ -119,7 +119,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
     setEditingParts(quoteId);
   };
 
-  const handleQuoteEditChange = (field: string, value: any) => {
+  const handleQuoteEditChange = (field: string, value: string | number | boolean) => {
     setEditData(prev => ({ ...prev, [field]: value }));
   };
 

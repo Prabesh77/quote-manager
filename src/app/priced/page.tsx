@@ -13,29 +13,34 @@ export default function PricedPage() {
     updatePart,
     updateMultipleParts,
     markQuoteCompleted,
+    markQuoteAsOrderedWithParts,
   } = useQuotes();
 
   // Filter quotes to only show those that have been priced
   const pricedQuotes = quotes.filter(quote => quote.status === 'priced');
 
-  // Wrapper functions to match QuoteTable interface
+  // Wrapper functions to match QuoteTableProps interface
   const onUpdateQuote = async (id: string, fields: Record<string, any>) => {
     const result = await updateQuote(id, fields);
-    return { error: result.error };
+    return { error: result.error as Error | null };
   };
 
   const onDeleteQuote = async (id: string) => {
     const result = await deleteQuote(id);
-    return { error: result.error };
+    return { error: result.error as Error | null };
   };
 
   const onUpdatePart = async (id: string, updates: any) => {
-    const result = await updatePart(id, updates);
-    return { data: result.data, error: result.error };
+    return await updatePart(id, updates);
   };
 
-  const onUpdateMultipleParts = async (updates: Array<{ id: string; updates: any }>) => {
+  const onUpdateMultipleParts = async (updates: any) => {
     await updateMultipleParts(updates);
+  };
+
+  const onMarkAsOrderedWithParts = async (id: string, taxInvoiceNumber: string, partIds: string[]) => {
+    const result = await markQuoteAsOrderedWithParts(id, taxInvoiceNumber, partIds);
+    return { error: result.error as Error | null };
   };
 
   const onMarkCompleted = async (id: string) => {

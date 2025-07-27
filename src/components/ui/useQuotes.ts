@@ -182,29 +182,26 @@ export const useQuotes = () => {
     return { data, error };
   };
 
-  const updateQuote = async (id: string, fields: Record<string, any>) => {
-    console.log('Updating quote with ID:', id);
-    console.log('Edit fields payload:', fields);
-    
-    const validatedFields = validateQuoteData(fields);
-    console.log('Validated edit fields:', validatedFields);
-    
-    const { data, error } = await supabase
-      .from('quotes')
-      .update(validatedFields)
-      .eq('id', id)
-      .select();
-    
-    if (error) {
-      console.error('Update error details:', error);
-      console.error('Error code:', error.code);
-      console.error('Error message:', error.message);
-      console.error('Error details:', error.details);
-    } else {
-      console.log('Update successful:', data);
-      fetchQuotes();
+  const updateQuote = async (id: string, fields: Record<string, string | number | boolean>) => {
+    try {
+      const validatedFields = validateQuoteData(fields);
+      
+      const { error } = await supabase
+        .from('quotes')
+        .update(validatedFields)
+        .eq('id', id);
+      
+      if (error) {
+        console.error('Update quote error:', error);
+        return { error };
+      } else {
+        fetchQuotes();
+        return { error: null };
+      }
+    } catch (error) {
+      console.error('Update quote error:', error);
+      return { error };
     }
-    return { error };
   };
 
   const addPart = async (partData: Omit<Part, 'id' | 'createdAt'>) => {

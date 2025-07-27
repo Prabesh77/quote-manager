@@ -4,34 +4,34 @@ import { useState } from 'react';
 import { Plus, Edit, Trash2, Save, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { QuotePart } from './useQuotes';
+import { Part } from './useQuotes';
 
 interface QuotePartsProps {
   quoteId: string;
-  parts: QuotePart[];
-  onAddPart: (quoteId: string, part: Omit<QuotePart, 'id'>) => Promise<{ error: any }>;
-  onUpdatePart: (quoteId: string, partId: string, updates: Partial<QuotePart>) => Promise<{ error: any }>;
-  onDeletePart: (quoteId: string, partId: string) => Promise<{ error: any }>;
+  parts: Part[];
+  onAddPart: (quoteId: string, part: Omit<Part, 'id' | 'createdAt'>) => Promise<{ error: Error | null }>;
+  onUpdatePart: (quoteId: string, partId: string, updates: Partial<Part>) => Promise<{ error: Error | null }>;
+  onDeletePart: (quoteId: string, partId: string) => Promise<{ error: Error | null }>;
 }
 
 export const QuoteParts = ({ quoteId, parts, onAddPart, onUpdatePart, onDeletePart }: QuotePartsProps) => {
   const [isAddingPart, setIsAddingPart] = useState(false);
   const [editingPartId, setEditingPartId] = useState<string | null>(null);
-  const [newPart, setNewPart] = useState({ partName: '', partNumber: '', price: '', notes: '' });
-  const [editingPart, setEditingPart] = useState<QuotePart | null>(null);
+  const [newPart, setNewPart] = useState({ name: '', number: '', price: '', note: '' });
+  const [editingPart, setEditingPart] = useState<Part | null>(null);
 
   const handleAddPart = async () => {
-    if (!newPart.partName.trim()) return;
+    if (!newPart.name.trim()) return;
     
     const { error } = await onAddPart(quoteId, {
-      partName: newPart.partName,
-      partNumber: newPart.partNumber,
-      price: newPart.price,
-      notes: newPart.notes,
+      name: newPart.name,
+      number: newPart.number,
+      price: newPart.price ? Number(newPart.price) : null,
+      note: newPart.note,
     });
 
     if (!error) {
-      setNewPart({ partName: '', partNumber: '', price: '', notes: '' });
+      setNewPart({ name: '', number: '', price: '', note: '' });
       setIsAddingPart(false);
     }
   };
@@ -40,10 +40,10 @@ export const QuoteParts = ({ quoteId, parts, onAddPart, onUpdatePart, onDeletePa
     if (!editingPart) return;
     
     const { error } = await onUpdatePart(quoteId, editingPart.id, {
-      partName: editingPart.partName,
-      partNumber: editingPart.partNumber,
+      name: editingPart.name,
+      number: editingPart.number,
       price: editingPart.price,
-      notes: editingPart.notes,
+      note: editingPart.note,
     });
 
     if (!error) {
@@ -58,7 +58,7 @@ export const QuoteParts = ({ quoteId, parts, onAddPart, onUpdatePart, onDeletePa
     }
   };
 
-  const startEditing = (part: QuotePart) => {
+  const startEditing = (part: Part) => {
     setEditingPartId(part.id);
     setEditingPart({ ...part });
   };
@@ -88,13 +88,13 @@ export const QuoteParts = ({ quoteId, parts, onAddPart, onUpdatePart, onDeletePa
           <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
             <Input
               placeholder="Part Name"
-              value={newPart.partName}
-              onChange={(e) => setNewPart({ ...newPart, partName: e.target.value })}
+              value={newPart.name}
+              onChange={(e) => setNewPart({ ...newPart, name: e.target.value })}
             />
             <Input
               placeholder="Part Number"
-              value={newPart.partNumber}
-              onChange={(e) => setNewPart({ ...newPart, partNumber: e.target.value })}
+              value={newPart.number}
+              onChange={(e) => setNewPart({ ...newPart, number: e.target.value })}
             />
             <Input
               placeholder="Price"
@@ -103,8 +103,8 @@ export const QuoteParts = ({ quoteId, parts, onAddPart, onUpdatePart, onDeletePa
             />
             <Input
               placeholder="Notes"
-              value={newPart.notes}
-              onChange={(e) => setNewPart({ ...newPart, notes: e.target.value })}
+              value={newPart.note}
+              onChange={(e) => setNewPart({ ...newPart, note: e.target.value })}
             />
           </div>
           <div className="flex gap-2 mt-3">
@@ -115,7 +115,7 @@ export const QuoteParts = ({ quoteId, parts, onAddPart, onUpdatePart, onDeletePa
             <Button
               onClick={() => {
                 setIsAddingPart(false);
-                setNewPart({ partName: '', partNumber: '', price: '', notes: '' });
+                setNewPart({ name: '', number: '', price: '', note: '' });
               }}
               size="sm"
               variant="ghost"
@@ -138,23 +138,23 @@ export const QuoteParts = ({ quoteId, parts, onAddPart, onUpdatePart, onDeletePa
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
                   <Input
                     placeholder="Part Name"
-                    value={editingPart?.partName || ''}
-                    onChange={(e) => setEditingPart(editingPart ? { ...editingPart, partName: e.target.value } : null)}
+                    value={editingPart?.name || ''}
+                    onChange={(e) => setEditingPart(editingPart ? { ...editingPart, name: e.target.value } : null)}
                   />
                   <Input
                     placeholder="Part Number"
-                    value={editingPart?.partNumber || ''}
-                    onChange={(e) => setEditingPart(editingPart ? { ...editingPart, partNumber: e.target.value } : null)}
+                    value={editingPart?.number || ''}
+                    onChange={(e) => setEditingPart(editingPart ? { ...editingPart, number: e.target.value } : null)}
                   />
                   <Input
                     placeholder="Price"
-                    value={editingPart?.price || ''}
-                    onChange={(e) => setEditingPart(editingPart ? { ...editingPart, price: e.target.value } : null)}
+                    value={editingPart?.price?.toString() || ''}
+                    onChange={(e) => setEditingPart(editingPart ? { ...editingPart, price: e.target.value ? Number(e.target.value) : null } : null)}
                   />
                   <Input
                     placeholder="Notes"
-                    value={editingPart?.notes || ''}
-                    onChange={(e) => setEditingPart(editingPart ? { ...editingPart, notes: e.target.value } : null)}
+                    value={editingPart?.note || ''}
+                    onChange={(e) => setEditingPart(editingPart ? { ...editingPart, note: e.target.value } : null)}
                   />
                 </div>
                 <div className="flex gap-2">
@@ -175,11 +175,11 @@ export const QuoteParts = ({ quoteId, parts, onAddPart, onUpdatePart, onDeletePa
                   <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                     <div>
                       <span className="text-sm font-medium text-gray-600">Part:</span>
-                      <p className="text-sm">{part.partName}</p>
+                      <p className="text-sm">{part.name}</p>
                     </div>
                     <div>
                       <span className="text-sm font-medium text-gray-600">Part #:</span>
-                      <p className="text-sm">{part.partNumber || 'N/A'}</p>
+                      <p className="text-sm">{part.number || 'N/A'}</p>
                     </div>
                     <div>
                       <span className="text-sm font-medium text-gray-600">Price:</span>
@@ -187,7 +187,7 @@ export const QuoteParts = ({ quoteId, parts, onAddPart, onUpdatePart, onDeletePa
                     </div>
                     <div>
                       <span className="text-sm font-medium text-gray-600">Notes:</span>
-                      <p className="text-sm">{part.notes || 'N/A'}</p>
+                      <p className="text-sm">{part.note || 'N/A'}</p>
                     </div>
                   </div>
                 </div>
@@ -215,7 +215,7 @@ export const QuoteParts = ({ quoteId, parts, onAddPart, onUpdatePart, onDeletePa
 
       {parts.length === 0 && !isAddingPart && (
         <div className="text-center py-8 text-gray-500">
-          <p>No parts added yet. Click "Add Part" to get started.</p>
+          <p>No parts added yet. Click &quot;Add Part&quot; to get started.</p>
         </div>
       )}
     </div>

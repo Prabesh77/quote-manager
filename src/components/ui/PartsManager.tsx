@@ -8,15 +8,15 @@ import { Part } from './useQuotes';
 
 interface PartsManagerProps {
   parts: Part[];
-  onAddPart: (part: Omit<Part, 'id' | 'createdAt'>) => Promise<{ data: any; error: any }>;
-  onUpdatePart: (id: string, updates: Partial<Part>) => Promise<{ data: any; error: any }>;
-  onDeletePart: (id: string) => Promise<{ error: any }>;
+  onAddPart: (part: Omit<Part, 'id' | 'createdAt'>) => Promise<{ data: Part; error: Error | null }>;
+  onUpdatePart: (id: string, updates: Partial<Part>) => Promise<{ data: Part; error: Error | null }>;
+  onDeletePart: (id: string) => Promise<{ error: Error | null }>;
 }
 
 export const PartsManager = ({ parts, onAddPart, onUpdatePart, onDeletePart }: PartsManagerProps) => {
   const [isAddingPart, setIsAddingPart] = useState(false);
   const [editingPartId, setEditingPartId] = useState<string | null>(null);
-  const [newPart, setNewPart] = useState({ name: '', number: '', price: '', notes: '' });
+  const [newPart, setNewPart] = useState({ name: '', number: '', price: '', note: '' });
   const [editingPart, setEditingPart] = useState<Part | null>(null);
 
   const handleAddPart = async () => {
@@ -25,12 +25,12 @@ export const PartsManager = ({ parts, onAddPart, onUpdatePart, onDeletePart }: P
     const { error } = await onAddPart({
       name: newPart.name,
       number: newPart.number,
-      price: newPart.price,
-      notes: newPart.notes,
+      price: newPart.price ? Number(newPart.price) : null,
+      note: newPart.note,
     });
 
     if (!error) {
-      setNewPart({ name: '', number: '', price: '', notes: '' });
+      setNewPart({ name: '', number: '', price: '', note: '' });
       setIsAddingPart(false);
     }
   };
@@ -42,7 +42,7 @@ export const PartsManager = ({ parts, onAddPart, onUpdatePart, onDeletePart }: P
       name: editingPart.name,
       number: editingPart.number,
       price: editingPart.price,
-      notes: editingPart.notes,
+      note: editingPart.note,
     });
 
     if (!error) {
@@ -102,8 +102,8 @@ export const PartsManager = ({ parts, onAddPart, onUpdatePart, onDeletePart }: P
             />
             <Input
               placeholder="Notes"
-              value={newPart.notes}
-              onChange={(e) => setNewPart({ ...newPart, notes: e.target.value })}
+              value={newPart.note}
+              onChange={(e) => setNewPart({ ...newPart, note: e.target.value })}
             />
           </div>
           <div className="flex gap-2 mt-3">
@@ -114,7 +114,7 @@ export const PartsManager = ({ parts, onAddPart, onUpdatePart, onDeletePart }: P
             <Button
               onClick={() => {
                 setIsAddingPart(false);
-                setNewPart({ name: '', number: '', price: '', notes: '' });
+                setNewPart({ name: '', number: '', price: '', note: '' });
               }}
               size="sm"
               variant="ghost"
@@ -147,13 +147,13 @@ export const PartsManager = ({ parts, onAddPart, onUpdatePart, onDeletePart }: P
                   />
                   <Input
                     placeholder="Price"
-                    value={editingPart?.price || ''}
-                    onChange={(e) => setEditingPart(editingPart ? { ...editingPart, price: e.target.value } : null)}
+                    value={editingPart?.price?.toString() || ''}
+                    onChange={(e) => setEditingPart(editingPart ? { ...editingPart, price: e.target.value ? Number(e.target.value) : null } : null)}
                   />
                   <Input
                     placeholder="Notes"
-                    value={editingPart?.notes || ''}
-                    onChange={(e) => setEditingPart(editingPart ? { ...editingPart, notes: e.target.value } : null)}
+                    value={editingPart?.note || ''}
+                    onChange={(e) => setEditingPart(editingPart ? { ...editingPart, note: e.target.value } : null)}
                   />
                 </div>
                 <div className="flex gap-2">
@@ -186,7 +186,7 @@ export const PartsManager = ({ parts, onAddPart, onUpdatePart, onDeletePart }: P
                     </div>
                     <div>
                       <span className="text-sm font-medium text-gray-600">Notes:</span>
-                      <p className="text-sm">{part.notes || 'N/A'}</p>
+                      <p className="text-sm">{part.note || 'N/A'}</p>
                     </div>
                   </div>
                 </div>
@@ -214,7 +214,7 @@ export const PartsManager = ({ parts, onAddPart, onUpdatePart, onDeletePart }: P
 
       {parts.length === 0 && !isAddingPart && (
         <div className="text-center py-8 text-gray-500">
-          <p>No parts available. Click "Add Part" to get started.</p>
+          <p>No parts available. Click &quot;Add Part&quot; to get started.</p>
         </div>
       )}
     </div>

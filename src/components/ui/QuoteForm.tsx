@@ -57,7 +57,7 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
   const handlePaste = () => {
     const lines = rawText.split('\n');
     const parsed: Record<string, string> = {};
-    for (let line of lines) {
+    for (const line of lines) {
       const [key, ...rest] = line.split(':');
       if (!key || !rest.length) continue;
       parsed[key.trim().toLowerCase()] = rest.join(':').trim();

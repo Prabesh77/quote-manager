@@ -33,7 +33,7 @@ const Navigation = () => {
       description: 'Review priced quotes'
     },
     {
-      name: 'Completed Quotes',
+      name: 'Completed',
       href: '/completed-quotes',
       icon: CheckCircle,
       description: 'View completed quotes'
@@ -56,7 +56,7 @@ const Navigation = () => {
               <div className="w-8 h-8 bg-red-600 rounded-lg flex items-center justify-center">
                 <span className="text-white font-bold text-sm">Q</span>
               </div>
-              <span className="ml-3 text-xl font-semibold text-gray-900">Quote Manager</span>
+              <span className="hidden md:block ml-3 text-xl font-semibold text-gray-900">Quoter</span>
             </div>
           </div>
 
@@ -84,9 +84,9 @@ const Navigation = () => {
                     }
                   `}
                 >
-                  <div className="flex items-center space-x-2">
+                  <div className="flex flex-col md:flex-row items-center space-x-2">
                     <IconComponent className={`h-4 w-4 ${isActive ? 'text-red-600' : 'text-gray-500'}`} />
-                    <span>{item.name}</span>
+                    <span className='text-xs md:text-sm'>{item.name}</span>
                   </div>
                   
                   {/* Active indicator */}

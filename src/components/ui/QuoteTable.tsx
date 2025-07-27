@@ -178,27 +178,43 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
 
   const getVehicleLogo = (make: string) => {
     const logos: Record<string, string> = {
-      'Toyota': '🚗',
-      'Honda': '🚗',
-      'Ford': '🚗',
-      'BMW': '🚗',
-      'Mercedes': '🚗',
-      'Audi': '🚗',
-      'Volkswagen': '🚗',
-      'Nissan': '🚗',
-      'Hyundai': '🚗',
-      'Kia': '🚗',
+      'toyota': '/car-logos/toyota.png',
+      'honda': '/car-logos/honda.png',
+      'ford': '/car-logos/ford.png',
+      'bmw': '/car-logos/bmw.png',
+      'mercedes': '/car-logos/mercedes.png',
+      'audi': '/car-logos/audi.png',
+      'volkswagen': '/car-logos/volkswagen.png',
+      'nissan': '/car-logos/nissan.png',
+      'hyundai': '/car-logos/hyundai.png',
+      'kia': '/car-logos/kia.png',
+      'chevrolet': '/car-logos/chevrolet.png',
+      'mazda': '/car-logos/mazda.png',
+      'lexus': '/car-logos/lexus.png',
+      'volvo': '/car-logos/volvo.png',
+      'subaru': '/car-logos/subaru.png',
+      'land rover': '/car-logos/landrover.png',
+      'jaguar': '/car-logos/jaguar.png',
+      'mini': '/car-logos/mini.png',
+      'peugeot': '/car-logos/peugeot.png',
+      'renault': '/car-logos/renault.png',
+      'skoda': '/car-logos/skoda.png',
+      'alfa romeo': '/car-logos/alfaromeo.png',
+      'infiniti': '/car-logos/infiniti.png',
+      'jeep': '/car-logos/jeep.png',
+      'mg': '/car-logos/mg.png',
+      'mitsubishi': '/car-logos/mitsubisi.png',
     };
-    return logos[make] || '🚗';
+    return logos[make.toLowerCase()] || '/car-logos/toyota.png'; // Default to Toyota if make not found
   };
 
-  const getPartIcon = (partName: string) => {
+  const getPartIcon = (partName: string): string | null => {
     const lowerName = partName.toLowerCase();
-    if (lowerName.includes('radiator')) return '🌡️';
-    if (lowerName.includes('condenser') || lowerName.includes('condensor')) return '❄️';
-    if (lowerName.includes('headlight') || lowerName.includes('head lamp')) return '💡';
-    if (lowerName.includes('intercooler')) return '💨';
-    if (lowerName.includes('fan assembly') || lowerName.includes('fan')) return '🌀';
+    if (lowerName.includes('radiator')) return '/part-icons/radiator.png';
+    if (lowerName.includes('condenser') || lowerName.includes('condensor')) return '/part-icons/condenser.png';
+    if (lowerName.includes('headlight') || lowerName.includes('head lamp') || lowerName.includes('left headlamp') || lowerName.includes('right headlamp')) return '/part-icons/headlight.png';
+    if (lowerName.includes('intercooler')) return '/part-icons/intercooler.png';
+    if (lowerName.includes('fan assembly') || lowerName.includes('fan')) return '/part-icons/fan.png';
     return null; // No icon for other parts
   };
 
@@ -454,7 +470,13 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
 
                   {/* Vehicle */}
                   <div className="flex items-center space-x-2">
-                    <span className="text-lg">{getVehicleLogo(quote.make)}</span>
+                    <span className="text-lg">
+                      <img 
+                        src={getVehicleLogo(editingQuote === quote.id ? (editData.make || quote.make) : quote.make)} 
+                        alt={editingQuote === quote.id ? (editData.make || quote.make) : quote.make} 
+                        className="h-6 w-6" 
+                      />
+                    </span>
                     {editingQuote === quote.id ? (
                       <div className="flex flex-col space-y-1">
                         <input
@@ -671,8 +693,8 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                               <div key={part.id} className="bg-white rounded-lg border border-gray-200 p-4 shadow-sm">
                                 <div className="relative">
                                   {getPartIcon(part.name) && (
-                                    <div className="absolute top-2 right-2 text-lg">
-                                      {getPartIcon(part.name)}
+                                    <div className="absolute top-2 right-2 bg-white rounded-full p-1.5 shadow-sm border border-gray-200">
+                                      <img src={getPartIcon(part.name)!} alt={part.name} className="h-7 w-7 object-contain" />
                                     </div>
                                   )}
                                 <div className="space-y-3">
@@ -813,6 +835,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
           {filteredQuotes.map((quote) => {
             const quoteParts = getQuoteParts(quote.partRequested);
             const status = getQuoteStatus(quoteParts, quote.status);
+            console.log({quoteParts})
 
             return (
               <AccordionItem key={quote.id} value={quote.id} className="bg-white rounded-lg border border-gray-200 shadow-sm">
@@ -845,7 +868,13 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                   
                   <div className="space-y-2">
                     <div className="flex items-center space-x-2">
-                      <span className="text-lg">{getVehicleLogo(quote.make)}</span>
+                      <span className="text-lg">
+                        <img 
+                          src={getVehicleLogo(editingQuote === quote.id ? (editData.make || quote.make) : quote.make)} 
+                          alt={editingQuote === quote.id ? (editData.make || quote.make) : quote.make} 
+                          className="h-6 w-6" 
+                        />
+                      </span>
                       <span className="text-sm font-medium text-gray-900">{quote.make} {quote.model}</span>
                     </div>
                     
@@ -937,8 +966,8 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                               <div key={part.id} className="bg-white rounded-lg border border-gray-200 p-3 shadow-sm">
                                 <div className="relative">
                                   {getPartIcon(part.name) && (
-                                    <div className="absolute top-2 right-2 text-base">
-                                      {getPartIcon(part.name)}
+                                    <div className="absolute top-2 right-2 bg-white rounded-full p-1.5 shadow-sm border border-gray-200">
+                                      <img src={getPartIcon(part.name)!} alt={part.name} className="h-7 w-7 object-contain" />
                                     </div>
                                   )}
                                 <div className="space-y-2">

@@ -10,21 +10,30 @@ import {
   Zap, 
   Gauge, 
   Shield, 
-  Settings 
+  Settings,
+  X,
+  Plus
 } from 'lucide-react';
 
 const PART_OPTIONS = [
   { name: 'Radiator', icon: Droplets },
   { name: 'Left Headlamp', icon: Lightbulb },
-  { name: 'RightHeadlamp', icon: Lightbulb },
+  { name: 'Right Headlamp', icon: Lightbulb },
   { name: 'Condenser', icon: Zap },
   { name: 'Radar Sensor', icon: Settings },
   { name: 'Fan Assembly', icon: Droplets },
   { name: 'Intercooler', icon: Shield },
 ];
 
+interface PartDetails {
+  name: string;
+  number: string;
+  price: number | null;
+  note: string;
+}
+
 interface QuoteFormProps {
-  onSubmit: (fields: Record<string, string>, parts: string[]) => void;
+  onSubmit: (fields: Record<string, string>, parts: PartDetails[]) => void;
 }
 
 export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
@@ -42,6 +51,7 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
   });
 
   const [selectedParts, setSelectedParts] = useState<string[]>([]);
+  const [partDetails, setPartDetails] = useState<Record<string, PartDetails>>({});
   const [isLoading, setIsLoading] = useState(false);
 
   const handlePaste = () => {
@@ -87,15 +97,57 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
       rego: '',
     });
     setSelectedParts([]);
+    setPartDetails({});
+  };
+
+  const togglePart = (partName: string) => {
+    setSelectedParts(prev => {
+      if (prev.includes(partName)) {
+        // Remove part and its details
+        const newDetails = { ...partDetails };
+        delete newDetails[partName];
+        setPartDetails(newDetails);
+        return prev.filter(p => p !== partName);
+      } else {
+        // Add part with default details
+        setPartDetails(prev => ({
+          ...prev,
+          [partName]: {
+            name: partName,
+            number: '',
+            price: null,
+            note: ''
+          }
+        }));
+        return [...prev, partName];
+      }
+    });
+  };
+
+  const updatePartDetail = (partName: string, field: keyof PartDetails, value: string | number | null) => {
+    setPartDetails(prev => ({
+      ...prev,
+      [partName]: {
+        ...prev[partName],
+        [field]: value
+      }
+    }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const { quoteRef, vin, make, model, series, auto, body, mthyr, rego } = fields;
     if (!quoteRef) return;
+    if (selectedParts.length === 0) {
+      alert('Please select at least one part');
+      return;
+    }
     
     setIsLoading(true);
     try {
+      // Convert part details to array
+      const partsArray = selectedParts.map(partName => partDetails[partName]);
+      
       await onSubmit({
         quoteRef,
         vin,
@@ -106,21 +158,13 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
         body,
         mthyr,
         rego,
-      }, selectedParts);
+      }, partsArray);
       clearForm();
     } catch (error) {
       console.error('Error submitting quote:', error);
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const togglePart = (partName: string) => {
-    setSelectedParts(prev => 
-      prev.includes(partName) 
-        ? prev.filter(p => p !== partName)
-        : [...prev, partName]
-    );
   };
 
   return (
@@ -273,11 +317,12 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
         </div>
       </div>
 
-      <div className="md:col-span-2 lg:col-span-3 mt-4">
-        <label className="block text-sm font-medium text-gray-700 mb-2">
+      {/* Parts Selection */}
+      <div className="mt-6">
+        <label className="block text-sm font-medium text-gray-700 mb-3">
           Parts Required
         </label>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-2 mb-4">
           {PART_OPTIONS.map((part) => {
             const IconComponent = part.icon;
             const isSelected = selectedParts.includes(part.name);
@@ -299,9 +344,82 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
             );
           })}
         </div>
+
+        {/* Dynamic Part Details */}
+        {selectedParts.length > 0 && (
+          <div className="space-y-4">
+            <h3 className="text-md font-semibold text-gray-800 flex items-center space-x-2">
+              <Plus className="h-4 w-4" />
+              <span>Part Details</span>
+            </h3>
+            
+            {selectedParts.map((partName) => {
+              const part = partDetails[partName];
+              const IconComponent = PART_OPTIONS.find(p => p.name === partName)?.icon || Wrench;
+              
+              return (
+                <div key={partName} className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center space-x-2">
+                      <IconComponent className="h-4 w-4 text-red-600" />
+                      <span className="font-medium text-gray-900">{partName}</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => togglePart(partName)}
+                      className="p-1 text-gray-400 hover:text-red-600 transition-colors"
+                      title="Remove part"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">
+                        Part Number
+                      </label>
+                      <Input
+                        value={part.number}
+                        onChange={(e) => updatePartDetail(partName, 'number', e.target.value)}
+                        placeholder="Enter part number"
+                        className="w-full h-8 text-sm"
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">
+                        Price
+                      </label>
+                      <Input
+                        type="number"
+                        value={part.price || ''}
+                        onChange={(e) => updatePartDetail(partName, 'price', e.target.value ? Number(e.target.value) : null)}
+                        placeholder="0.00"
+                        className="w-full h-8 text-sm"
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">
+                        Notes
+                      </label>
+                      <Input
+                        value={part.note}
+                        onChange={(e) => updatePartDetail(partName, 'note', e.target.value)}
+                        placeholder="Additional notes"
+                        className="w-full h-8 text-sm"
+                      />
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
-      {/* Create Quote Button - Moved below form */}
+      {/* Create Quote Button */}
       <div className="mt-6 pt-4 border-t border-gray-200">
         <Button
           onClick={handleSubmit}

@@ -16,6 +16,9 @@ export default function CompletedQuotesPage() {
     deleteQuote,
     updatePart,
     updateMultipleParts,
+    markQuoteCompleted,
+    markQuoteAsOrdered,
+    markQuoteAsOrderedWithParts,
   } = useQuotes();
 
   const handleUpdateQuote = async (id: string, fields: Record<string, any>) => {
@@ -53,23 +56,39 @@ export default function CompletedQuotesPage() {
     }
   };
 
+  const handleMarkCompleted = async (id: string) => {
+    try {
+      return await markQuoteCompleted(id);
+    } catch (error) {
+      console.error('Error marking quote as completed:', error);
+      return { error };
+    }
+  };
+
+  const handleMarkAsOrdered = async (id: string, taxInvoiceNumber: string) => {
+    try {
+      return await markQuoteAsOrdered(id, taxInvoiceNumber);
+    } catch (error) {
+      console.error('Error marking quote as ordered:', error);
+      return { error };
+    }
+  };
+
+  const handleMarkAsOrderedWithParts = async (id: string, taxInvoiceNumber: string, partIds: string[]) => {
+    try {
+      return await markQuoteAsOrderedWithParts(id, taxInvoiceNumber, partIds);
+    } catch (error) {
+      console.error('Error marking quote as ordered with parts:', error);
+      return { error };
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Connection Status */}
-      <ConnectionStatus status={connectionStatus === 'checking' ? 'disconnected' : connectionStatus} />
 
       {/* Main Content */}
       <div className="container mx-auto px-4 py-8">
         <div className="mb-8">
-          <div className="flex items-center space-x-4 mb-4">
-            <Link 
-              href="/new" 
-              className="flex items-center space-x-2 text-red-600 hover:text-red-700 transition-colors"
-            >
-              <ArrowLeft className="h-4 w-4" />
-              <span>Back to Active Quotes</span>
-            </Link>
-          </div>
           
           <div className="flex items-center space-x-3">
             <Archive className="h-8 w-8 text-red-600" />
@@ -89,6 +108,9 @@ export default function CompletedQuotesPage() {
             onDeleteQuote={handleDeleteQuote}
             onUpdatePart={handleUpdatePart}
             onUpdateMultipleParts={handleUpdateMultipleParts}
+            onMarkCompleted={handleMarkCompleted}
+            onMarkAsOrdered={handleMarkAsOrdered}
+            onMarkAsOrderedWithParts={handleMarkAsOrderedWithParts}
             showCompleted={true}
           />
         </div>

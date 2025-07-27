@@ -33,7 +33,7 @@ const Navigation = () => {
       description: 'Review priced quotes'
     },
     {
-      name: 'Completed Quotes',
+      name: 'Completed',
       href: '/completed-quotes',
       icon: CheckCircle,
       description: 'View completed quotes'

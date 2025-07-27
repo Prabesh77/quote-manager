@@ -7,6 +7,7 @@ import QuoteTable from '@/components/ui/QuoteTable';
 import { useQuotes } from '@/components/ui/useQuotes';
 import { Archive } from 'lucide-react';
 import Link from 'next/link';
+import { PartDetails } from '@/types/quote';
 
 export default function NewPage() {
   const {
@@ -20,12 +21,45 @@ export default function NewPage() {
     updateMultipleParts,
     markQuoteCompleted,
     getActiveQuotes,
+    addPart,
   } = useQuotes();
 
-  const handleSubmitQuote = async (fields: Record<string, string>, partsArray: string[]) => {
-    const { error } = await addQuote(fields, partsArray);
-    if (error) {
-      alert('Failed to add quote. Check console.');
+  const handleSubmitQuote = async (fields: Record<string, string>, partsArray: PartDetails[]) => {
+    try {
+      // First, create all parts and get their IDs
+      const createdParts = [];
+      
+      for (const part of partsArray) {
+        const { data: partData, error: partError } = await addPart({
+          name: part.name,
+          number: part.number,
+          price: part.price,
+          note: part.note
+        });
+        
+        if (partError) {
+          console.error('Error creating part:', partError);
+          alert('Failed to create some parts. Please try again.');
+          return;
+        }
+        
+        if (partData) {
+          createdParts.push(partData[0]);
+        }
+      }
+
+      // Create quote with part IDs
+      const partIds = createdParts.map(part => part.id);
+      const { error: quoteError } = await addQuote(fields, partIds);
+      
+      if (quoteError) {
+        console.error('Error creating quote:', quoteError);
+        alert('Failed to create quote. Please try again.');
+        return;
+      }
+    } catch (error) {
+      console.error('Error in quote submission:', error);
+      alert('Failed to create quote. Please try again.');
     }
   };
 
@@ -78,8 +112,6 @@ export default function NewPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Connection Status */}
-      <ConnectionStatus status={connectionStatus === 'checking' ? 'disconnected' : connectionStatus} />
 
       {/* Main Content */}
       <div className="container mx-auto px-4 py-8">
@@ -89,14 +121,6 @@ export default function NewPage() {
               <h1 className="text-3xl font-bold text-gray-900 mb-2">Quote Management</h1>
               <p className="text-gray-600">Fast and efficient quote creation for busy environments</p>
             </div>
-            
-            <Link 
-              href="/completed-quotes" 
-              className="flex items-center space-x-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
-            >
-              <Archive className="h-4 w-4" />
-              <span>Completed Quotes</span>
-            </Link>
           </div>
         </div>
 

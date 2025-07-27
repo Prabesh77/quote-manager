@@ -107,7 +107,7 @@ export const ConnectionStatus = ({ status }: ConnectionStatusProps) => {
   const IconComponent = config.icon;
 
   return (
-    <div className={`flex absolute top-1 right-0 items-center space-x-2 px-2 py-1 rounded-sm ${config.bgColor} border border-gray-200 shadow-sm`}>
+    <div className={`flex items-center space-x-2 px-2 py-1 rounded-sm ${config.bgColor} border border-gray-200 shadow-sm`}>
       <IconComponent className={`h-4 w-4 ${config.iconColor} ${isChecking ? 'animate-spin' : ''}`} />
       <span className={`text-xs font-medium ${config.color}`}>
         {config.text}

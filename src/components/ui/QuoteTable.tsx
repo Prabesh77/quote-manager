@@ -35,7 +35,6 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
   const [partsEditData, setPartsEditData] = useState<Record<string, Record<string, any>>>({});
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedQuote, setSelectedQuote] = useState<string | null>(null);
-  const [activeFilter, setActiveFilter] = useState<FilterType>(defaultFilter);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
   const [showOrderModal, setShowOrderModal] = useState<string | null>(null);
   const [taxInvoiceNumber, setTaxInvoiceNumber] = useState('');
@@ -178,17 +177,29 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
   };
 
   const getVehicleLogo = (make: string) => {
-    const makeLower = make.toLowerCase();
-    // You can add more vehicle logos here
     const logos: Record<string, string> = {
-      'toyota': '🚗',
-      'honda': '🚗',
-      'ford': '🚗',
-      'bmw': '🚗',
-      'mercedes': '🚗',
-      'audi': '🚗',
+      'Toyota': '🚗',
+      'Honda': '🚗',
+      'Ford': '🚗',
+      'BMW': '🚗',
+      'Mercedes': '🚗',
+      'Audi': '🚗',
+      'Volkswagen': '🚗',
+      'Nissan': '🚗',
+      'Hyundai': '🚗',
+      'Kia': '🚗',
     };
-    return logos[makeLower] || '🚗';
+    return logos[make] || '🚗';
+  };
+
+  const getPartIcon = (partName: string) => {
+    const lowerName = partName.toLowerCase();
+    if (lowerName.includes('radiator')) return '🌡️';
+    if (lowerName.includes('condenser') || lowerName.includes('condensor')) return '❄️';
+    if (lowerName.includes('headlight') || lowerName.includes('head lamp')) return '💡';
+    if (lowerName.includes('intercooler')) return '💨';
+    if (lowerName.includes('fan assembly') || lowerName.includes('fan')) return '🌀';
+    return null; // No icon for other parts
   };
 
   const getStatusChip = (status: QuoteStatus) => {
@@ -241,12 +252,6 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
     // Filter by completion status
     if (showCompleted && quote.status !== 'completed') return false;
     if (!showCompleted && quote.status === 'completed') return false;
-    
-    // Apply status filter (only for active quotes page)
-    if (!showCompleted) {
-      if (activeFilter === 'unpriced' && status !== 'unpriced') return false;
-      if (activeFilter === 'priced' && status !== 'priced') return false;
-    }
     
     // Apply search filter
     const matchesSearch = 
@@ -345,303 +350,267 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
           </div>
         </div>
         
-        {/* Filter Chips */}
-        <div className="flex items-center space-x-2">
-          {(showCompleted ? ['all'] : ['all', 'unpriced', 'priced']).map((filter) => (
-            <button
-              key={filter}
-              onClick={() => setActiveFilter(filter as FilterType)}
-              className={`px-3 py-1 rounded-full text-xs font-medium transition-colors cursor-pointer ${
-                activeFilter === filter
-                  ? 'bg-red-600 text-white' 
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
-            >
-              {filter === 'all' ? 'All' : filter === 'unpriced' ? 'Unpriced' : filter === 'priced' ? 'Priced' : 'Completed'}
-            </button>
-          ))}
-        </div>
       </div>
 
       {/* Quotes Accordion */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-        {/* Table Header */}
-        <div className="bg-white border-b border-gray-200 sticky top-0 z-10">
-          <div className="px-6 py-3">
-            <div className="grid grid-cols-6 gap-2 items-center" style={{ gridTemplateColumns: '1fr 1fr 2fr 1fr 0.5fr 0.5fr' }}>
-              <div className="w-40">
-                <span className="text-xs font-semibold text-gray-600 uppercase tracking-wider">Quote Ref</span>
-              </div>
-              <div className="w-40">
-                <span className="text-xs font-semibold text-gray-600 uppercase tracking-wider">VIN</span>
-              </div>
-              <div>
-                <span className="text-xs font-semibold text-gray-600 uppercase tracking-wider">Vehicle</span>
-              </div>
-              <div className="w-36">
-                <span className="text-xs font-semibold text-gray-600 uppercase tracking-wider">Status</span>
-              </div>
-              <div className="w-24">
-                <span className="text-xs font-semibold text-gray-600 uppercase tracking-wider">Parts</span>
-              </div>
-              <div className="">
-                <span className="text-xs font-semibold text-gray-600 uppercase tracking-wider text-right">Actions</span>
-              </div>
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden hidden lg:block">
+        {filteredQuotes.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-16 px-4">
+            <div className="w-32 h-32 bg-gradient-to-br from-blue-100 to-purple-100 rounded-full flex items-center justify-center mb-8">
+              <svg className="w-16 h-16 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+            </div>
+            <h3 className="text-2xl font-semibold text-gray-900 mb-3">No quotes found</h3>
+            <p className="text-gray-600 text-center max-w-lg mb-8 text-lg">
+              {defaultFilter === 'unpriced' ? 'No quotes are waiting for pricing at the moment.' :
+               defaultFilter === 'priced' ? 'No quotes have been priced yet.' :
+               showCompleted ? 'No quotes have been completed yet.' :
+               'Get started by adding your first quote to track parts and pricing.'}
+            </p>
+            <div className="flex items-center space-x-3 text-base text-gray-500">
+              <div className="w-3 h-3 bg-blue-500 rounded-full animate-pulse"></div>
+              <span>Ready to get started</span>
             </div>
           </div>
-        </div>
+        ) : (
+        <>
+          {/* Table Header */}
+          <div className="bg-white border-b border-gray-200 sticky top-0 z-10">
+            <div className="grid grid-cols-6 gap-4 px-6 py-4" style={{ gridTemplateColumns: '1fr 1fr 2fr 1fr 0.5fr 0.5fr' }}>
+              <div className="font-semibold text-gray-900">Quote Ref</div>
+              <div className="font-semibold text-gray-900">VIN</div>
+              <div className="font-semibold text-gray-900">Vehicle</div>
+              <div className="font-semibold text-gray-900">Status</div>
+              <div className="font-semibold text-gray-900">Parts</div>
+              <div className="font-semibold text-gray-900">Actions</div>
+            </div>
+          </div>
 
-        <Accordion type="multiple" className="w-full" defaultValue={allQuoteIds}>
+          {/* Quotes List */}
+          <Accordion type="multiple" className="w-full" defaultValue={allQuoteIds}>
           {filteredQuotes.map((quote) => {
             const quoteParts = getQuoteParts(quote.partRequested);
-            const isEditing = editingQuote === quote.id;
             const status = getQuoteStatus(quoteParts, quote.status);
 
             return (
-              <AccordionItem key={quote.id} value={quote.id} className="border-b border-gray-200 last:border-b-0">
-                <AccordionTrigger className="px-6 py-4 hover:bg-gray-50 transition-colors cursor-pointer">
-                  <div className="grid grid-cols-6 gap-2 items-center w-full" style={{ gridTemplateColumns: '1fr 1fr 2fr 1fr 0.5fr 0.5fr' }}>
-                    {/* Quote Ref */}
-                    <div>
-                      {isEditing ? (
-                        <input
-                          type="text"
-                          value={editData.quoteRef || ''}
-                          onChange={(e) => handleQuoteEditChange('quoteRef', e.target.value)}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-red-500 focus:border-transparent text-sm"
-                          autoFocus
-                          onClick={(e) => e.stopPropagation()}
-                        />
-                      ) : (
-                        <div>
-                        <div className="flex items-center space-x-2 pb-1">
-                          <span className="font-semibold text-gray-900">{quote.quoteRef}</span>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              copyToClipboard(quote.quoteRef || '');
-                            }}
-                            className="p-1 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
-                            title="Copy quote ref"
-                          >
-                            <Copy className="h-3 w-3" />
-                          </button>
-                        </div>
-                         {/* Tax Invoice Number for Ordered Quotes - Main Row Display */}
-                         {quote.status === 'ordered' && quote.taxInvoiceNumber && (
-                          <div className="flex items-center border-t border-gray-100">
-                            <div className="flex items-center space-x-1  py-1 text-xs">
-                              <span className="text-purple-800 font-medium text-sm">Invoice:</span>
-                              <span className="text-purple-900 font-mono text-[15px]">{quote.taxInvoiceNumber}</span>
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  copyToClipboard(quote.taxInvoiceNumber || '');
-                                }}
-                                className="p-0.5 text-purple-600 hover:text-purple-700 hover:bg-purple-200 rounded transition-colors cursor-pointer"
-                                title="Copy tax invoice number"
-                              >
-                                <Copy className="h-3.5 w-3.5" />
-                              </button>
-                            </div>
-                          </div>
-                        )}
-                        </div>
-                      )}
-                    </div>
+              <AccordionItem key={quote.id} value={quote.id} className="border-b border-gray-100 last:border-b-0">
+                <AccordionTrigger className="grid grid-cols-6 gap-4 w-full px-6 hover:bg-gray-50 transition-colors cursor-pointer" style={{ gridTemplateColumns: '1fr 1fr 2fr 1fr 0.5fr 0.5fr' }}>
+                  {/* Quote Ref */}
+                  <div className="flex items-center space-x-2">
+                    <ChevronDown className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                    {editingQuote === quote.id ? (
+                      <input
+                        type="text"
+                        value={editData.quoteRef || quote.quoteRef || ''}
+                        onChange={(e) => handleQuoteEditChange('quoteRef', e.target.value)}
+                        className="px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                    ) : (
+                      <>
+                        <span className="font-medium text-gray-900">{quote.quoteRef}</span>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            copyToClipboard(quote.quoteRef || '');
+                          }}
+                          className="p-1 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
+                          title="Copy quote ref"
+                        >
+                          <Copy className="h-4 w-4" />
+                        </button>
+                      </>
+                    )}
+                  </div>
 
-                    {/* VIN */}
-                    <div>
-                      {isEditing ? (
+                  {/* VIN */}
+                  <div className="flex items-center space-x-2">
+                    {editingQuote === quote.id ? (
+                      <input
+                        type="text"
+                        value={editData.vin || quote.vin || ''}
+                        onChange={(e) => handleQuoteEditChange('vin', e.target.value)}
+                        className="px-2 py-1 text-sm font-mono border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        onClick={(e) => e.stopPropagation()}
+                        placeholder="Enter VIN"
+                      />
+                    ) : (
+                      <>
+                        <span className="font-mono text-sm text-gray-900">{quote.vin || '-'}</span>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            copyToClipboard(quote.vin || '');
+                          }}
+                          className="p-1 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
+                          title="Copy VIN"
+                        >
+                          <Copy className="h-4 w-4" />
+                        </button>
+                      </>
+                    )}
+                  </div>
+
+                  {/* Vehicle */}
+                  <div className="flex items-center space-x-2">
+                    <span className="text-lg">{getVehicleLogo(quote.make)}</span>
+                    {editingQuote === quote.id ? (
+                      <div className="flex flex-col space-y-1">
                         <input
                           type="text"
-                          value={editData.vin || ''}
-                          onChange={(e) => handleQuoteEditChange('vin', e.target.value)}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-red-500 focus:border-transparent text-sm"
+                          value={editData.make || quote.make || ''}
+                          onChange={(e) => handleQuoteEditChange('make', e.target.value)}
+                          className="px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                           onClick={(e) => e.stopPropagation()}
+                          placeholder="Make"
                         />
-                      ) : (
-                        <div className="flex items-center space-x-2">
-                          <span className="text-sm text-gray-900 font-mono">{quote.vin || '-'}</span>
-                          {quote.vin && (
+                        <input
+                          type="text"
+                          value={editData.model || quote.model || ''}
+                          onChange={(e) => handleQuoteEditChange('model', e.target.value)}
+                          className="px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          onClick={(e) => e.stopPropagation()}
+                          placeholder="Model"
+                        />
+                        <input
+                          type="text"
+                          value={editData.series || quote.series || ''}
+                          onChange={(e) => handleQuoteEditChange('series', e.target.value)}
+                          className="px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          onClick={(e) => e.stopPropagation()}
+                          placeholder="Series (optional)"
+                        />
+                      </div>
+                    ) : (
+                      <div className="flex flex-col">
+                        <span className="font-medium text-gray-900">{quote.make} {quote.model}</span>
+                        {quote.series && (
+                          <span className="text-xs text-gray-500">{quote.series}</span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Status */}
+                  <div>
+                    <div className="flex space-y-1">
+                      {getStatusChip(status)}
+                      {/* Tax Invoice Number for Ordered Quotes - Main Row Display */}
+                      {quote.status === 'ordered' && quote.taxInvoiceNumber && (
+                        <div className="flex items-center space-x-1">
+                          <div className="flex items-center space-x-1 px-2 py-1 bg-purple-100 border border-purple-200 rounded text-xs">
+                            <ShoppingCart className="h-3 w-3 text-purple-600" />
+                            <span className="text-purple-800 font-medium">Tax:</span>
+                            <span className="text-purple-900 font-mono">{quote.taxInvoiceNumber}</span>
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
-                                copyToClipboard(quote.vin || '');
+                                copyToClipboard(quote.taxInvoiceNumber || '');
                               }}
-                              className="p-1 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
-                              title="Copy VIN"
+                              className="p-0.5 text-purple-600 hover:text-purple-700 hover:bg-purple-200 rounded transition-colors cursor-pointer"
+                              title="Copy tax invoice number"
                             >
-                              <Copy className="h-3 w-3" />
+                              <Copy className="h-2.5 w-2.5" />
                             </button>
-                          )}
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Vehicle */}
-                    <div>
-                      {isEditing ? (
-                        <div className="space-y-2">
-                          <input
-                            type="text"
-                            value={editData.make || ''}
-                            onChange={(e) => handleQuoteEditChange('make', e.target.value)}
-                            placeholder="Make"
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-red-500 focus:border-transparent text-sm"
-                            onClick={(e) => e.stopPropagation()}
-                          />
-                          <input
-                            type="text"
-                            value={editData.model || ''}
-                            onChange={(e) => handleQuoteEditChange('model', e.target.value)}
-                            placeholder="Model"
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-red-500 focus:border-transparent text-sm"
-                            onClick={(e) => e.stopPropagation()}
-                          />
-                        </div>
-                      ) : (
-                        <div className="flex items-center space-x-2">
-                          <div className="flex items-center space-x-1">
-                            <span className="text-lg">{getVehicleLogo(quote.make)}</span>
-                            <span className="text-sm font-medium text-gray-900">{quote.make}</span>
                           </div>
-                          <span className="text-sm text-gray-600">•</span>
-                          <span className="text-sm text-gray-900">{quote.model}</span>
-                          {quote.series && (
-                            <>
-                              <span className="text-sm text-gray-600">•</span>
-                              <span className="text-sm text-gray-900">{quote.series}</span>
-                            </>
-                          )}
                         </div>
                       )}
                     </div>
+                  </div>
 
-                    {/* Status */}
-                    <div>
-                      <div className="flex space-y-1">
-                        {getStatusChip(status)}
-                      </div>
-                    </div>
+                  {/* Parts Count */}
+                  <div className="flex items-center">
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                      {quoteParts.length} {quoteParts.length === 1 ? 'part' : 'parts'}
+                    </span>
+                  </div>
 
-                    {/* Parts */}
-                    <div>
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                        {quoteParts.length} {quoteParts.length === 1 ? 'part' : 'parts'}
-                      </span>
-                    </div>
-
-                    {/* Actions */}
-                    <div className="flex items-center justify-end space-x-1 action-buttons">
-                      {(quote.status !== 'completed' || showCompleted) && (
-                        <>
-                          {isEditing ? (
-                            <>
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleSave();
-                                }}
-                                className="p-2 text-green-600 hover:text-green-700 hover:bg-green-50 rounded-md transition-colors cursor-pointer"
-                                title="Save (Enter)"
-                              >
-                                <Save className="h-4 w-4" />
-                              </button>
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setEditingQuote(null);
-                                  setEditData({});
-                                }}
-                                className="p-2 text-gray-600 hover:text-gray-700 hover:bg-gray-50 rounded-md transition-colors cursor-pointer"
-                                title="Cancel (Esc)"
-                              >
-                                <X className="h-4 w-4" />
-                              </button>
-                            </>
-                          ) : (
-                            <>
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  startEditingQuote(quote);
-                                }}
-                                className="p-2 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-md transition-colors cursor-pointer"
-                                title="Edit"
-                              >
-                                <Edit className="h-4 w-4" />
-                              </button>
-                              {!showCompleted && status === 'priced' && onMarkCompleted && (
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    onMarkCompleted(quote.id);
-                                  }}
-                                  className="p-2 text-green-600 hover:text-green-700 hover:bg-green-50 rounded-md transition-colors cursor-pointer"
-                                  title="Mark as Completed"
-                                >
-                                  <CheckCircle className="h-4 w-4" />
-                                </button>
-                              )}
-                              {status === 'completed' && onMarkAsOrdered && (
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleMarkAsOrder(quote.id);
-                                  }}
-                                  className="p-2 text-purple-600 hover:text-purple-700 hover:bg-purple-50 rounded-md transition-colors cursor-pointer"
-                                  title="Mark as Order"
-                                >
-                                  <ShoppingCart className="h-4 w-4" />
-                                </button>
-                              )}
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleDeleteWithConfirm(quote.id);
-                                }}
-                                className="p-2 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-md transition-colors cursor-pointer"
-                                title="Delete"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </button>
-                            </>
-                          )}
-                        </>
-                      )}
-                    </div>
+                  {/* Actions */}
+                  <div className="flex items-center space-x-2">
+                    {(quote.status !== 'completed' || showCompleted) && (
+                      <>
+                        {editingQuote === quote.id ? (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleSave();
+                            }}
+                            className="p-1 text-green-600 hover:text-green-700 hover:bg-green-100 rounded transition-colors cursor-pointer"
+                            title="Save changes"
+                          >
+                            <Save className="h-4 w-4" />
+                          </button>
+                        ) : (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              startEditingQuote(quote);
+                            }}
+                            className="p-1 text-blue-600 hover:text-blue-700 hover:bg-blue-100 rounded transition-colors cursor-pointer"
+                            title="Edit quote"
+                          >
+                            <Edit className="h-4 w-4" />
+                          </button>
+                        )}
+                        
+                        {editingQuote === quote.id ? (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setEditingQuote(null);
+                              setEditData({});
+                            }}
+                            className="p-1 text-gray-600 hover:text-gray-700 hover:bg-gray-100 rounded transition-colors cursor-pointer"
+                            title="Cancel editing"
+                          >
+                            <X className="h-4 w-4" />
+                          </button>
+                        ) : (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteWithConfirm(quote.id);
+                            }}
+                            className="p-1 text-red-600 hover:text-red-700 hover:bg-red-100 rounded transition-colors cursor-pointer"
+                            title="Delete quote"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        )}
+                        
+                        {status === 'priced' && onMarkCompleted && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onMarkCompleted(quote.id);
+                            }}
+                            className="p-1 text-green-600 hover:text-green-700 hover:bg-green-100 rounded transition-colors cursor-pointer"
+                            title="Mark as completed"
+                          >
+                            <CheckCircle className="h-4 w-4" />
+                          </button>
+                        )}
+                        
+                        {status === 'completed' && onMarkAsOrdered && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleMarkAsOrder(quote.id);
+                            }}
+                            className="p-1 text-purple-600 hover:text-purple-700 hover:bg-purple-100 rounded transition-colors cursor-pointer"
+                            title="Mark as order"
+                          >
+                            <ShoppingCart className="h-4 w-4" />
+                          </button>
+                        )}
+                      </>
+                    )}
                   </div>
                 </AccordionTrigger>
 
                 <AccordionContent className="px-6 py-4 bg-gray-50">
                   <div className="animate-in slide-in-from-top-2 duration-300">
-                    {/* Tax Invoice Number for Ordered Quotes */}
-                    {quote.status === 'ordered' && quote.taxInvoiceNumber && (
-                      <div className="mb-4 p-3 bg-purple-50 border border-purple-200 rounded-lg">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center space-x-2">
-                            <div className="w-6 h-6 bg-purple-100 rounded-full flex items-center justify-center">
-                              <ShoppingCart className="h-3 w-3 text-purple-600" />
-                            </div>
-                            <span className="text-sm font-medium text-purple-800">Tax Invoice Number</span>
-                          </div>
-                          <div className="flex items-center space-x-2">
-                            <span className="text-sm font-mono text-purple-900 bg-purple-100 px-2 py-1 rounded">
-                              {quote.taxInvoiceNumber}
-                            </span>
-                            <button
-                              onClick={() => copyToClipboard(quote.taxInvoiceNumber || '')}
-                              className="p-1 text-purple-600 hover:text-purple-700 hover:bg-purple-100 rounded transition-colors cursor-pointer"
-                              title="Copy tax invoice number"
-                            >
-                              <Copy className="h-3 w-3" />
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                    
                     <div className="space-y-4">
                       <div className="flex items-center justify-between">
                         <h4 className="text-sm font-semibold text-gray-900 flex items-center space-x-2">
@@ -653,7 +622,10 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                         )}
                         {quoteParts.length > 0 && !editingParts.size && quote.status !== 'completed' && (
                           <button
-                            onClick={() => startEditingParts(quoteParts)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              startEditingParts(quoteParts);
+                            }}
                             className="px-3 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700 transition-colors cursor-pointer flex items-center space-x-1"
                             title="Edit all parts in this quote"
                           >
@@ -664,7 +636,10 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                         {editingParts.size > 0 && (
                           <div className="flex space-x-1">
                             <button
-                              onClick={() => handleSave()}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleSave();
+                              }}
                               className="px-3 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700 transition-colors cursor-pointer flex items-center space-x-1"
                               title="Save all part changes"
                             >
@@ -672,7 +647,8 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                               <span>Save All</span>
                             </button>
                             <button
-                              onClick={() => {
+                              onClick={(e) => {
+                                e.stopPropagation();
                                 setEditingParts(new Set());
                                 setPartsEditData({});
                               }}
@@ -687,29 +663,301 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                       </div>
                       
                       {quoteParts.length > 0 && (
-                        <div className="grid gap-3">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                           {quoteParts.map((part) => {
                             const isPartEditing = editingParts.has(part.id);
                             
                             return (
-                              <div key={part.id} className="bg-white rounded-lg border border-gray-200 p-3 shadow-sm hover:shadow-md transition-shadow">
-                                <div className="flex items-center justify-between">
-                                  <div className="grid grid-cols-1 md:grid-cols-4 gap-3 flex-1">
+                              <div key={part.id} className="bg-white rounded-lg border border-gray-200 p-4 shadow-sm">
+                                <div className="relative">
+                                  {getPartIcon(part.name) && (
+                                    <div className="absolute top-2 right-2 text-lg">
+                                      {getPartIcon(part.name)}
+                                    </div>
+                                  )}
+                                <div className="space-y-3">
+                                  <div>
+                                    <label className="block text-xs font-medium text-gray-500 mb-1">Part Name</label>
+                                    {isPartEditing ? (
+                                      <input
+                                        type="text"
+                                        value={partsEditData[part.id]?.name || ''}
+                                        onChange={(e) => handlePartEditChange(part.id, 'name', e.target.value)}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-1 focus:ring-red-500 focus:border-transparent"
+                                        autoFocus
+                                      />
+                                    ) : (
+                                      <span className="text-sm font-medium text-gray-900">{part.name}</span>
+                                    )}
+                                  </div>
+                                  
+                                  <div className="grid grid-cols-2 gap-3">
                                     <div>
-                                      <label className="block text-xs font-medium text-gray-500 mb-1">Part Name</label>
+                                      <label className="block text-xs font-medium text-gray-500 mb-1">Part Number</label>
+                                      <div className="flex items-center space-x-1">
+                                        {isPartEditing ? (
+                                          <input
+                                            type="text"
+                                            value={partsEditData[part.id]?.number || ''}
+                                            onChange={(e) => handlePartEditChange(part.id, 'number', e.target.value)}
+                                            className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-1 focus:ring-red-500 focus:border-transparent"
+                                          />
+                                        ) : (
+                                          <>
+                                            <span className="text-sm text-gray-600 font-mono">{part.number || '-'}</span>
+                                            <button
+                                              onClick={() => copyToClipboard(part.number || '')}
+                                              className="p-1 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
+                                              title="Copy to clipboard"
+                                            >
+                                              <Copy className="h-3 w-3" />
+                                            </button>
+                                          </>
+                                        )}
+                                      </div>
+                                    </div>
+                                    
+                                    <div>
+                                      <label className="block text-xs font-medium text-gray-500 mb-1">Price</label>
+                                      <div className="flex items-center space-x-1">
+                                        {isPartEditing ? (
+                                          <input
+                                            type="number"
+                                            value={partsEditData[part.id]?.price || ''}
+                                            onChange={(e) => handlePartEditChange(part.id, 'price', e.target.value ? Number(e.target.value) : null)}
+                                            className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-1 focus:ring-red-500 focus:border-transparent"
+                                          />
+                                        ) : (
+                                          <>
+                                            <span className="text-sm font-medium text-gray-900">
+                                              {part.price ? `$${part.price.toFixed(2)}` : '-'}
+                                            </span>
+                                            <button
+                                              onClick={() => copyToClipboard(part.price ? part.price.toString() : '')}
+                                              className="p-1 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
+                                              title="Copy to clipboard"
+                                            >
+                                              <Copy className="h-3 w-3" />
+                                            </button>
+                                          </>
+                                        )}
+                                      </div>
+                                    </div>
+                                  </div>
+                                  
+                                  <div>
+                                    <label className="block text-xs font-medium text-gray-500 mb-1">Notes</label>
+                                    <div className="flex items-center space-x-1">
                                       {isPartEditing ? (
                                         <input
                                           type="text"
-                                          value={partsEditData[part.id]?.name || ''}
-                                          onChange={(e) => handlePartEditChange(part.id, 'name', e.target.value)}
-                                          className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:ring-1 focus:ring-red-500 focus:border-transparent"
-                                          autoFocus
+                                          value={partsEditData[part.id]?.note || ''}
+                                          onChange={(e) => handlePartEditChange(part.id, 'note', e.target.value)}
+                                          className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-1 focus:ring-red-500 focus:border-transparent"
                                         />
                                       ) : (
-                                        <span className="text-sm font-medium text-gray-900">{part.name}</span>
+                                        <>
+                                          <span className="text-sm text-gray-600">{part.note || '-'}</span>
+                                          <button
+                                            onClick={() => copyToClipboard(part.note || '')}
+                                            className="p-1 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
+                                            title="Copy to clipboard"
+                                          >
+                                            <Copy className="h-3 w-3" />
+                                          </button>
+                                        </>
                                       )}
                                     </div>
-                                    
+                                  </div>
+                                </div>
+                              </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </AccordionContent>
+              </AccordionItem>
+            );
+          })}
+        </Accordion>
+        </>
+        )}
+      </div>
+
+      {/* Mobile Card View */}
+      <div className="lg:hidden space-y-4">
+        {filteredQuotes.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-12 px-4">
+            <div className="w-24 h-24 bg-gradient-to-br from-blue-100 to-purple-100 rounded-full flex items-center justify-center mb-6">
+              <svg className="w-12 h-12 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+            </div>
+            <h3 className="text-xl font-semibold text-gray-900 mb-2">No quotes found</h3>
+            <p className="text-gray-600 text-center max-w-md mb-6">
+              {defaultFilter === 'unpriced' ? 'No quotes are waiting for pricing at the moment.' :
+               defaultFilter === 'priced' ? 'No quotes have been priced yet.' :
+               showCompleted ? 'No quotes have been completed yet.' :
+               'Get started by adding your first quote to track parts and pricing.'}
+            </p>
+            <div className="flex items-center space-x-2 text-sm text-gray-500">
+              <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
+              <span>Ready to get started</span>
+            </div>
+          </div>
+        ) : (
+        <Accordion type="multiple" className="w-full" defaultValue={allQuoteIds}>
+          {filteredQuotes.map((quote) => {
+            const quoteParts = getQuoteParts(quote.partRequested);
+            const status = getQuoteStatus(quoteParts, quote.status);
+
+            return (
+              <AccordionItem key={quote.id} value={quote.id} className="bg-white rounded-lg border border-gray-200 shadow-sm">
+                <AccordionTrigger className="p-4 hover:bg-gray-50 transition-colors cursor-pointer">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center space-x-2">
+                      <ChevronDown className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                      <div className="flex flex-col">
+                        <span className="text-xs font-medium text-gray-500">Quote Ref</span>
+                        <span className="font-semibold text-gray-900">{quote.quoteRef}</span>
+                      </div>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          copyToClipboard(quote.quoteRef || '');
+                        }}
+                        className="p-1 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
+                        title="Copy quote ref"
+                      >
+                        <Copy className="h-4 w-4" />
+                      </button>
+                    </div>
+                    <div className="flex flex-col items-end space-y-1">
+                      {getStatusChip(status)}
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                        {quoteParts.length} {quoteParts.length === 1 ? 'part' : 'parts'}
+                      </span>
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <div className="flex items-center space-x-2">
+                      <span className="text-lg">{getVehicleLogo(quote.make)}</span>
+                      <span className="text-sm font-medium text-gray-900">{quote.make} {quote.model}</span>
+                    </div>
+                    
+                    <div className="flex items-center space-x-2">
+                      <span className="text-xs font-medium text-gray-500">VIN:</span>
+                      <span className="text-sm font-mono text-gray-900">{quote.vin || '-'}</span>
+                    </div>
+                    
+                    {quote.status === 'ordered' && quote.taxInvoiceNumber && (
+                      <div className="flex items-center justify-between p-2 bg-purple-50 border border-purple-200 rounded">
+                        <div className="flex items-center space-x-2">
+                          <span className="text-xs font-medium text-purple-800">Invoice:</span>
+                          <span className="text-sm font-mono text-purple-900">{quote.taxInvoiceNumber}</span>
+                        </div>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            copyToClipboard(quote.taxInvoiceNumber || '');
+                          }}
+                          className="p-1 text-purple-600 hover:text-purple-700 hover:bg-purple-200 rounded transition-colors cursor-pointer"
+                          title="Copy tax invoice number"
+                        >
+                          <Copy className="h-3 w-3" />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </AccordionTrigger>
+                
+                <AccordionContent className="px-4 pb-4 bg-gray-50">
+                  <div className="animate-in slide-in-from-top-2 duration-300">
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <h4 className="text-sm font-semibold text-gray-900 flex items-center space-x-2">
+                          <Eye className="h-4 w-4" />
+                          <span>Parts Details ({quoteParts.length})</span>
+                        </h4>
+                        {quoteParts.length === 0 && (
+                          <span className="text-sm text-gray-500">No parts linked to this quote</span>
+                        )}
+                        {quoteParts.length > 0 && !editingParts.size && quote.status !== 'completed' && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              startEditingParts(quoteParts);
+                            }}
+                            className="px-3 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700 transition-colors cursor-pointer flex items-center space-x-1"
+                            title="Edit all parts in this quote"
+                          >
+                            <Edit className="h-3 w-3" />
+                            <span>Edit All Parts</span>
+                          </button>
+                        )}
+                        {editingParts.size > 0 && (
+                          <div className="flex space-x-1">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleSave();
+                              }}
+                              className="px-3 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700 transition-colors cursor-pointer flex items-center space-x-1"
+                              title="Save all part changes"
+                            >
+                              <Save className="h-3 w-3" />
+                              <span>Save All</span>
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setEditingParts(new Set());
+                                setPartsEditData({});
+                              }}
+                              className="px-3 py-1 text-xs bg-gray-600 text-white rounded hover:bg-gray-700 transition-colors cursor-pointer flex items-center space-x-1"
+                              title="Cancel editing and discard changes"
+                            >
+                              <X className="h-3 w-3" />
+                              <span>Cancel</span>
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                      
+                      {quoteParts.length > 0 && (
+                        <div className="space-y-3">
+                          {quoteParts.map((part) => {
+                            const isPartEditing = editingParts.has(part.id);
+                            
+                            return (
+                              <div key={part.id} className="bg-white rounded-lg border border-gray-200 p-3 shadow-sm">
+                                <div className="relative">
+                                  {getPartIcon(part.name) && (
+                                    <div className="absolute top-2 right-2 text-base">
+                                      {getPartIcon(part.name)}
+                                    </div>
+                                  )}
+                                <div className="space-y-2">
+                                  <div>
+                                    <label className="block text-xs font-medium text-gray-500 mb-1">Part Name</label>
+                                    {isPartEditing ? (
+                                      <input
+                                        type="text"
+                                        value={partsEditData[part.id]?.name || ''}
+                                        onChange={(e) => handlePartEditChange(part.id, 'name', e.target.value)}
+                                        className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:ring-1 focus:ring-red-500 focus:border-transparent"
+                                        autoFocus
+                                      />
+                                    ) : (
+                                      <span className="text-sm font-medium text-gray-900">{part.name}</span>
+                                    )}
+                                  </div>
+                                  
+                                  <div className="grid grid-cols-2 gap-2">
                                     <div>
                                       <label className="block text-xs font-medium text-gray-500 mb-1">Part Number</label>
                                       <div className="flex items-center space-x-1">
@@ -736,9 +984,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                     </div>
                                     
                                     <div>
-                                      <label className="block text-xs font-medium text-gray-500 mb-1 flex items-center space-x-1">
-                                        <span>Price</span>
-                                      </label>
+                                      <label className="block text-xs font-medium text-gray-500 mb-1">Price</label>
                                       <div className="flex items-center space-x-1">
                                         {isPartEditing ? (
                                           <input
@@ -763,33 +1009,34 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                         )}
                                       </div>
                                     </div>
-                                    
-                                    <div>
-                                      <label className="block text-xs font-medium text-gray-500 mb-1">Notes</label>
-                                      <div className="flex items-center space-x-1">
-                                        {isPartEditing ? (
-                                          <input
-                                            type="text"
-                                            value={partsEditData[part.id]?.note || ''}
-                                            onChange={(e) => handlePartEditChange(part.id, 'note', e.target.value)}
-                                            className="flex-1 px-2 py-1 border border-gray-300 rounded text-sm focus:ring-1 focus:ring-red-500 focus:border-transparent"
-                                          />
-                                        ) : (
-                                          <>
-                                            <span className="text-sm text-gray-600">{part.note || '-'}</span>
-                                            <button
-                                              onClick={() => copyToClipboard(part.note || '')}
-                                              className="p-1 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
-                                              title="Copy to clipboard"
-                                            >
-                                              <Copy className="h-3 w-3" />
-                                            </button>
-                                          </>
-                                        )}
-                                      </div>
+                                  </div>
+                                  
+                                  <div>
+                                    <label className="block text-xs font-medium text-gray-500 mb-1">Notes</label>
+                                    <div className="flex items-center space-x-1">
+                                      {isPartEditing ? (
+                                        <input
+                                          type="text"
+                                          value={partsEditData[part.id]?.note || ''}
+                                          onChange={(e) => handlePartEditChange(part.id, 'note', e.target.value)}
+                                          className="flex-1 px-2 py-1 border border-gray-300 rounded text-sm focus:ring-1 focus:ring-red-500 focus:border-transparent"
+                                        />
+                                      ) : (
+                                        <>
+                                          <span className="text-sm text-gray-600">{part.note || '-'}</span>
+                                          <button
+                                            onClick={() => copyToClipboard(part.note || '')}
+                                            className="p-1 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
+                                            title="Copy to clipboard"
+                                          >
+                                            <Copy className="h-3 w-3" />
+                                          </button>
+                                        </>
+                                      )}
                                     </div>
                                   </div>
                                 </div>
+                              </div>
                               </div>
                             );
                           })}
@@ -802,15 +1049,6 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
             );
           })}
         </Accordion>
-        
-        {filteredQuotes.length === 0 && (
-          <div className="text-center py-12">
-            <div className="text-gray-400 mb-4">
-              <Search className="h-12 w-12 mx-auto" />
-            </div>
-            <h3 className="text-lg font-medium text-gray-900 mb-2">No quotes found</h3>
-            <p className="text-gray-500">Try adjusting your search terms or create a new quote.</p>
-          </div>
         )}
       </div>
 

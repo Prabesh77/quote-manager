@@ -2,7 +2,6 @@
 
 import { useQuotes } from '@/components/ui/useQuotes';
 import QuoteTable from '@/components/ui/QuoteTable';
-import Navigation from '@/components/ui/Navigation';
 
 export default function NewQuotePage() {
   const { 
@@ -49,7 +48,6 @@ export default function NewQuotePage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Navigation />
       <div className="container mx-auto px-4 py-8">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900">Add Quote</h1>

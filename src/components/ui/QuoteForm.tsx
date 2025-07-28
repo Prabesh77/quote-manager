@@ -4,25 +4,33 @@ import { useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { 
-  Wrench, 
-  Lightbulb, 
-  Droplets, 
-  Zap, 
-  Gauge, 
-  Shield, 
-  Settings,
   X,
   Plus
 } from 'lucide-react';
 
+// Function to get part icon from /public/part-icons
+const getPartIcon = (partName: string): string | null => {
+  const iconMap: Record<string, string> = {
+    'Radiator': '/part-icons/radiator.png',
+    'Left Headlamp': '/part-icons/headlight-left.png',
+    'Right Headlamp': '/part-icons/headlight-right.png',
+    'Condenser': '/part-icons/condenser.png',
+    'Radar Sensor': '/part-icons/sensor.png',
+    'Fan Assembly': '/part-icons/fan.png',
+    'Intercooler': '/part-icons/intercooler.png',
+  };
+  
+  return iconMap[partName] || null;
+};
+
 const PART_OPTIONS = [
-  { name: 'Radiator', icon: Droplets },
-  { name: 'Left Headlamp', icon: Lightbulb },
-  { name: 'Right Headlamp', icon: Lightbulb },
-  { name: 'Condenser', icon: Zap },
-  { name: 'Radar Sensor', icon: Settings },
-  { name: 'Fan Assembly', icon: Droplets },
-  { name: 'Intercooler', icon: Shield },
+  { name: 'Radiator', icon: getPartIcon('Radiator') },
+  { name: 'Left Headlamp', icon: getPartIcon('Left Headlamp') },
+  { name: 'Right Headlamp', icon: getPartIcon('Right Headlamp') },
+  { name: 'Condenser', icon: getPartIcon('Condenser') },
+  { name: 'Radar Sensor', icon: getPartIcon('Radar Sensor') },
+  { name: 'Fan Assembly', icon: getPartIcon('Fan Assembly') },
+  { name: 'Intercooler', icon: getPartIcon('Intercooler') },
 ];
 
 interface PartDetails {
@@ -44,7 +52,7 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
     make: '',
     model: '',
     series: '',
-    auto: 'false',
+    auto: 'true',
     body: '',
     mthyr: '',
     rego: '',
@@ -324,7 +332,7 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
         </label>
         <div className="flex flex-wrap gap-2 mb-4">
           {PART_OPTIONS.map((part) => {
-            const IconComponent = part.icon;
+            const iconUrl = part.icon;
             const isSelected = selectedParts.includes(part.name);
             
             return (
@@ -338,7 +346,11 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
                     : 'bg-gray-100 text-gray-700 hover:bg-gray-200 border-2 border-gray-200'
                 }`}
               >
-                <IconComponent className="h-4 w-4" />
+                {iconUrl && (
+                  <div className="w-6 h-6 bg-white rounded-full flex items-center justify-center shadow-sm border border-gray-200">
+                    <img src={iconUrl} alt={part.name} className="h-4 w-4 object-contain" />
+                  </div>
+                )}
                 <span>{part.name}</span>
               </button>
             );
@@ -355,13 +367,17 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
             
             {selectedParts.map((partName) => {
               const part = partDetails[partName];
-              const IconComponent = PART_OPTIONS.find(p => p.name === partName)?.icon || Wrench;
+              const iconUrl = getPartIcon(partName);
               
               return (
                 <div key={partName} className="bg-gray-50 rounded-lg p-4 border border-gray-200">
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center space-x-2">
-                      <IconComponent className="h-4 w-4 text-red-600" />
+                      {iconUrl && (
+                        <div className="w-6 h-6 bg-white rounded-full flex items-center justify-center shadow-sm border border-gray-200">
+                          <img src={iconUrl} alt={partName} className="h-4 w-4 object-contain" />
+                        </div>
+                      )}
                       <span className="font-medium text-gray-900">{partName}</span>
                     </div>
                     <button

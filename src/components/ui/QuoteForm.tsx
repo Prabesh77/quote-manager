@@ -1,28 +1,37 @@
 'use client';
 
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { 
-  Wrench, 
-  Lightbulb, 
-  Droplets, 
-  Zap, 
-  Gauge, 
-  Shield, 
-  Settings,
   X,
-  Plus
+  Plus,
+  AlertCircle
 } from 'lucide-react';
 
+// Function to get part icon from /public/part-icons
+const getPartIcon = (partName: string): string | null => {
+  const iconMap: Record<string, string> = {
+    'Radiator': '/part-icons/radiator.png',
+    'Left Headlamp': '/part-icons/headlight-left.png',
+    'Right Headlamp': '/part-icons/headlight-right.png',
+    'Condenser': '/part-icons/condenser.png',
+    'Radar Sensor': '/part-icons/sensor.png',
+    'Fan Assembly': '/part-icons/fan.png',
+    'Intercooler': '/part-icons/intercooler.png',
+  };
+  
+  return iconMap[partName] || null;
+};
+
 const PART_OPTIONS = [
-  { name: 'Radiator', icon: Droplets },
-  { name: 'Left Headlamp', icon: Lightbulb },
-  { name: 'Right Headlamp', icon: Lightbulb },
-  { name: 'Condenser', icon: Zap },
-  { name: 'Radar Sensor', icon: Settings },
-  { name: 'Fan Assembly', icon: Droplets },
-  { name: 'Intercooler', icon: Shield },
+  { name: 'Radiator', icon: getPartIcon('Radiator') },
+  { name: 'Left Headlamp', icon: getPartIcon('Left Headlamp') },
+  { name: 'Right Headlamp', icon: getPartIcon('Right Headlamp') },
+  { name: 'Condenser', icon: getPartIcon('Condenser') },
+  { name: 'Radar Sensor', icon: getPartIcon('Radar Sensor') },
+  { name: 'Fan Assembly', icon: getPartIcon('Fan Assembly') },
+  { name: 'Intercooler', icon: getPartIcon('Intercooler') },
 ];
 
 interface PartDetails {
@@ -44,34 +53,114 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
     make: '',
     model: '',
     series: '',
-    auto: 'false',
+    auto: 'true',
     body: '',
     mthyr: '',
     rego: '',
+    requiredBy: '',
   });
-
   const [selectedParts, setSelectedParts] = useState<string[]>([]);
   const [partDetails, setPartDetails] = useState<Record<string, PartDetails>>({});
   const [isLoading, setIsLoading] = useState(false);
+  const [showValidationPopup, setShowValidationPopup] = useState(false);
+  const [validationMessage, setValidationMessage] = useState('');
 
   const handlePaste = () => {
     const lines = rawText.split('\n');
     const parsed: Record<string, string> = {};
-    for (const line of lines) {
-      const [key, ...rest] = line.split(':');
-      if (!key || !rest.length) continue;
-      parsed[key.trim().toLowerCase()] = rest.join(':').trim();
+    
+    for (let i = 0; i < lines.length; i++) {
+      const trimmedLine = lines[i].trim();
+      if (!trimmedLine) continue;
+      
+      // Handle different patterns in the data
+      let key = '';
+      let value = '';
+      
+      // Pattern 1: "Reference28495#2" (no space)
+      if (trimmedLine.match(/^(Reference|Make|Model|Series|Trans|Body|Mth\/Yr|Veh Reg)(.+)$/i)) {
+        const match = trimmedLine.match(/^(Reference|Make|Model|Series|Trans|Body|Mth\/Yr|Veh Reg)(.+)$/i);
+        if (match) {
+          key = match[1].toLowerCase();
+          value = match[2].trim();
+        }
+      }
+      // Pattern 2: "Reference 28495#2" (with space)
+      else if (trimmedLine.match(/^(Reference|Make|Model|Series|Trans|Body|Mth\/Yr|Veh Reg)\s+(.+)$/i)) {
+        const match = trimmedLine.match(/^(Reference|Make|Model|Series|Trans|Body|Mth\/Yr|Veh Reg)\s+(.+)$/i);
+        if (match) {
+          key = match[1].toLowerCase();
+          value = match[2].trim();
+        }
+      }
+      // Pattern 3: "Reference: 28495#2" (with colon)
+      else if (trimmedLine.includes(':')) {
+        const [k, ...rest] = trimmedLine.split(':');
+        key = k.trim().toLowerCase();
+        value = rest.join(':').trim();
+      }
+      // Pattern 4: Standalone "VIN" followed by value on next line
+      else if (trimmedLine === 'VIN' && i + 1 < lines.length) {
+        key = 'vin';
+        value = lines[i + 1].trim();
+        i++; // Skip the next line since we've processed it
+      }
+      // Pattern 5: "Required By" followed by value on next line
+      else if (trimmedLine === 'Required By' && i + 1 < lines.length) {
+        key = 'required by';
+        value = lines[i + 1].trim();
+        i++; // Skip the next line since we've processed it
+      }
+      
+      if (!key || !value) continue;
+      
+      // Map the keys to our form fields
+      switch (key) {
+        case 'reference':
+          parsed['quoteRef'] = value;
+          break;
+        case 'vin':
+          parsed['vin'] = value;
+          break;
+        case 'make':
+          parsed['make'] = value;
+          break;
+        case 'model':
+          parsed['model'] = value;
+          break;
+        case 'series':
+          parsed['series'] = value;
+          break;
+        case 'trans':
+          parsed['auto'] = value.toLowerCase().includes('auto') ? 'true' : 'false';
+          break;
+        case 'body':
+          parsed['body'] = value;
+          break;
+        case 'mth/yr':
+        case 'mthyr':
+          parsed['mthyr'] = value;
+          break;
+        case 'veh reg':
+          parsed['rego'] = value;
+          break;
+        case 'required by':
+          parsed['requiredBy'] = value;
+          break;
+      }
     }
+    
     setFields({
-      quoteRef: parsed['quote ref'] || '',
+      quoteRef: parsed['quoteRef'] || '',
       vin: parsed['vin'] || '',
       make: parsed['make'] || '',
       model: parsed['model'] || '',
       series: parsed['series'] || '',
-      auto: parsed['auto'] || 'false',
+      auto: parsed['auto'] || 'true',
       body: parsed['body'] || '',
-      mthyr: parsed['mth/yr'] || '',
+      mthyr: parsed['mthyr'] || '',
       rego: parsed['rego'] || '',
+      requiredBy: parsed['requiredBy'] || '',
     });
   };
 
@@ -95,6 +184,7 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
       body: '',
       mthyr: '',
       rego: '',
+      requiredBy: '',
     });
     setSelectedParts([]);
     setPartDetails({});
@@ -139,7 +229,21 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
     const { quoteRef, vin, make, model, series, auto, body, mthyr, rego } = fields;
     if (!quoteRef) return;
     if (selectedParts.length === 0) {
-      alert('Please select at least one part');
+      setValidationMessage('Please select at least one part');
+      setShowValidationPopup(true);
+      return;
+    }
+    
+    // Validate that all parts have part numbers
+    const partsWithoutNumbers = selectedParts.filter(partName => {
+      const part = partDetails[partName];
+      return !part || !part.number || part.number.trim() === '';
+    });
+    
+    if (partsWithoutNumbers.length > 0) {
+      const missingParts = partsWithoutNumbers.join(', ');
+      setValidationMessage(`Please add part numbers for the following parts: ${missingParts}`);
+      setShowValidationPopup(true);
       return;
     }
     
@@ -171,22 +275,137 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
     <div className="bg-white rounded-lg shadow-sm border p-4">
       <h2 className="text-lg font-semibold text-gray-800 mb-4">Create New Quote</h2>
       
-      <div className="mb-4">
+      {/* Raw Data Input */}
+      <div className="mb-6">
         <label className="block text-sm font-medium text-gray-700 mb-2">
-          Paste Quote Details
+          Paste Raw Data
         </label>
-        <textarea
-          rows={4}
-          className="w-full border border-gray-300 rounded-md p-2 text-sm focus:ring-2 focus:ring-red-500 focus:border-red-500 transition-colors"
-          placeholder="Paste the full quote text here..."
-          value={rawText}
-          onChange={(e) => setRawText(e.target.value)}
-        />
-        <div className="flex gap-2 mt-2">
-          <Button onClick={handlePaste} type="button" size="sm" className="cursor-pointer bg-red-600 hover:bg-red-700">
-            Auto-Fill
-          </Button>
+        <div className="relative">
+          <textarea
+            value={rawText}
+            onChange={(e) => setRawText(e.target.value)}
+            onPaste={(e) => {
+              // Get the pasted text immediately
+              const pastedText = e.clipboardData.getData('text');
+              setRawText(pastedText);
+              // Process the pasted text directly
+              setTimeout(() => {
+                const lines = pastedText.split('\n');
+                const parsed: Record<string, string> = {};
+                
+                for (let i = 0; i < lines.length; i++) {
+                  const trimmedLine = lines[i].trim();
+                  if (!trimmedLine) continue;
+                  
+                  // Handle different patterns in the data
+                  let key = '';
+                  let value = '';
+                  
+                  // Pattern 1: "Reference28495#2" (no space)
+                  if (trimmedLine.match(/^(Reference|Make|Model|Series|Trans|Body|Mth\/Yr|Veh Reg)(.+)$/i)) {
+                    const match = trimmedLine.match(/^(Reference|Make|Model|Series|Trans|Body|Mth\/Yr|Veh Reg)(.+)$/i);
+                    if (match) {
+                      key = match[1].toLowerCase();
+                      value = match[2].trim();
+                    }
+                  }
+                  // Pattern 2: "Reference 28495#2" (with space)
+                  else if (trimmedLine.match(/^(Reference|Make|Model|Series|Trans|Body|Mth\/Yr|Veh Reg)\s+(.+)$/i)) {
+                    const match = trimmedLine.match(/^(Reference|Make|Model|Series|Trans|Body|Mth\/Yr|Veh Reg)\s+(.+)$/i);
+                    if (match) {
+                      key = match[1].toLowerCase();
+                      value = match[2].trim();
+                    }
+                  }
+                  // Pattern 3: "Reference: 28495#2" (with colon)
+                  else if (trimmedLine.includes(':')) {
+                    const [k, ...rest] = trimmedLine.split(':');
+                    key = k.trim().toLowerCase();
+                    value = rest.join(':').trim();
+                  }
+                  // Pattern 4: Standalone "VIN" followed by value on next line
+                  else if (trimmedLine === 'VIN' && i + 1 < lines.length) {
+                    key = 'vin';
+                    value = lines[i + 1].trim();
+                    i++; // Skip the next line since we've processed it
+                  }
+                  // Pattern 5: "Required By" followed by value on next line
+                  else if (trimmedLine === 'Required By' && i + 1 < lines.length) {
+                    key = 'required by';
+                    value = lines[i + 1].trim();
+                    i++; // Skip the next line since we've processed it
+                  }
+                  
+                  if (!key || !value) continue;
+                  
+                  // Map the keys to our form fields
+                  switch (key) {
+                    case 'reference':
+                      parsed['quoteRef'] = value;
+                      break;
+                    case 'vin':
+                      parsed['vin'] = value;
+                      break;
+                    case 'make':
+                      parsed['make'] = value;
+                      break;
+                    case 'model':
+                      parsed['model'] = value;
+                      break;
+                    case 'series':
+                      parsed['series'] = value;
+                      break;
+                    case 'trans':
+                      parsed['auto'] = value.toLowerCase().includes('auto') ? 'true' : 'false';
+                      break;
+                    case 'body':
+                      parsed['body'] = value;
+                      break;
+                    case 'mth/yr':
+                    case 'mthyr':
+                      parsed['mthyr'] = value;
+                      break;
+                    case 'veh reg':
+                      parsed['rego'] = value;
+                      break;
+                    case 'required by':
+                      parsed['requiredBy'] = value;
+                      break;
+                  }
+                }
+                
+                setFields({
+                  quoteRef: parsed['quoteRef'] || '',
+                  vin: parsed['vin'] || '',
+                  make: parsed['make'] || '',
+                  model: parsed['model'] || '',
+                  series: parsed['series'] || '',
+                  auto: parsed['auto'] || 'true',
+                  body: parsed['body'] || '',
+                  mthyr: parsed['mthyr'] || '',
+                  rego: parsed['rego'] || '',
+                  requiredBy: parsed['requiredBy'] || '',
+                });
+              }, 0);
+            }}
+            placeholder="Paste your quote data here and it will auto-populate the form below..."
+            className="w-full h-32 p-4 text-sm border-2 border-gray-300 rounded-lg shadow-sm focus:border-red-500 focus:ring-2 focus:ring-red-200 focus:outline-none transition-all duration-200 bg-gray-50 font-mono resize-none"
+            style={{
+              backgroundImage: 'linear-gradient(45deg, #f9fafb 25%, transparent 25%), linear-gradient(-45deg, #f9fafb 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #f9fafb 75%), linear-gradient(-45deg, transparent 75%, #f9fafb 75%)',
+              backgroundSize: '20px 20px',
+              backgroundPosition: '0 0, 0 10px, 10px -10px, -10px 0px'
+            }}
+          />
+          <div className="absolute top-2 right-2">
+            <div className="flex items-center space-x-1 px-2 py-1 bg-gray-100 rounded text-xs text-gray-600">
+              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+              <span>Auto-fill enabled</span>
+            </div>
+          </div>
         </div>
+        <p className="text-xs text-gray-500 mt-1">
+          Paste your data and the form will automatically populate below
+        </p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -306,12 +525,25 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            Registration
+            Rego
           </label>
           <Input
             name="rego"
             value={fields.rego}
             onChange={handleChange}
+            className="w-full h-8 text-sm"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Required By
+          </label>
+          <Input
+            name="requiredBy"
+            value={fields.requiredBy}
+            onChange={handleChange}
+            placeholder="e.g., 28/07/2025 12:00pm"
             className="w-full h-8 text-sm"
           />
         </div>
@@ -324,7 +556,7 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
         </label>
         <div className="flex flex-wrap gap-2 mb-4">
           {PART_OPTIONS.map((part) => {
-            const IconComponent = part.icon;
+            const iconUrl = part.icon;
             const isSelected = selectedParts.includes(part.name);
             
             return (
@@ -338,7 +570,11 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
                     : 'bg-gray-100 text-gray-700 hover:bg-gray-200 border-2 border-gray-200'
                 }`}
               >
-                <IconComponent className="h-4 w-4" />
+                {iconUrl && (
+                  <div className="w-6 h-6 bg-white rounded-full flex items-center justify-center shadow-sm border border-gray-200">
+                    <img src={iconUrl} alt={part.name} className="h-4 w-4 object-contain" />
+                  </div>
+                )}
                 <span>{part.name}</span>
               </button>
             );
@@ -355,13 +591,17 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
             
             {selectedParts.map((partName) => {
               const part = partDetails[partName];
-              const IconComponent = PART_OPTIONS.find(p => p.name === partName)?.icon || Wrench;
+              const iconUrl = getPartIcon(partName);
               
               return (
                 <div key={partName} className="bg-gray-50 rounded-lg p-4 border border-gray-200">
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center space-x-2">
-                      <IconComponent className="h-4 w-4 text-red-600" />
+                      {iconUrl && (
+                        <div className="w-6 h-6 bg-white rounded-full flex items-center justify-center shadow-sm border border-gray-200">
+                          <img src={iconUrl} alt={partName} className="h-4 w-4 object-contain" />
+                        </div>
+                      )}
                       <span className="font-medium text-gray-900">{partName}</span>
                     </div>
                     <button
@@ -377,7 +617,7 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                     <div>
                       <label className="block text-xs font-medium text-gray-600 mb-1">
-                        Part Number
+                        Part Number *
                       </label>
                       <Input
                         value={part.number}
@@ -438,6 +678,51 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
           )}
         </Button>
       </div>
+
+      {/* Beautiful Validation Popup */}
+      {showValidationPopup && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 transform transition-all border border-gray-200">
+            <div className="flex items-center space-x-3 p-6 border-b border-gray-200">
+              <div className="flex-shrink-0">
+                <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
+                  <AlertCircle className="h-6 w-6 text-red-600" />
+                </div>
+              </div>
+              <div className="flex-1">
+                <h3 className="text-lg font-semibold text-gray-900">Validation Required</h3>
+                <p className="text-sm text-gray-600 mt-1">Please fix the following issues:</p>
+              </div>
+            </div>
+            
+            <div className="p-6">
+              <p className="text-gray-700 leading-relaxed mb-3">{validationMessage.split(':')[0]}:</p>
+              {validationMessage.includes('Please add part numbers for the following parts:') && (
+                <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                  <p className="text-sm font-medium text-gray-700 mb-2">Missing part numbers:</p>
+                  <div className="space-y-2">
+                    {validationMessage.split('Please add part numbers for the following parts: ')[1]?.split(', ').map((part, index) => (
+                      <div key={index} className="flex items-center space-x-2 p-2 bg-white rounded border border-gray-200 shadow-sm">
+                        <div className="w-2 h-2 bg-red-500 rounded-full"></div>
+                        <span className="text-sm font-medium text-gray-900">{part}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+            
+            <div className="flex justify-end p-6 border-t border-gray-200">
+              <Button
+                onClick={() => setShowValidationPopup(false)}
+                className="bg-red-600 hover:bg-red-700 text-white px-6 py-2 rounded-lg transition-colors"
+              >
+                Got it
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
-}; 
+};

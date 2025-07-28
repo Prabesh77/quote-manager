@@ -89,27 +89,22 @@ export const useQuotes = () => {
       console.error('Fetch quotes error:', error);
       setConnectionStatus('error');
     } else {
-      console.log('Fetched quotes:', data);
       setQuotes(data || []);
       setConnectionStatus('connected');
     }
   };
 
   const fetchParts = async () => {
-    console.log('Fetching parts from database...');
     const { data, error } = await supabase.from('parts').select('*').order('createdAt', { ascending: false });
     if (error) {
       console.error('Fetch parts error:', error);
     } else {
-      console.log('Fetched parts from database:', data);
-      console.log('Number of parts fetched:', data?.length || 0);
       setParts(data || []);
     }
   };
 
   // Real-time subscriptions
   useEffect(() => {
-    console.log('Setting up real-time subscriptions...');
     
     // Subscribe to quotes table changes
     const quotesSubscription = supabase
@@ -122,7 +117,6 @@ export const useQuotes = () => {
           table: 'quotes'
         },
         (payload) => {
-          console.log('Quotes real-time change:', payload);
           // Refresh both quotes and parts since status depends on parts data
           fetchQuotes();
           fetchParts();
@@ -143,7 +137,6 @@ export const useQuotes = () => {
           table: 'parts'
         },
         (payload) => {
-          console.log('Parts real-time change:', payload);
           // Refresh both quotes and parts since status depends on parts data
           fetchQuotes();
           fetchParts();
@@ -160,7 +153,6 @@ export const useQuotes = () => {
 
     // Cleanup subscriptions on unmount
     return () => {
-      console.log('Cleaning up real-time subscriptions...');
       quotesSubscription.unsubscribe();
       partsSubscription.unsubscribe();
     };
@@ -258,7 +250,6 @@ export const useQuotes = () => {
       if (updateError) {
         console.error('Error updating quote status:', updateError);
       } else {
-        console.log('Quote status updated to:', status);
         // Refresh quotes to update the UI immediately
         fetchQuotes();
       }
@@ -268,25 +259,19 @@ export const useQuotes = () => {
   };
 
   const updateQuoteStatusInState = (quoteId: string) => {
-    console.log('updateQuoteStatusInState called for quoteId:', quoteId);
     
     // Find the quote in local state
     const quoteIndex = quotes.findIndex(q => q.id === quoteId);
     if (quoteIndex === -1) {
-      console.log('Quote not found in local state');
       return;
     }
 
     // Get the quote's parts
     const quote = quotes[quoteIndex];
-    console.log('Quote found:', quote);
     
     const partIds = quote.partRequested?.split(',').map((id: string) => id.trim()) || [];
-    console.log('Part IDs for quote:', partIds);
     
     const quoteParts = parts.filter(part => partIds.includes(part.id));
-    console.log('Quote parts found:', quoteParts);
-    console.log('All parts available:', parts);
 
     // Calculate new status
     let newStatus: 'unpriced' | 'priced' | 'completed' = 'unpriced';
@@ -294,25 +279,18 @@ export const useQuotes = () => {
       newStatus = 'completed';
     } else if (quoteParts.length > 0) {
       const hasPricedParts = quoteParts.some(part => part.price && part.price > 0);
-      console.log('Has priced parts:', hasPricedParts);
       newStatus = hasPricedParts ? 'priced' : 'unpriced';
     }
-
-    console.log('Calculated new status:', newStatus, 'Current status:', quote.status);
 
     // Update the quote in local state
     const updatedQuotes = [...quotes];
     updatedQuotes[quoteIndex] = { ...quote, status: newStatus };
     setQuotes(updatedQuotes);
-
-    console.log('Updated quotes state');
-
     // Also update in database
     updateQuoteStatus(quoteId);
   };
 
   const updatePart = async (id: string, updates: Partial<Part>) => {
-    console.log('updatePart called with id:', id, 'updates:', updates);
     
     const { data, error } = await supabase
       .from('parts')
@@ -322,7 +300,6 @@ export const useQuotes = () => {
       .single();
     
     if (!error) {
-      console.log('Part updated successfully:', data);
       
       // Update parts immediately
       fetchParts();
@@ -359,11 +336,9 @@ export const useQuotes = () => {
         }
       }
       
-      console.log('Found quotes containing this part:', quoteData);
       
       if (quoteData && quoteData.length > 0) {
         for (const quote of quoteData) {
-          console.log('Updating status for quote:', quote.id);
           updateQuoteStatusInState(quote.id);
         }
       } else {
@@ -470,12 +445,10 @@ export const useQuotes = () => {
   };
 
   const updateMultipleParts = async (updates: Array<{ id: string; updates: Partial<Part> }>) => {
-    console.log('updateMultipleParts called with updates:', updates);
     const results = [];
     const affectedQuoteIds = new Set<string>();
     
     for (const { id, updates: partUpdates } of updates) {
-      console.log('Updating part:', id, 'with updates:', partUpdates);
       
       const { data, error } = await supabase
         .from('parts')
@@ -517,7 +490,6 @@ export const useQuotes = () => {
         }
       }
       
-      console.log('Found quotes containing part', id, ':', quoteData);
       
       if (quoteData && quoteData.length > 0) {
         quoteData.forEach(quote => affectedQuoteIds.add(quote.id));
@@ -526,9 +498,7 @@ export const useQuotes = () => {
     
     if (!results.some(r => r.error)) {
       fetchParts();
-      
-      console.log('Updating status for affected quotes:', Array.from(affectedQuoteIds));
-      
+            
       // Update status for all affected quotes
       for (const quoteId of affectedQuoteIds) {
         updateQuoteStatusInState(quoteId);
@@ -560,7 +530,6 @@ export const useQuotes = () => {
 
   // Test functions
   const testSupabaseConnection = async () => {
-    console.log('Testing Supabase connection...');
     setConnectionStatus('checking');
     
     const { data: testData, error: testError } = await supabase
@@ -569,17 +538,14 @@ export const useQuotes = () => {
       .limit(1);
     
     if (testError) {
-      console.error('Connection test failed:', testError);
       setConnectionStatus('error');
     } else {
-      console.log('Connection test successful');
       setConnectionStatus('connected');
     }
   };
 
 
   const checkTableStructure = async () => {
-    console.log('Checking table structure...');
     
     const { data, error } = await supabase
       .from('quotes')
@@ -587,13 +553,10 @@ export const useQuotes = () => {
       .limit(1);
     
     if (error) {
-      console.error('Table structure check failed:', error);
       alert(`Table structure check failed: ${error.message}`);
     } else if (data && data.length > 0) {
-      console.log('Table structure:', Object.keys(data[0]));
       alert(`Table has columns: ${Object.keys(data[0]).join(', ')}`);
     } else {
-      console.log('Table is empty');
       alert('Table is empty - no records found');
     }
   };
@@ -605,7 +568,6 @@ export const useQuotes = () => {
     }
     
     const firstQuote = quotes[0];
-    console.log('Testing update with quote:', firstQuote);
     
     const testUpdateData = {
       partRequested: 'test-part-id'
@@ -618,10 +580,8 @@ export const useQuotes = () => {
       .select();
     
     if (error) {
-      console.error('Test update failed:', error);
       alert(`Test update failed: ${error.message}`);
     } else {
-      console.log('Test update successful:', data);
       alert('Test update successful');
       fetchQuotes();
     }

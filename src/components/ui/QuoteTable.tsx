@@ -208,7 +208,8 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
     const lowerName = partName.toLowerCase();
     if (lowerName.includes('radiator')) return '/part-icons/radiator.png';
     if (lowerName.includes('condenser') || lowerName.includes('condensor')) return '/part-icons/condenser.png';
-    if (lowerName.includes('headlight') || lowerName.includes('head lamp') || lowerName.includes('left headlamp') || lowerName.includes('right headlamp')) return '/part-icons/headlight.png';
+    if (lowerName.includes('headlight') || lowerName.includes('head lamp') ||  lowerName.includes('right headlamp')) return '/part-icons/headlight-right.png';
+    if (lowerName.includes('headlight') || lowerName.includes('head lamp') ||  lowerName.includes('left headlamp')) return '/part-icons/headlight-left.png';
     if (lowerName.includes('intercooler')) return '/part-icons/intercooler.png';
     if (lowerName.includes('fan assembly') || lowerName.includes('fan')) return '/part-icons/fan.png';
     return null; // No icon for other parts
@@ -250,7 +251,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
     const IconComponent = config.icon;
 
     return (
-      <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-semibold border ${config.bg} ${config.text} ${config.border} shadow-sm`}>
+      <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-semibold border ${config.bg} ${config.text} ${config.border} shadow-sm whitespace-nowrap`}>
         <IconComponent className="h-4 w-4" />
         <span>{config.label}</span>
       </div>
@@ -325,8 +326,6 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
       return;
     }
     
-    console.log('Ordering quote:', quoteId, 'with tax invoice:', taxInvoiceNumber);
-    console.log('Selected parts:', selectedParts.map(p => p.name));
     
     if (onMarkAsOrderedWithParts) {
       await onMarkAsOrderedWithParts(quoteId, taxInvoiceNumber, selectedParts.map(p => p.id));

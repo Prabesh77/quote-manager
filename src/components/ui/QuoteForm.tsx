@@ -108,8 +108,74 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
       // Pattern 5: "Required By" followed by value on next line
       else if (trimmedLine === 'Required By' && i + 1 < lines.length) {
         key = 'required by';
-        value = lines[i + 1].trim();
-        i++; // Skip the next line since we've processed it
+        // Get the next two lines for date and time
+        const dateLine = lines[i + 1]?.trim();
+        const timeLine = lines[i + 2]?.trim();
+        
+        if (dateLine && timeLine) {
+          try {
+            // Parse the date (format: "28/07/2025")
+            const [day, month, year] = dateLine.split('/');
+            
+            // Validate date components
+            if (!day || !month || !year || isNaN(parseInt(day)) || isNaN(parseInt(month)) || isNaN(parseInt(year))) {
+              throw new Error('Invalid date format');
+            }
+            
+            // Parse the time (format: "12:00pm" or "1200pm")
+            const timeStr = timeLine.toLowerCase();
+            let hours = 0;
+            let minutes = 0;
+            
+            if (timeStr.includes('pm')) {
+              const time = timeStr.replace('pm', '');
+              if (time.includes(':')) {
+                const [h, m] = time.split(':');
+                hours = parseInt(h) + 12;
+                minutes = parseInt(m || '0');
+              } else {
+                // Handle format like "1200pm"
+                const timeNum = parseInt(time);
+                hours = Math.floor(timeNum / 100) + 12;
+                minutes = timeNum % 100;
+              }
+            } else if (timeStr.includes('am')) {
+              const time = timeStr.replace('am', '');
+              if (time.includes(':')) {
+                const [h, m] = time.split(':');
+                hours = parseInt(h);
+                minutes = parseInt(m || '0');
+              } else {
+                // Handle format like "1200am"
+                const timeNum = parseInt(time);
+                hours = Math.floor(timeNum / 100);
+                minutes = timeNum % 100;
+              }
+            }
+            
+            // Validate time components
+            if (isNaN(hours) || isNaN(minutes) || hours < 0 || hours > 23 || minutes < 0 || minutes > 59) {
+              throw new Error('Invalid time format');
+            }
+            
+            // Create ISO timestamp
+            const deadline = new Date(parseInt(year), parseInt(month) - 1, parseInt(day), hours, minutes);
+            
+            // Validate the created date
+            if (isNaN(deadline.getTime())) {
+              throw new Error('Invalid date/time combination');
+            }
+            
+            value = deadline.toISOString();
+          } catch (error) {
+            // Fallback to original format if parsing fails
+            value = `${dateLine} ${timeLine}`;
+          }
+          i += 2; // Skip the next two lines since we've processed them
+        } else if (dateLine) {
+          value = dateLine;
+          i += 1; // Skip the next line since we've processed it
+        }
       }
       
       if (!key || !value) continue;
@@ -180,7 +246,7 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
       make: '',
       model: '',
       series: '',
-      auto: 'false',
+      auto: 'true',
       body: '',
       mthyr: '',
       rego: '',
@@ -226,7 +292,7 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const { quoteRef, vin, make, model, series, auto, body, mthyr, rego } = fields;
+    const { quoteRef, vin, make, model, series, auto, body, mthyr, rego, requiredBy } = fields;
     if (!quoteRef) return;
     if (selectedParts.length === 0) {
       setValidationMessage('Please select at least one part');
@@ -262,6 +328,7 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
         body,
         mthyr,
         rego,
+        requiredBy,
       }, partsArray);
       clearForm();
     } catch (error) {
@@ -332,8 +399,106 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
                   // Pattern 5: "Required By" followed by value on next line
                   else if (trimmedLine === 'Required By' && i + 1 < lines.length) {
                     key = 'required by';
-                    value = lines[i + 1].trim();
-                    i++; // Skip the next line since we've processed it
+                    // Get the next two lines for date and time, skipping empty lines
+                    let dateLine = '';
+                    let timeLine = '';
+                    let lineIndex = i + 1;
+                    
+                    // Find the first non-empty line for date
+                    while (lineIndex < lines.length && !dateLine) {
+                      const line = lines[lineIndex]?.trim();
+                      if (line) {
+                        dateLine = line;
+                      }
+                      lineIndex++;
+                    }
+                    
+                    // Find the next non-empty line for time
+                    while (lineIndex < lines.length && !timeLine) {
+                      const line = lines[lineIndex]?.trim();
+                      if (line) {
+                        timeLine = line;
+                      }
+                      lineIndex++;
+                    }
+                    
+                    console.log('Found Required By:', { dateLine, timeLine, i });
+                    
+                    if (dateLine && timeLine) {
+                      try {
+                        // Parse the date (format: "28/07/2025")
+                        const [day, month, year] = dateLine.split('/');
+                        
+                        console.log('Parsed date components:', { day, month, year });
+                        
+                        // Validate date components
+                        if (!day || !month || !year || isNaN(parseInt(day)) || isNaN(parseInt(month)) || isNaN(parseInt(year))) {
+                          throw new Error('Invalid date format');
+                        }
+                        
+                        // Parse the time (format: "12:00pm" or "1200pm")
+                        const timeStr = timeLine.toLowerCase();
+                        let hours = 0;
+                        let minutes = 0;
+                        
+                        console.log('Parsing time:', timeStr);
+                        
+                        if (timeStr.includes('pm')) {
+                          const time = timeStr.replace('pm', '');
+                          if (time.includes(':')) {
+                            const [h, m] = time.split(':');
+                            hours = parseInt(h) + 12;
+                            minutes = parseInt(m || '0');
+                          } else {
+                            // Handle format like "1200pm"
+                            const timeNum = parseInt(time);
+                            hours = Math.floor(timeNum / 100) + 12;
+                            minutes = timeNum % 100;
+                          }
+                        } else if (timeStr.includes('am')) {
+                          const time = timeStr.replace('am', '');
+                          if (time.includes(':')) {
+                            const [h, m] = time.split(':');
+                            hours = parseInt(h);
+                            minutes = parseInt(m || '0');
+                          } else {
+                            // Handle format like "1200am"
+                            const timeNum = parseInt(time);
+                            hours = Math.floor(timeNum / 100);
+                            minutes = timeNum % 100;
+                          }
+                        }
+                        
+                        console.log('Parsed time components:', { hours, minutes });
+                        
+                        // Validate time components
+                        if (isNaN(hours) || isNaN(minutes) || hours < 0 || hours > 23 || minutes < 0 || minutes > 59) {
+                          throw new Error('Invalid time format');
+                        }
+                        
+                        // Create ISO timestamp
+                        const deadline = new Date(parseInt(year), parseInt(month) - 1, parseInt(day), hours, minutes);
+                        
+                        console.log('Created deadline:', deadline);
+                        
+                        // Validate the created date
+                        if (isNaN(deadline.getTime())) {
+                          throw new Error('Invalid date/time combination');
+                        }
+                        
+                        value = deadline.toISOString();
+                        console.log('Final ISO value:', value);
+                      } catch (error) {
+                        console.error('Error parsing Required By:', error);
+                        // Fallback to original format if parsing fails
+                        value = `${dateLine} ${timeLine}`;
+                      }
+                      // Skip the lines we processed
+                      i = lineIndex - 1;
+                    } else if (dateLine) {
+                      value = dateLine;
+                      i = lineIndex - 1;
+                    }
                   }
                   
                   if (!key || !value) continue;

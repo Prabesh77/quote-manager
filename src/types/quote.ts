@@ -16,6 +16,7 @@ export interface Quote {
   body: string;
   mthyr: string;
   rego: string;
+  requiredBy?: string;
   partRequested: string;
   createdAt: string;
   status: 'active' | 'completed';

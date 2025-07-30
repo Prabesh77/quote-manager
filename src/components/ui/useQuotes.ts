@@ -25,6 +25,7 @@ export interface Quote {
   body: string;
   mthyr: string; // mth/yr field
   rego: string;
+  requiredBy?: string; // Deadline field
   status: 'active' | 'completed' | 'unpriced' | 'priced' | 'ordered'; // Updated status field
   taxInvoiceNumber?: string; // Tax invoice number for orders
   [key: string]: any; // Allow string indexing

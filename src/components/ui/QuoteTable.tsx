@@ -495,42 +495,41 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
   const handleMarkAsOrder = (quoteId: string) => {
     setShowOrderModal(quoteId);
     setTaxInvoiceNumber('');
-    // Get the quote and its parts
+    
+    // Auto-select all orderable parts (parts with price > 0)
     const quote = quotes.find(q => q.id === quoteId);
     if (quote) {
       const quoteParts = getQuoteParts(quote.partRequested);
-      // Initialize with all parts selected
-      setSelectedPartsForOrder(new Set(quoteParts.map(part => part.id)));
+      const orderableParts = quoteParts.filter(part => part.price && part.price > 0);
+      const orderablePartIds = orderableParts.map(part => part.id);
+      setSelectedPartsForOrder(new Set(orderablePartIds));
+    } else {
+      setSelectedPartsForOrder(new Set());
     }
   };
 
-  const confirmOrder = async (quoteId: string) => {
-    if (!taxInvoiceNumber.trim()) {
-      alert('Please enter a Tax Invoice Number');
-      return;
-    }
+  const confirmOrder = async () => {
+    if (!showOrderModal || !taxInvoiceNumber.trim() || !onMarkAsOrderedWithParts) return;
     
-    // Get the quote and its parts
-    const quote = quotes.find(q => q.id === quoteId);
-    if (!quote) return;
-    
-    const quoteParts = getQuoteParts(quote.partRequested);
-    const selectedParts = quoteParts.filter(part => selectedPartsForOrder.has(part.id));
-    
-    if (selectedParts.length === 0) {
+    // Validate that at least one part is selected
+    if (selectedPartsForOrder.size === 0) {
       alert('Please select at least one part to order');
       return;
     }
     
+    // console.log('Marking quote as ordered:', showOrderModal, 'with tax invoice:', taxInvoiceNumber);
     
-    if (onMarkAsOrderedWithParts) {
-      await onMarkAsOrderedWithParts(quoteId, taxInvoiceNumber, selectedParts.map(p => p.id));
-    } else {
-      console.log('Marking quote as ordered:', quoteId, 'with tax invoice:', taxInvoiceNumber);
+    const result = await onMarkAsOrderedWithParts(
+      showOrderModal,
+      taxInvoiceNumber.trim(),
+      Array.from(selectedPartsForOrder)
+    );
+    
+    if (!result.error) {
+      setShowOrderModal(null);
+      setTaxInvoiceNumber('');
+      setSelectedPartsForOrder(new Set());
     }
-    setShowOrderModal(null);
-    setTaxInvoiceNumber('');
-    setSelectedPartsForOrder(new Set());
   };
 
   const cancelOrder = () => {
@@ -611,14 +610,14 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
             
             return (
               <AccordionItem key={quote.id} value={quote.id} className="border-b border-gray-100 last:border-b-0 relative">
-                {/* Deadline Indicator */}
-                {(() => {
+                {/* Deadline Indicator - Only for unpriced and priced quotes */}
+                {quote.status !== 'completed' && quote.status !== 'ordered' && (() => {
                   const deadlineInfo = getDeadlineIndicator(quote.requiredBy);
                   if (!deadlineInfo) return null;
                   
                   return (
                     <>
-                      <div className={`absolute left-0 top-0 bottom-0 w-[2px] ${deadlineInfo.color} ${deadlineInfo.animation}`}></div>
+                      <div className={`absolute left-0 top-0 bottom-0 w-1 ${deadlineInfo.color} ${deadlineInfo.animation}`}></div>
                       <div className="absolute left-0 top-[11px] transform -translate-y-1/2 z-10">
                         <div className={`px-2 py-[2px] text-[12px] font-semibold text-white shadow-sm ${deadlineInfo.color} ${deadlineInfo.animation}`}>
                           {deadlineInfo.timeDisplay}
@@ -1715,7 +1714,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                 Cancel
               </button>
               <button
-                onClick={() => confirmOrder(showOrderModal)}
+                onClick={() => confirmOrder()}
                 className="flex-1 px-4 py-2 text-white bg-red-600 hover:bg-red-700 rounded-lg font-medium transition-colors cursor-pointer"
               >
                 Mark as Order

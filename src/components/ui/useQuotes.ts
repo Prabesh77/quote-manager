@@ -124,7 +124,7 @@ export const useQuotes = () => {
         }
       )
       .subscribe((status) => {
-        console.log('Quotes subscription status:', status);
+        // console.log('Quotes subscription status:', status);
       });
 
     // Subscribe to parts table changes
@@ -144,7 +144,7 @@ export const useQuotes = () => {
         }
       )
       .subscribe((status) => {
-        console.log('Parts subscription status:', status);
+        // console.log('Parts subscription status:', status);
       });
 
     // Initial data fetch
@@ -343,7 +343,7 @@ export const useQuotes = () => {
           updateQuoteStatusInState(quote.id);
         }
       } else {
-        console.log('No quotes found containing this part');
+        // console.log('No quotes found containing this part');
       }
     } else {
       console.error('Error updating part:', error);
@@ -586,6 +586,13 @@ export const useQuotes = () => {
       alert('Test update successful');
       fetchQuotes();
     }
+  };
+
+  const getQuotesContainingPart = (partId: string): Quote[] => {
+    return quotes.filter(quote => {
+      const quoteParts = parts.filter(part => part.id === quote.id);
+      return quoteParts.some(part => part.id === partId);
+    });
   };
 
   return {

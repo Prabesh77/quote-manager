@@ -332,7 +332,7 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
       }, partsArray);
       clearForm();
     } catch (error) {
-      console.error('Error submitting quote:', error);
+      // console.error('Error submitting quote:', error);
     } finally {
       setIsLoading(false);
     }
@@ -422,14 +422,10 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
                       lineIndex++;
                     }
                     
-                    console.log('Found Required By:', { dateLine, timeLine, i });
-                    
                     if (dateLine && timeLine) {
                       try {
                         // Parse the date (format: "28/07/2025")
                         const [day, month, year] = dateLine.split('/');
-                        
-                        console.log('Parsed date components:', { day, month, year });
                         
                         // Validate date components
                         if (!day || !month || !year || isNaN(parseInt(day)) || isNaN(parseInt(month)) || isNaN(parseInt(year))) {
@@ -440,8 +436,6 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
                         const timeStr = timeLine.toLowerCase();
                         let hours = 0;
                         let minutes = 0;
-                        
-                        console.log('Parsing time:', timeStr);
                         
                         if (timeStr.includes('pm')) {
                           const time = timeStr.replace('pm', '');
@@ -469,8 +463,6 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
                           }
                         }
                         
-                        console.log('Parsed time components:', { hours, minutes });
-                        
                         // Validate time components
                         if (isNaN(hours) || isNaN(minutes) || hours < 0 || hours > 23 || minutes < 0 || minutes > 59) {
                           throw new Error('Invalid time format');
@@ -479,17 +471,13 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
                         // Create ISO timestamp
                         const deadline = new Date(parseInt(year), parseInt(month) - 1, parseInt(day), hours, minutes);
                         
-                        console.log('Created deadline:', deadline);
-                        
                         // Validate the created date
                         if (isNaN(deadline.getTime())) {
                           throw new Error('Invalid date/time combination');
                         }
                         
                         value = deadline.toISOString();
-                        console.log('Final ISO value:', value);
                       } catch (error) {
-                        console.error('Error parsing Required By:', error);
                         // Fallback to original format if parsing fails
                         value = `${dateLine} ${timeLine}`;
                       }

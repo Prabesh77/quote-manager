@@ -31,7 +31,7 @@ type QuoteStatus = 'unpriced' | 'priced' | 'completed' | 'ordered';
 export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote, onUpdatePart, onUpdateMultipleParts, onMarkCompleted, onMarkAsOrdered, onMarkAsOrderedWithParts, showCompleted = false, defaultFilter = 'all' }: QuoteTableProps) {
   const [editingQuote, setEditingQuote] = useState<string | null>(null);
   const [editData, setEditData] = useState<Record<string, any>>({});
-  const [editingParts, setEditingParts] = useState<string | null>(null); // Changed from Set to string | null
+  const [editingParts, setEditingParts] = useState<string | null>(null);
   const [partsEditData, setPartsEditData] = useState<Record<string, Record<string, any>>>({});
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedQuote, setSelectedQuote] = useState<string | null>(null);
@@ -39,6 +39,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
   const [showOrderModal, setShowOrderModal] = useState<string | null>(null);
   const [taxInvoiceNumber, setTaxInvoiceNumber] = useState('');
   const [selectedPartsForOrder, setSelectedPartsForOrder] = useState<Set<string>>(new Set());
+  const [currentTime, setCurrentTime] = useState(new Date());
 
   // Brand colors
   const brandRed = '#d0202d';
@@ -205,14 +206,209 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
   };
 
   const getPartIcon = (partName: string): string | null => {
-    const lowerName = partName.toLowerCase();
-    if (lowerName.includes('radiator')) return '/part-icons/radiator.png';
-    if (lowerName.includes('condenser') || lowerName.includes('condensor')) return '/part-icons/condenser.png';
-    if (lowerName.includes('headlight') || lowerName.includes('head lamp') ||  lowerName.includes('right headlamp')) return '/part-icons/headlight-right.png';
-    if (lowerName.includes('headlight') || lowerName.includes('head lamp') ||  lowerName.includes('left headlamp')) return '/part-icons/headlight-left.png';
-    if (lowerName.includes('intercooler')) return '/part-icons/intercooler.png';
-    if (lowerName.includes('fan assembly') || lowerName.includes('fan')) return '/part-icons/fan.png';
-    return null; // No icon for other parts
+    const iconMap: Record<string, string> = {
+      'Radiator': '/part-icons/radiator.png',
+      'Left Headlamp': '/part-icons/headlight-left.png',
+      'Right Headlamp': '/part-icons/headlight-right.png',
+      'Condenser': '/part-icons/condenser.png',
+      'Radar Sensor': '/part-icons/sensor.png',
+      'Fan Assembly': '/part-icons/fan.png',
+      'Intercooler': '/part-icons/intercooler.png',
+    };
+    
+    return iconMap[partName] || null;
+  };
+
+  const getDeadlineIndicator = (requiredBy: string | undefined) => {
+    if (!requiredBy) return null;
+    
+    try {
+      // Check if it's an ISO timestamp (contains 'T' and 'Z' or timezone)
+      if (requiredBy.includes('T')) {
+        // ISO timestamp format
+        const deadline = new Date(requiredBy);
+        const now = currentTime; // Use currentTime from state instead of new Date()
+        const diffMs = deadline.getTime() - now.getTime();
+        const diffMins = Math.floor(diffMs / (1000 * 60));
+        
+        let color = 'bg-green-500';
+        let animation = '';
+        
+        if (diffMins < 0) {
+          // Overdue
+          color = 'bg-red-500';
+          animation = 'animate-blink-warning';
+        } else if (diffMins < 15) {
+          // Less than 15 minutes
+          color = 'bg-red-500';
+        } else if (diffMins < 30) {
+          // Less than 30 minutes
+          color = 'bg-yellow-500';
+        } else {
+          // More than 30 minutes
+          color = 'bg-green-500';
+        }
+        
+        // Format the time display
+        let timeDisplay = '';
+        if (diffMins < 0) {
+          // Overdue - show negative time
+          const absMins = Math.abs(diffMins);
+          if (absMins < 60) {
+            timeDisplay = `-${absMins}m`;
+          } else if (absMins < 1440) { // Less than 24 hours
+            const hours = Math.floor(absMins / 60);
+            const mins = absMins % 60;
+            timeDisplay = `-${hours}h ${mins}m`;
+          } else if (absMins < 10080) { // Less than 7 days
+            const days = Math.floor(absMins / 1440);
+            const remainingMins = absMins % 1440;
+            const hours = Math.floor(remainingMins / 60);
+            const mins = remainingMins % 60;
+            timeDisplay = `-${days}d ${hours}h ${mins}m`;
+          } else {
+            const weeks = Math.floor(absMins / 10080);
+            const remainingMins = absMins % 10080;
+            const days = Math.floor(remainingMins / 1440);
+            const hours = Math.floor((remainingMins % 1440) / 60);
+            const mins = remainingMins % 60;
+            timeDisplay = `-${weeks}wk ${days}d ${hours}h ${mins}m`;
+          }
+        } else if (diffMins < 60) {
+          // Less than 1 hour
+          timeDisplay = `${diffMins}m`;
+        } else if (diffMins < 1440) { // Less than 24 hours
+          const hours = Math.floor(diffMins / 60);
+          const mins = diffMins % 60;
+          timeDisplay = `${hours}h ${mins}m`;
+        } else if (diffMins < 10080) { // Less than 7 days
+          const days = Math.floor(diffMins / 1440);
+          const remainingMins = diffMins % 1440;
+          const hours = Math.floor(remainingMins / 60);
+          const mins = remainingMins % 60;
+          timeDisplay = `${days}d ${hours}h ${mins}m`;
+        } else {
+          // More than 7 days
+          const weeks = Math.floor(diffMins / 10080);
+          const remainingMins = diffMins % 10080;
+          const days = Math.floor(remainingMins / 1440);
+          const hours = Math.floor((remainingMins % 1440) / 60);
+          const mins = remainingMins % 60;
+          timeDisplay = `${weeks}wk ${days}d ${hours}h ${mins}m`;
+        }
+        
+        return { color, animation, timeDisplay };
+      } else {
+        // Legacy format (date and time as string)
+        const [datePart, timePart] = requiredBy.split(' ');
+        const [day, month, year] = datePart.split('/');
+        const timeStr = timePart.toLowerCase();
+        
+        let hours = 0;
+        let minutes = 0;
+        
+        if (timeStr.includes('pm')) {
+          const time = timeStr.replace('pm', '');
+          if (time.includes(':')) {
+            const [h, m] = time.split(':');
+            hours = parseInt(h) + 12;
+            minutes = parseInt(m || '0');
+          } else {
+            // Handle format like "1200pm"
+            const timeNum = parseInt(time);
+            hours = Math.floor(timeNum / 100) + 12;
+            minutes = timeNum % 100;
+          }
+        } else if (timeStr.includes('am')) {
+          const time = timeStr.replace('am', '');
+          if (time.includes(':')) {
+            const [h, m] = time.split(':');
+            hours = parseInt(h);
+            minutes = parseInt(m || '0');
+          } else {
+            // Handle format like "1200am"
+            const timeNum = parseInt(time);
+            hours = Math.floor(timeNum / 100);
+            minutes = timeNum % 100;
+          }
+        }
+        
+        const deadline = new Date(parseInt(year), parseInt(month) - 1, parseInt(day), hours, minutes);
+        const now = currentTime; // Use currentTime from state instead of new Date()
+        const diffMs = deadline.getTime() - now.getTime();
+        const diffMins = Math.floor(diffMs / (1000 * 60));
+        
+        let color = 'bg-green-500';
+        let animation = '';
+        
+        if (diffMins < 0) {
+          // Overdue
+          color = 'bg-red-500';
+          animation = 'animate-blink-warning';
+        } else if (diffMins < 15) {
+          // Less than 15 minutes
+          color = 'bg-red-500';
+        } else if (diffMins < 30) {
+          // Less than 30 minutes
+          color = 'bg-yellow-500';
+        } else {
+          // More than 30 minutes
+          color = 'bg-green-500';
+        }
+        
+        // Format the time display
+        let timeDisplay = '';
+        if (diffMins < 0) {
+          // Overdue - show negative time
+          const absMins = Math.abs(diffMins);
+          if (absMins < 60) {
+            timeDisplay = `-${absMins}m`;
+          } else if (absMins < 1440) { // Less than 24 hours
+            const hours = Math.floor(absMins / 60);
+            const mins = absMins % 60;
+            timeDisplay = `-${hours}h ${mins}m`;
+          } else if (absMins < 10080) { // Less than 7 days
+            const days = Math.floor(absMins / 1440);
+            const remainingMins = absMins % 1440;
+            const hours = Math.floor(remainingMins / 60);
+            const mins = remainingMins % 60;
+            timeDisplay = `-${days}d ${hours}h ${mins}m`;
+          } else {
+            const weeks = Math.floor(absMins / 10080);
+            const remainingMins = absMins % 10080;
+            const days = Math.floor(remainingMins / 1440);
+            const hours = Math.floor((remainingMins % 1440) / 60);
+            const mins = remainingMins % 60;
+            timeDisplay = `-${weeks}wk ${days}d ${hours}h ${mins}m`;
+          }
+        } else if (diffMins < 60) {
+          // Less than 1 hour
+          timeDisplay = `${diffMins}m`;
+        } else if (diffMins < 1440) { // Less than 24 hours
+          const hours = Math.floor(diffMins / 60);
+          const mins = diffMins % 60;
+          timeDisplay = `${hours}h ${mins}m`;
+        } else if (diffMins < 10080) { // Less than 7 days
+          const days = Math.floor(diffMins / 1440);
+          const remainingMins = diffMins % 1440;
+          const hours = Math.floor(remainingMins / 60);
+          const mins = remainingMins % 60;
+          timeDisplay = `${days}d ${hours}h ${mins}m`;
+        } else {
+          // More than 7 days
+          const weeks = Math.floor(diffMins / 10080);
+          const remainingMins = diffMins % 10080;
+          const days = Math.floor(remainingMins / 1440);
+          const hours = Math.floor((remainingMins % 1440) / 60);
+          const mins = remainingMins % 60;
+          timeDisplay = `${weeks}wk ${days}d ${hours}h ${mins}m`;
+        }
+        
+        return { color, animation, timeDisplay };
+      }
+    } catch (error) {
+      return null;
+    }
   };
 
   const getStatusChip = (status: QuoteStatus) => {
@@ -343,6 +539,15 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
     setSelectedPartsForOrder(new Set());
   };
 
+  // Timer to update deadline indicators every minute
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 60000); // Update every minute
+
+    return () => clearInterval(timer);
+  }, []);
+
   return (
     <div className="space-y-4">
       {/* Search and Filters */}
@@ -403,9 +608,26 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
           {filteredQuotes.map((quote) => {
             const quoteParts = getQuoteParts(quote.partRequested);
             const status = getQuoteStatus(quoteParts, quote.status);
-
+            
             return (
-              <AccordionItem key={quote.id} value={quote.id} className="border-b border-gray-100 last:border-b-0">
+              <AccordionItem key={quote.id} value={quote.id} className="border-b border-gray-100 last:border-b-0 relative">
+                {/* Deadline Indicator */}
+                {(() => {
+                  const deadlineInfo = getDeadlineIndicator(quote.requiredBy);
+                  if (!deadlineInfo) return null;
+                  
+                  return (
+                    <>
+                      <div className={`absolute left-0 top-0 bottom-0 w-[2px] ${deadlineInfo.color} ${deadlineInfo.animation}`}></div>
+                      <div className="absolute left-0 top-[11px] transform -translate-y-1/2 z-10">
+                        <div className={`px-2 py-[2px] text-[12px] font-semibold text-white shadow-sm ${deadlineInfo.color} ${deadlineInfo.animation}`}>
+                          {deadlineInfo.timeDisplay}
+                        </div>
+                      </div>
+                    </>
+                  );
+                })()}
+                
                 <AccordionTrigger className="grid grid-cols-6 gap-4 w-full px-6 hover:bg-gray-50 transition-colors cursor-pointer" style={{ gridTemplateColumns: '1fr 1fr 2fr 1fr 0.5fr 0.5fr' }}>
                   {/* Quote Ref */}
                   <div>

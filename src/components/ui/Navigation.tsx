@@ -3,7 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Plus, DollarSign, CheckCircle, ShoppingCart, FileText } from 'lucide-react';
+import { Plus, DollarSign, CheckCircle, ShoppingCart, FileText, BarChart3 } from 'lucide-react';
 import { ConnectionStatus } from './ConnectionStatus';
 import { useQuotes } from './useQuotes';
 

@@ -58,6 +58,9 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
     mthyr: '',
     rego: '',
     requiredBy: '',
+    customer: '',
+    address: '',
+    phone: '',
   });
   const [selectedParts, setSelectedParts] = useState<string[]>([]);
   const [partDetails, setPartDetails] = useState<Record<string, PartDetails>>({});
@@ -178,7 +181,13 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
         }
       }
       
-      if (!key || !value) continue;
+      console.log('Before continue check - key:', key, 'value:', value);
+      if (!key || !value) {
+        console.log('Continue triggered - key or value is empty');
+        continue;
+      }
+      
+      console.log('Processing key:', key, 'value:', value);
       
       // Map the keys to our form fields
       switch (key) {
@@ -213,9 +222,26 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
         case 'required by':
           parsed['requiredBy'] = value;
           break;
+        case 'customer':
+          parsed['customer'] = value;
+          console.log('Mapped customer to parsed:', value);
+          break;
+        case 'address':
+          parsed['address'] = value;
+          console.log('Mapped address to parsed:', value);
+          break;
+        case 'phone':
+          parsed['phone'] = value;
+          console.log('Mapped phone to parsed:', value);
+          break;
       }
     }
     
+    console.log('Reached end of parsing loop');
+    console.log('Final parsed object:', parsed);
+    console.log('Setting customer to:', parsed['customer']);
+    console.log('Setting address to:', parsed['address']);
+    console.log('Setting phone to:', parsed['phone']);
     setFields({
       quoteRef: parsed['quoteRef'] || '',
       vin: parsed['vin'] || '',
@@ -227,6 +253,9 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
       mthyr: parsed['mthyr'] || '',
       rego: parsed['rego'] || '',
       requiredBy: parsed['requiredBy'] || '',
+      customer: parsed['customer'] || '',
+      address: parsed['address'] || '',
+      phone: parsed['phone'] || '',
     });
   };
 
@@ -251,6 +280,9 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
       mthyr: '',
       rego: '',
       requiredBy: '',
+      customer: '',
+      address: '',
+      phone: '',
     });
     setSelectedParts([]);
     setPartDetails({});
@@ -292,7 +324,7 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const { quoteRef, vin, make, model, series, auto, body, mthyr, rego, requiredBy } = fields;
+    const { quoteRef, vin, make, model, series, auto, body, mthyr, rego, requiredBy, customer, address, phone } = fields;
     if (!quoteRef) return;
     if (selectedParts.length === 0) {
       setValidationMessage('Please select at least one part');
@@ -329,6 +361,9 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
         mthyr,
         rego,
         requiredBy,
+        customer,
+        address,
+        phone,
       }, partsArray);
       clearForm();
     } catch (error) {
@@ -356,13 +391,14 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
               const pastedText = e.clipboardData.getData('text');
               setRawText(pastedText);
               // Process the pasted text directly
-              setTimeout(() => {
                 const lines = pastedText.split('\n');
                 const parsed: Record<string, string> = {};
                 
                 for (let i = 0; i < lines.length; i++) {
                   const trimmedLine = lines[i].trim();
                   if (!trimmedLine) continue;
+                  
+
                   
                   // Handle different patterns in the data
                   let key = '';
@@ -396,19 +432,59 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
                       value = match[2].trim();
                     }
                   }
-                  // Pattern 3: "Reference: 28495#2" (with colon)
+                  // Pattern 3: "Ph:" followed by phone number (check before general colon pattern)
+                  else if (trimmedLine.startsWith('Ph:')) {
+                    key = 'phone';
+                    value = trimmedLine.replace('Ph:', '').trim();
+
+                  }
+                  // Pattern 4: "Reference: 28495#2" (with colon)
                   else if (trimmedLine.includes(':')) {
                     const [k, ...rest] = trimmedLine.split(':');
                     key = k.trim().toLowerCase();
                     value = rest.join(':').trim();
+
                   }
-                  // Pattern 4: Standalone "VIN" followed by value on next line
+                  // Pattern 5: Standalone "VIN" followed by value on next line
                   else if (trimmedLine === 'VIN' && i + 1 < lines.length) {
                     key = 'vin';
                     value = lines[i + 1].trim();
                     i++; // Skip the next line since we've processed it
                   }
-                  // Pattern 5: "Required By" followed by value on next line
+                  // Pattern 6: "Purchaser" followed by customer name
+                  else if (trimmedLine.startsWith('Purchaser')) {
+                    key = 'customer';
+                    value = trimmedLine.replace('Purchaser', '').trim();
+
+                  }
+                  // Pattern 7: Address lines (after Purchaser, before Ph:)
+                  else if (trimmedLine && !trimmedLine.includes(':') && !trimmedLine.match(/^(Reference|Make|Model|Series|Trans|Body|Mth\/Yr|Veh Reg|Required By|Purchaser|Ph:|General Info|Vehicle Info|Quote Status|Estimator)/i)) {
+                    // Check if this might be an address line
+                    if (i > 0) {
+                      const prevLine = lines[i - 1]?.trim();
+                      // If we haven't found an address yet and this line looks like an address
+                      if (!parsed['address'] && prevLine && prevLine.startsWith('Purchaser')) {
+                        key = 'address';
+                        value = trimmedLine;
+                        // Look ahead for additional address lines
+                        let fullAddress = trimmedLine;
+                        let nextIndex = i + 1;
+                        while (nextIndex < lines.length) {
+                          const nextLine = lines[nextIndex]?.trim();
+                          if (nextLine && !nextLine.includes(':') && !nextLine.match(/^(Reference|Make|Model|Series|Trans|Body|Mth\/Yr|Veh Reg|Required By|Purchaser|Ph:|General Info|Vehicle Info|Quote Status|Estimator)/i)) {
+                            fullAddress += ', ' + nextLine;
+                            nextIndex++;
+                          } else {
+                            break;
+                          }
+                        }
+                        value = fullAddress;
+                        i = nextIndex - 1; // Skip the processed lines
+                        // Don't continue - let it reach the switch statement
+                      }
+                    }
+                  }
+                  // Pattern 8: "Required By" followed by value on next line
                   else if (trimmedLine === 'Required By' && i + 1 < lines.length) {
                     key = 'required by';
                     // Get the next two lines for date and time, skipping empty lines
@@ -536,6 +612,18 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
                     case 'required by':
                       parsed['requiredBy'] = value;
                       break;
+                    case 'customer':
+                      parsed['customer'] = value;
+
+                      break;
+                    case 'address':
+                      parsed['address'] = value;
+
+                      break;
+                    case 'phone':
+                      parsed['phone'] = value;
+
+                      break;
                   }
                 }
                 
@@ -550,9 +638,11 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
                   mthyr: parsed['mthyr'] || '',
                   rego: parsed['rego'] || '',
                   requiredBy: parsed['requiredBy'] || '',
+                  customer: parsed['customer'] || '',
+                  address: parsed['address'] || '',
+                  phone: parsed['phone'] || '',
                 });
-              }, 0);
-            }}
+                            }}
             placeholder="Paste your quote data here and it will auto-populate the form below..."
             className="w-full h-32 p-4 text-sm border-2 border-gray-300 rounded-lg shadow-sm focus:border-red-500 focus:ring-2 focus:ring-red-200 focus:outline-none transition-all duration-200 bg-gray-50 font-mono resize-none"
             style={{
@@ -709,6 +799,45 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
             value={fields.requiredBy}
             onChange={handleChange}
             placeholder="e.g., 28/07/2025 12:00pm"
+            className="w-full h-8 text-sm"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Customer Name
+          </label>
+          <Input
+            name="customer"
+            value={fields.customer}
+            onChange={handleChange}
+            placeholder=""
+            className="w-full h-8 text-sm"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Address
+          </label>
+          <Input
+            name="address"
+            value={fields.address}
+            onChange={handleChange}
+            placeholder=""
+            className="w-full h-8 text-sm"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Phone Number
+          </label>
+          <Input
+            name="phone"
+            value={fields.phone}
+            onChange={handleChange}
+            placeholder="e.g., 03 9786 8199"
             className="w-full h-8 text-sm"
           />
         </div>

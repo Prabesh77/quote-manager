@@ -17,6 +17,9 @@ export interface Quote {
   mthyr: string;
   rego: string;
   requiredBy?: string;
+  customer?: string;
+  address?: string;
+  phone?: string;
   partRequested: string;
   createdAt: string;
   status: 'active' | 'completed';

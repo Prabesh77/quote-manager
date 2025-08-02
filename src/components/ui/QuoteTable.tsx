@@ -618,10 +618,15 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                   return (
                     <>
                       <div className={`absolute left-0 top-0 bottom-0 w-1 ${deadlineInfo.color} ${deadlineInfo.animation}`}></div>
-                      <div className="absolute left-0 top-[11px] transform -translate-y-1/2 z-10">
+                      <div className="absolute left-0 top-[11px] transform -translate-y-1/2 z-10 flex items-center space-x-2">
                         <div className={`px-2 py-[2px] text-[12px] font-semibold text-white shadow-sm ${deadlineInfo.color} ${deadlineInfo.animation}`}>
                           {deadlineInfo.timeDisplay}
                         </div>
+                        {quote.customer && (
+                          <div className="px-2 py-[2px] text-[10px] text-gray-600 bg-gray-100 rounded shadow-sm">
+                            {quote.customer}
+                          </div>
+                        )}
                       </div>
                     </>
                   );

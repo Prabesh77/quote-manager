@@ -5,15 +5,15 @@ import QuoteTable from '@/components/ui/QuoteTable';
 import { QuoteForm } from '@/components/ui/QuoteForm';
 
 export default function NewQuotePage() {
-  const { 
-    quotes, 
-    parts, 
+  const {
+    quotes,
+    parts,
     addQuote,
     addPart,
-    updateQuote, 
-    deleteQuote, 
-    updatePart, 
-    updateMultipleParts, 
+    updateQuote,
+    deleteQuote,
+    updatePart,
+    updateMultipleParts,
     markQuoteCompleted,
     markQuoteAsOrderedWithParts
   } = useQuotes();
@@ -71,7 +71,7 @@ export default function NewQuotePage() {
           partIds.push(newPart[0].id);
         }
       }
-      
+
       // Then create the quote with the part IDs
       await addQuote(fields, partIds);
     } catch (error) {
@@ -85,22 +85,22 @@ export default function NewQuotePage() {
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900">Add Quote</h1>
           <p className="text-gray-600 mt-2">Create and manage new quotes</p>
-        </div>
-        
+            </div>
+            
         <div className="mb-8">
           <QuoteForm onSubmit={handleSubmit} />
         </div>
-        
-        <QuoteTable
-          quotes={activeQuotes}
-          parts={parts}
-          onUpdateQuote={handleUpdateQuote}
-          onDeleteQuote={handleDeleteQuote}
-          onUpdatePart={handleUpdatePart}
-          onUpdateMultipleParts={handleUpdateMultipleParts}
-          onMarkCompleted={handleMarkCompleted}
+
+          <QuoteTable
+            quotes={activeQuotes}
+            parts={parts}
+            onUpdateQuote={handleUpdateQuote}
+            onDeleteQuote={handleDeleteQuote}
+            onUpdatePart={handleUpdatePart}
+            onUpdateMultipleParts={handleUpdateMultipleParts}
+            onMarkCompleted={handleMarkCompleted}
           onMarkAsOrderedWithParts={handleMarkAsOrderedWithParts}
-        />
+          />
       </div>
     </div>
   );

@@ -26,6 +26,9 @@ export interface Quote {
   mthyr: string; // mth/yr field
   rego: string;
   requiredBy?: string; // Deadline field
+  customer?: string; // Customer name
+  address?: string; // Customer address
+  phone?: string; // Customer phone
   status: 'active' | 'completed' | 'unpriced' | 'priced' | 'ordered'; // Updated status field
   taxInvoiceNumber?: string; // Tax invoice number for orders
   [key: string]: any; // Allow string indexing
@@ -51,6 +54,10 @@ export const useQuotes = () => {
       body: 'string',
       mthyr: 'string',
       rego: 'string',
+      requiredBy: 'string',
+      customer: 'string',
+      address: 'string',
+      phone: 'string',
       partRequested: 'string',
       createdAt: 'date'
     };

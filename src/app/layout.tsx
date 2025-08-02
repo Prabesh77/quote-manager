@@ -32,7 +32,9 @@ export default function RootLayout({
         <Navigation />
         <DashboardSidebar />
         <main className="min-h-screen bg-gray-50">
-          {children}
+          <div className="container mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+            {children}
+          </div>
         </main>
       </body>
     </html>

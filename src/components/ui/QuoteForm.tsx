@@ -348,9 +348,9 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
           Paste Raw Data
         </label>
         <div className="relative">
-          <textarea
-            value={rawText}
-            onChange={(e) => setRawText(e.target.value)}
+        <textarea
+          value={rawText}
+          onChange={(e) => setRawText(e.target.value)}
             onPaste={(e) => {
               // Get the pasted text immediately
               const pastedText = e.clipboardData.getData('text');
@@ -368,17 +368,29 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
                   let key = '';
                   let value = '';
                   
-                  // Pattern 1: "Reference28495#2" (no space)
-                  if (trimmedLine.match(/^(Reference|Make|Model|Series|Trans|Body|Mth\/Yr|Veh Reg)(.+)$/i)) {
-                    const match = trimmedLine.match(/^(Reference|Make|Model|Series|Trans|Body|Mth\/Yr|Veh Reg)(.+)$/i);
+                  // Pattern 1: "Reference28495#2" (no space) - but exclude "Model Nr"
+                  if (trimmedLine.match(/^(Reference|Make|Series|Trans|Body|Mth\/Yr|Veh Reg)(.+)$/i)) {
+                    const match = trimmedLine.match(/^(Reference|Make|Series|Trans|Body|Mth\/Yr|Veh Reg)(.+)$/i);
                     if (match) {
                       key = match[1].toLowerCase();
                       value = match[2].trim();
                     }
                   }
+                  // Pattern 1.5: "ModelAccent" (Model without space) - but ignore "Model Nr"
+                  else if (trimmedLine.match(/^Model(.+)$/i)) {
+                    const match = trimmedLine.match(/^Model(.+)$/i);
+                    if (match) {
+                      const modelValue = match[1].trim();
+                      // If the value is "Nr", ignore it (it's not a model value)
+                      if (modelValue !== 'Nr') {
+                        key = 'model';
+                        value = modelValue;
+                      }
+                    }
+                  }
                   // Pattern 2: "Reference 28495#2" (with space)
-                  else if (trimmedLine.match(/^(Reference|Make|Model|Series|Trans|Body|Mth\/Yr|Veh Reg)\s+(.+)$/i)) {
-                    const match = trimmedLine.match(/^(Reference|Make|Model|Series|Trans|Body|Mth\/Yr|Veh Reg)\s+(.+)$/i);
+                  else if (trimmedLine.match(/^(Reference|Make|Series|Trans|Body|Mth\/Yr|Veh Reg)\s+(.+)$/i)) {
+                    const match = trimmedLine.match(/^(Reference|Make|Series|Trans|Body|Mth\/Yr|Veh Reg)\s+(.+)$/i);
                     if (match) {
                       key = match[1].toLowerCase();
                       value = match[2].trim();
@@ -878,4 +890,4 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
       )}
     </div>
   );
-};
+}; 

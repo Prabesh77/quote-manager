@@ -177,18 +177,18 @@ export const useQuotes = () => {
 
   const updateQuote = async (id: string, fields: Record<string, string | number | boolean>) => {
     try {
-      const validatedFields = validateQuoteData(fields);
-      
+    const validatedFields = validateQuoteData(fields);
+    
       const { error } = await supabase
-        .from('quotes')
-        .update(validatedFields)
+      .from('quotes')
+      .update(validatedFields)
         .eq('id', id);
-      
-      if (error) {
+    
+    if (error) {
         console.error('Update quote error:', error);
         return { error };
-      } else {
-        fetchQuotes();
+    } else {
+      fetchQuotes();
         return { error: null };
       }
     } catch (error) {

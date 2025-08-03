@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { ChevronDown, ChevronRight, Edit, Trash2, Save, X, Search, Eye, Copy, Car, CheckCircle, AlertTriangle, ShoppingCart } from 'lucide-react';
+import { ChevronDown, ChevronRight, Edit, Trash2, Save, X, Search, Eye, Copy, Car, CheckCircle, AlertTriangle, ShoppingCart, Package } from 'lucide-react';
 import { Quote, Part } from './useQuotes';
 import {
   Accordion,
@@ -26,7 +26,7 @@ interface QuoteTableProps {
 
 type FilterType = 'all' | 'unpriced' | 'priced';
 
-type QuoteStatus = 'unpriced' | 'priced' | 'completed' | 'ordered';
+type QuoteStatus = 'unpriced' | 'priced' | 'completed' | 'ordered' | 'delivered';
 
 export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote, onUpdatePart, onUpdateMultipleParts, onMarkCompleted, onMarkAsOrdered, onMarkAsOrderedWithParts, showCompleted = false, defaultFilter = 'all' }: QuoteTableProps) {
   const [editingQuote, setEditingQuote] = useState<string | null>(null);
@@ -151,6 +151,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
 
   const getQuoteStatus = (quoteParts: Part[], quoteStatus?: string): QuoteStatus => {
     // Prioritize database status over calculated status
+    if (quoteStatus === 'delivered') return 'delivered';
     if (quoteStatus === 'ordered') return 'ordered';
     if (quoteStatus === 'completed') return 'completed';
     if (quoteStatus === 'priced') return 'priced';
@@ -440,6 +441,13 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
         border: 'border-purple-200',
         icon: ShoppingCart,
         label: 'Ordered'
+      },
+      delivered: {
+        bg: 'bg-orange-100',
+        text: 'text-orange-800',
+        border: 'border-orange-200',
+        icon: Package,
+        label: 'Delivered'
       }
     };
 
@@ -452,6 +460,26 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
         <span>{config.label}</span>
       </div>
     );
+  };
+
+  // Function to calculate deadline priority (lower number = higher priority)
+  const getDeadlinePriority = (quote: Quote) => {
+    if (!quote.requiredBy) return Infinity; // No deadline = lowest priority
+    
+    try {
+      const deadline = new Date(quote.requiredBy);
+      const now = currentTime;
+      const diffMs = deadline.getTime() - now.getTime();
+      const diffMins = Math.floor(diffMs / (1000 * 60));
+      
+      // Overdue items get highest priority (negative values)
+      if (diffMins < 0) return diffMins; // Negative values for overdue
+      
+      // Items due soon get higher priority
+      return diffMins;
+    } catch (error) {
+      return Infinity; // Invalid date = lowest priority
+    }
   };
 
   const filteredQuotes = quotes.filter(quote => {
@@ -470,10 +498,26 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
     
     return matchesSearch;
   }).sort((a, b) => {
-    // Sort by date - latest first for completed quotes, oldest first for active quotes
+    // For completed quotes, sort by creation date (newest first)
+    if (showCompleted) {
+      const dateA = new Date(a.createdAt).getTime();
+      const dateB = new Date(b.createdAt).getTime();
+      return dateB - dateA;
+    }
+    
+    // For active quotes, sort by deadline priority
+    const priorityA = getDeadlinePriority(a);
+    const priorityB = getDeadlinePriority(b);
+    
+    // Lower priority number = higher priority (shows first)
+    if (priorityA !== priorityB) {
+      return priorityA - priorityB;
+    }
+    
+    // If same priority, sort by creation date (oldest first for active quotes)
     const dateA = new Date(a.createdAt).getTime();
     const dateB = new Date(b.createdAt).getTime();
-    return showCompleted ? dateB - dateA : dateA - dateB;
+    return dateA - dateB;
   });
 
   // Memoize the array of IDs so it doesn't change on every render
@@ -611,7 +655,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                 return (
               <AccordionItem key={quote.id} value={quote.id} className="border-b border-gray-100 last:border-b-0 relative">
                 {/* Deadline Indicator - Only for unpriced and priced quotes */}
-                {quote.status !== 'completed' && quote.status !== 'ordered' && (() => {
+                {quote.status !== 'completed' && quote.status !== 'ordered' && quote.status !== 'delivered' && (() => {
                   const deadlineInfo = getDeadlineIndicator(quote.requiredBy);
                   if (!deadlineInfo) return null;
                   
@@ -635,6 +679,12 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                 <AccordionTrigger className="grid grid-cols-6 gap-4 w-full px-3 hover:bg-gray-50 transition-colors cursor-pointer" style={{ gridTemplateColumns: '1fr 1fr 2fr 1fr 0.5fr 0.5fr' }}>
                   {/* Quote Ref */}
                   <div>
+                  {/* Customer Name - Always Visible */}
+                  {quote.customer && (
+                    <div className="text-[10px] text-orange-600 font-medium mb-1 text-left pl-2">
+                      {quote.customer}
+                    </div>
+                  )}
                   <div className="flex items-center space-x-2 w-[160px]">
                     <ChevronDown className="h-4 w-4 text-gray-400 flex-shrink-0" />
                     {editingQuote === quote.id ? (
@@ -1224,7 +1274,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
       </div>
 
       {/* Mobile View */}
-      <div className="lg:hidden space-y-4">
+      <div className="lg:hidden space-y-4 p-1">
         {filteredQuotes.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 px-4">
             <div className="w-24 h-24 bg-gradient-to-br from-blue-100 to-purple-100 rounded-full flex items-center justify-center mb-6">
@@ -1317,6 +1367,11 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                           <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
                             {quoteParts.length} {quoteParts.length === 1 ? 'part' : 'parts'}
                           </span>
+                          {quote.customer && (
+                            <span className="text-[10px] text-orange-600 font-medium">
+                              {quote.customer}
+                            </span>
+                          )}
                         </div>
                       </div>
                       

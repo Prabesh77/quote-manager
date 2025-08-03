@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Camera, FileText, User, Package, CheckCircle, Clock, MapPin, PenTool } from 'lucide-react';
 import { useDelivery, Delivery } from '../../components/ui/useDelivery';
+import { useQuotes } from '../../components/ui/useQuotes';
 import SignatureCanvas from '../../components/ui/SignatureCanvas';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
@@ -11,37 +12,25 @@ import { getAccessibleStorageUrl, testBucketAccess, ensureBucketExists } from '.
 export default function DeliveryPage() {
   const [showAddModal, setShowAddModal] = useState(false);
   const { deliveries, addDelivery, loading } = useDelivery();
+  const { quotes } = useQuotes();
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white shadow-sm border-b sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            <div className="flex items-center space-x-3">
-              <div className="p-2 bg-green-100 rounded-lg">
-                <Package className="h-6 w-6 text-green-600" />
-              </div>
-              <div>
-                <h1 className="text-xl font-semibold text-gray-900">Delivery Management</h1>
-                <p className="text-sm text-gray-500">Track and manage deliveries</p>
-              </div>
-            </div>
-            <div className="flex items-center space-x-2">
-              <Button
-                onClick={() => setShowAddModal(true)}
-                className="bg-red-600 hover:bg-red-700"
-              >
-                <Plus className="h-4 w-4" />
-                <span className="hidden sm:inline">Add Delivery</span>
-              </Button>
-            </div>
-          </div>
-        </div>
-      </div>
-
       {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">Delivery Management</h1>
+            <p className="text-sm text-gray-500">Track and manage deliveries</p>
+          </div>
+          <Button
+            onClick={() => setShowAddModal(true)}
+            className="bg-red-600 hover:bg-red-700"
+          >
+            <Plus className="h-4 w-4" />
+            <span className="hidden sm:inline">Add Delivery</span>
+          </Button>
+        </div>
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
           <div className="bg-white rounded-lg shadow-sm border p-4">
@@ -129,6 +118,7 @@ export default function DeliveryPage() {
         <AddDeliveryModal
           onClose={() => setShowAddModal(false)}
           onAdd={addDelivery}
+          quotes={quotes}
         />
       )}
     </div>
@@ -249,7 +239,11 @@ function DeliveryCard({ delivery }: { delivery: Delivery }) {
   );
 }
 
-function AddDeliveryModal({ onClose, onAdd }: { onClose: () => void; onAdd: (delivery: Omit<Delivery, 'id' | 'deliveredAt'>) => void }) {
+function AddDeliveryModal({ onClose, onAdd, quotes }: { 
+  onClose: () => void; 
+  onAdd: (delivery: Omit<Delivery, 'id' | 'deliveredAt'> & { matchingQuoteId?: string }) => void;
+  quotes: any[];
+}) {
   const [formData, setFormData] = useState({
     customerName: '',
     taxInvoiceNumber: '',
@@ -261,6 +255,11 @@ function AddDeliveryModal({ onClose, onAdd }: { onClose: () => void; onAdd: (del
   const [showSignatureCanvas, setShowSignatureCanvas] = useState(false);
   const [signatureDataUrl, setSignatureDataUrl] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+
+  // Get ordered quotes with customer names
+  const orderedQuotes = quotes.filter(quote => quote.status === 'ordered' && quote.customer);
+  const customerSuggestions = [...new Set(orderedQuotes.map(quote => quote.customer))];
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -275,11 +274,17 @@ function AddDeliveryModal({ onClose, onAdd }: { onClose: () => void; onAdd: (del
         photoProof = await fileToBase64(photoFile);
       }
       
+      // Check if there's a matching ordered quote with the same tax invoice number
+      const matchingQuote = orderedQuotes.find(quote => 
+        quote.taxInvoiceNumber === formData.taxInvoiceNumber
+      );
+      
       await onAdd({
         ...formData,
         photoProof,
         signature: signatureDataUrl,
         status: 'delivered' as const,
+        matchingQuoteId: matchingQuote?.id, // Pass the matching quote ID
       });
       
       onClose();
@@ -322,7 +327,7 @@ function AddDeliveryModal({ onClose, onAdd }: { onClose: () => void; onAdd: (del
         </div>
         
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
+          <div className="relative">
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Customer Name
             </label>
@@ -330,10 +335,33 @@ function AddDeliveryModal({ onClose, onAdd }: { onClose: () => void; onAdd: (del
               type="text"
               required
               value={formData.customerName}
-              onChange={(e) => setFormData({ ...formData, customerName: e.target.value })}
+              onChange={(e) => {
+                setFormData({ ...formData, customerName: e.target.value });
+                setShowSuggestions(e.target.value.length > 0);
+              }}
+              onFocus={() => setShowSuggestions(formData.customerName.length > 0)}
               placeholder="Enter customer name"
               disabled={isSubmitting}
             />
+            {showSuggestions && customerSuggestions.length > 0 && (
+              <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-40 overflow-y-auto">
+                {customerSuggestions
+                  .filter(name => name.toLowerCase().includes(formData.customerName.toLowerCase()))
+                  .map((name, index) => (
+                    <button
+                      key={index}
+                      type="button"
+                      className="w-full px-3 py-2 text-left text-sm hover:bg-gray-100 focus:bg-gray-100 focus:outline-none"
+                      onClick={() => {
+                        setFormData({ ...formData, customerName: name });
+                        setShowSuggestions(false);
+                      }}
+                    >
+                      {name}
+                    </button>
+                  ))}
+              </div>
+            )}
           </div>
           
           <div>

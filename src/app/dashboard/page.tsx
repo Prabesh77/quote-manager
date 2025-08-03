@@ -1,6 +1,7 @@
 'use client';
 
 import { useQuotes } from '@/components/ui/useQuotes';
+import { useDelivery } from '@/components/ui/useDelivery';
 import { useEffect, useState, useMemo } from 'react';
 import type { Part } from '@/components/ui/useQuotes';
 import { 
@@ -22,6 +23,7 @@ interface DashboardStats {
   totalQuotes: number;
   completedQuotes: number;
   orderedQuotes: number;
+  deliveredQuotes: number;
   unpricedQuotes: number;
   pricedQuotes: number;
   totalParts: number;
@@ -31,9 +33,11 @@ interface DashboardStats {
   averageOrderValue: number;
   totalPartsOrdered: number;
   averagePartsPerQuote: number;
+  totalDeliveries: number;
+  deliveryRate: number;
   recentActivity: Array<{
     id: string;
-    type: 'quote' | 'order' | 'completion';
+    type: 'quote' | 'order' | 'completion' | 'delivery';
     message: string;
     timestamp: string;
   }>;
@@ -46,12 +50,14 @@ interface DashboardStats {
 }
 
 export default function Dashboard() {
-  const { quotes, parts } = useQuotes();
+  const { quotes, parts, connectionStatus } = useQuotes();
+  const { deliveries, loading: deliveriesLoading } = useDelivery();
   const [isLoading, setIsLoading] = useState(true);
   const [stats, setStats] = useState<DashboardStats>({
     totalQuotes: 0,
     completedQuotes: 0,
     orderedQuotes: 0,
+    deliveredQuotes: 0,
     unpricedQuotes: 0,
     pricedQuotes: 0,
     totalParts: 0,
@@ -61,20 +67,24 @@ export default function Dashboard() {
     averageOrderValue: 0,
     totalPartsOrdered: 0,
     averagePartsPerQuote: 0,
+    totalDeliveries: 0,
+    deliveryRate: 0,
     recentActivity: [],
     monthlyStats: []
   });
 
   useEffect(() => {
-    // Only calculate stats when both quotes and parts are loaded
-    if (quotes.length > 0 && parts.length > 0) {
+    // Check if data is still loading
+    const isDataLoading = connectionStatus === 'checking' || deliveriesLoading;
+    
+    if (isDataLoading) {
+      setIsLoading(true);
+    } else {
+      // Data has finished loading, calculate stats
       setIsLoading(false);
       calculateStats();
-    } else if (quotes.length === 0 && parts.length === 0) {
-      // Still loading
-      setIsLoading(true);
     }
-  }, [quotes, parts]);
+  }, [quotes, parts, connectionStatus, deliveriesLoading]);
 
   const getQuoteParts = useMemo(() => {
     return (partRequested: string): Part[] => {
@@ -96,6 +106,7 @@ export default function Dashboard() {
     const totalQuotes = quotes.length;
     const completedQuotes = quotes.filter(q => q.status === 'completed').length;
     const orderedQuotes = quotes.filter(q => q.status === 'ordered').length;
+    const deliveredQuotes = quotes.filter(q => q.status === 'delivered').length;
     const unpricedQuotes = quotes.filter(q => q.status === 'unpriced').length;
     const pricedQuotes = quotes.filter(q => q.status === 'priced').length;
     
@@ -114,12 +125,12 @@ export default function Dashboard() {
       const quoteParts = getQuoteParts(quote.partRequested);
       totalPartsInQuotes += quoteParts.length;
       
-      // Calculate revenue for both ordered and completed quotes with prices
-      if (quote.status === 'ordered' || quote.status === 'completed') {
+      // Calculate revenue for ordered, completed, and delivered quotes with prices
+      if (quote.status === 'ordered' || quote.status === 'completed' || quote.status === 'delivered') {
         quoteParts.forEach((part: Part) => {
           if (part.price && part.price > 0) {
             totalRevenue += part.price;
-            if (quote.status === 'ordered') {
+            if (quote.status === 'ordered' || quote.status === 'delivered') {
               totalPartsOrdered++;
             }
           }
@@ -131,23 +142,34 @@ export default function Dashboard() {
 
     const averageQuoteValue = totalQuotes > 0 ? totalRevenue / totalQuotes : 0;
     const quoteToOrderRate = totalQuotes > 0 ? (orderedQuotes / totalQuotes) * 100 : 0;
-    const averageOrderValue = orderedQuotes > 0 ? totalRevenue / orderedQuotes : 0;
+    const averageOrderValue = (orderedQuotes + deliveredQuotes) > 0 ? totalRevenue / (orderedQuotes + deliveredQuotes) : 0;
     const averagePartsPerQuote = totalQuotes > 0 ? totalPartsInQuotes / totalQuotes : 0;
+    
+    // Calculate delivery statistics
+    // Only count deliveries that correspond to quotes with 'delivered' status
+    const totalDeliveries = deliveredQuotes;
+    const totalOrders = orderedQuotes + deliveredQuotes;
+    const deliveryRate = totalOrders > 0 ? (deliveredQuotes / totalOrders) * 100 : 0;
 
          // Generate recent activity
-     const recentActivity = quotes
-       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-       .slice(0, 10)
-       .map(quote => ({
-         id: quote.id,
-         type: (quote.status === 'ordered' ? 'order' : quote.status === 'completed' ? 'completion' : 'quote') as 'quote' | 'order' | 'completion',
-         message: quote.status === 'ordered' 
-           ? `Order created for ${quote.quoteRef}`
-           : quote.status === 'completed'
-           ? `Quote ${quote.quoteRef} completed`
-           : `New quote ${quote.quoteRef} created`,
-         timestamp: quote.createdAt
-       }));
+     const recentActivity = [
+       ...quotes
+         .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+         .slice(0, 10)
+         .map(quote => ({
+           id: quote.id,
+           type: (quote.status === 'ordered' ? 'order' : quote.status === 'completed' ? 'completion' : quote.status === 'delivered' ? 'delivery' : 'quote') as 'quote' | 'order' | 'completion' | 'delivery',
+           message: quote.status === 'ordered' 
+             ? `Order created for ${quote.quoteRef}`
+             : quote.status === 'completed'
+             ? `Quote ${quote.quoteRef} completed`
+             : quote.status === 'delivered'
+             ? `Quote ${quote.quoteRef} delivered`
+             : `New quote ${quote.quoteRef} created`,
+           timestamp: quote.createdAt
+         }))
+     ].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+       .slice(0, 10);
 
     // Generate monthly stats (last 6 months)
     const monthlyStats = [];
@@ -163,8 +185,9 @@ export default function Dashboard() {
       
       const monthOrders = monthQuotes.filter(q => q.status === 'ordered');
       const monthCompleted = monthQuotes.filter(q => q.status === 'completed');
+      const monthDelivered = monthQuotes.filter(q => q.status === 'delivered');
       
-      const monthRevenue = [...monthOrders, ...monthCompleted].reduce((sum, quote) => {
+      const monthRevenue = [...monthOrders, ...monthCompleted, ...monthDelivered].reduce((sum, quote) => {
         const quoteParts = getQuoteParts(quote.partRequested);
         return sum + quoteParts.reduce((partSum: number, part: Part) => partSum + (part.price || 0), 0);
       }, 0);
@@ -181,6 +204,7 @@ export default function Dashboard() {
       totalQuotes,
       completedQuotes,
       orderedQuotes,
+      deliveredQuotes,
       unpricedQuotes,
       pricedQuotes,
       totalParts: parts.length,
@@ -190,6 +214,8 @@ export default function Dashboard() {
       averageOrderValue,
       totalPartsOrdered,
       averagePartsPerQuote,
+      totalDeliveries,
+      deliveryRate,
       recentActivity,
       monthlyStats
     });
@@ -261,8 +287,21 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* Dashboard Content - Only show when not loading */}
-        {!isLoading && (
+        {/* Empty State */}
+        {!isLoading && quotes.length === 0 && (
+          <div className="flex items-center justify-center py-16">
+            <div className="text-center">
+              <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <BarChart3 className="h-8 w-8 text-gray-400" />
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">No Stats to Preview</h3>
+              <p className="text-gray-600">Add your first quote to see dashboard statistics</p>
+            </div>
+          </div>
+        )}
+
+        {/* Dashboard Content - Only show when not loading and has data */}
+        {!isLoading && quotes.length > 0 && (
           <>
             {/* Key Metrics */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
@@ -282,7 +321,7 @@ export default function Dashboard() {
           />
           <StatCard
             title="Orders"
-            value={stats.orderedQuotes}
+            value={stats.orderedQuotes + stats.deliveredQuotes}
             subtitle={`${stats.quoteToOrderRate.toFixed(1)}% conversion rate`}
             icon={ShoppingCart}
             color="bg-purple-500"
@@ -326,6 +365,18 @@ export default function Dashboard() {
             change="Ready for completion"
             trend="neutral"
           />
+          <MetricCard
+            title="Total Deliveries"
+            value={stats.totalDeliveries.toString()}
+            change="All time"
+            trend="neutral"
+          />
+          <MetricCard
+            title="Delivery Rate"
+            value={`${stats.deliveryRate.toFixed(1)}%`}
+            change="Orders delivered"
+            trend="neutral"
+          />
         </div>
 
         {/* Charts and Detailed Stats */}
@@ -362,6 +413,13 @@ export default function Dashboard() {
                 </div>
                 <span className="text-sm font-medium">{stats.orderedQuotes}</span>
               </div>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <div className="w-3 h-3 bg-orange-500 rounded-full"></div>
+                  <span className="text-sm text-gray-600">Delivered</span>
+                </div>
+                <span className="text-sm font-medium">{stats.deliveredQuotes}</span>
+              </div>
             </div>
           </div>
 
@@ -391,10 +449,12 @@ export default function Dashboard() {
               <div key={activity.id} className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
                 <div className={`p-2 rounded-full ${
                   activity.type === 'order' ? 'bg-purple-100' :
-                  activity.type === 'completion' ? 'bg-green-100' : 'bg-blue-100'
+                  activity.type === 'completion' ? 'bg-green-100' :
+                  activity.type === 'delivery' ? 'bg-orange-100' : 'bg-blue-100'
                 }`}>
                   {activity.type === 'order' && <ShoppingCart className="h-4 w-4 text-purple-600" />}
                   {activity.type === 'completion' && <CheckCircle className="h-4 w-4 text-green-600" />}
+                  {activity.type === 'delivery' && <Package className="h-4 w-4 text-orange-600" />}
                   {activity.type === 'quote' && <BarChart3 className="h-4 w-4 text-blue-600" />}
                 </div>
                 <div className="flex-1">
@@ -455,6 +515,10 @@ export default function Dashboard() {
               <div className="flex items-center justify-between">
                 <span className="text-sm text-gray-600">Avg Parts per Quote</span>
                 <span className="text-sm font-medium text-blue-600">{stats.averagePartsPerQuote.toFixed(1)}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-gray-600">Delivery Rate</span>
+                <span className="text-sm font-medium text-orange-600">{stats.deliveryRate.toFixed(1)}%</span>
               </div>
             </div>
           </div>

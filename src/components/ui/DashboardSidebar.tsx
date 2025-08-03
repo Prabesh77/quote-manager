@@ -12,7 +12,7 @@ const DashboardSidebar = () => {
   const isDeliveryActive = pathname === '/delivery';
 
   return (
-    <div className="fixed left-0 top-16 h-full z-50">
+    <div className="fixed left-0 top-1/2 h-full z-50">
       {/* Dashboard Button */}
       <div className="relative">
         <Link

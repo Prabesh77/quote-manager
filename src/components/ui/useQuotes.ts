@@ -29,7 +29,7 @@ export interface Quote {
   customer?: string; // Customer name
   address?: string; // Customer address
   phone?: string; // Customer phone
-  status: 'active' | 'completed' | 'unpriced' | 'priced' | 'ordered'; // Updated status field
+  status: 'active' | 'completed' | 'unpriced' | 'priced' | 'ordered' | 'delivered'; // Updated status field
   taxInvoiceNumber?: string; // Tax invoice number for orders
   [key: string]: any; // Allow string indexing
 }

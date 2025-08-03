@@ -38,7 +38,7 @@ export const useDelivery = () => {
     }
   };
 
-  const addDelivery = async (deliveryData: Omit<Delivery, 'id' | 'deliveredAt'>) => {
+  const addDelivery = async (deliveryData: Omit<Delivery, 'id' | 'deliveredAt'> & { matchingQuoteId?: string }) => {
     try {
       let photoProofUrl = '';
       let signatureUrl = '';
@@ -78,6 +78,18 @@ export const useDelivery = () => {
         console.error('Error adding delivery:', error);
         return { error };
       } else {
+        // If there's a matching quote, update its status to 'delivered'
+        if (deliveryData.matchingQuoteId) {
+          const { error: quoteError } = await supabase
+            .from('quotes')
+            .update({ status: 'delivered' })
+            .eq('id', deliveryData.matchingQuoteId);
+          
+          if (quoteError) {
+            console.error('Error updating quote status:', quoteError);
+          }
+        }
+        
         await fetchDeliveries();
         return { data, error: null };
       }

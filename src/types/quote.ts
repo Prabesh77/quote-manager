@@ -22,7 +22,8 @@ export interface Quote {
   phone?: string;
   partRequested: string;
   createdAt: string;
-  status: 'active' | 'completed';
+  status: 'active' | 'completed' | 'ordered' | 'delivered';
+  taxInvoiceNumber?: string;
 }
 
 export interface Part {

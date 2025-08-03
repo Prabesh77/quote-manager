@@ -241,7 +241,7 @@ function DeliveryCard({ delivery }: { delivery: Delivery }) {
 
 function AddDeliveryModal({ onClose, onAdd, quotes }: { 
   onClose: () => void; 
-  onAdd: (delivery: Omit<Delivery, 'id' | 'deliveredAt'>) => void;
+  onAdd: (delivery: Omit<Delivery, 'id' | 'deliveredAt'> & { matchingQuoteId?: string }) => void;
   quotes: any[];
 }) {
   const [formData, setFormData] = useState({

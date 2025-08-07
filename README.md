@@ -1,48 +1,90 @@
-# 🚗 Auto Parts Quote Management System
+# Quote Management System
 
-A modern, fast, and efficient quote management system designed for busy automotive parts businesses. Built with Next.js, TypeScript, and Supabase for seamless real-time operations.
+A comprehensive quote management system built with Next.js, TypeScript, Tailwind CSS, and Supabase. The system focuses on quote creation, order tracking, and delivery management with a modern, responsive interface.
 
-## ✨ Features
+## 🏗️ Project Structure
 
-### 📋 **Quote Management**
-- **Fast Quote Creation** - Paste raw text or fill forms manually
-- **Real-time Updates** - Instant synchronization across all users
-- **Smart Auto-fill** - Parse structured text into form fields
-- **Part Selection** - Visual part selection with relevant icons
-- **Status Tracking** - Track quotes from creation to completion
+### Quote Management (`/quotes/*`) - **Primary Focus**
+- **Add Quote** (`/quotes/new`) - Create new quotes with vehicle and part details
+- **Pricing** (`/quotes/pricing`) - Manage quote pricing
+- **Orders** (`/quotes/orders`) - Track order status and delivery
+- **Dashboard** (`/quotes/dashboard`) - Business statistics and analytics
+- **Delivery Management** (`/quotes/delivery`) - Integrated delivery tracking
 
-### 🎯 **Workflow Management**
-- **Active Quotes** - Manage ongoing quotes with pricing
-- **Completed Quotes** - Archive finished quotes for reference
-- **Status Filtering** - Filter by Unpriced, Priced, or Completed
-- **Bulk Operations** - Edit multiple parts simultaneously
+### Delivery App (`/delivery/*`) - **On Hold**
+- **Admin Dashboard** (`/delivery/admin`) - Comprehensive dashboard for administrators
+- **Driver App** (`/delivery/driver`) - Mobile-first interface for delivery drivers
+- **Authentication** (`/delivery/auth`) - Login and user management
 
-### 💼 **Advanced Features**
-- **Inline Editing** - Edit quotes and parts directly in the table
-- **Copy to Clipboard** - One-click copy for VIN, part numbers, and references
-- **Keyboard Shortcuts** - Ctrl+F for search, Enter to save, Esc to cancel
-- **Responsive Design** - Works perfectly on desktop and mobile
-- **Connection Health** - Real-time database connection monitoring
+## 🚀 Features
 
-### 🎨 **User Experience**
-- **Smooth Animations** - Subtle transitions and accordion effects
-- **Visual Feedback** - Loading states and confirmation dialogs
-- **Intuitive Interface** - Clean, modern design with clear visual hierarchy
-- **Accessibility** - Proper ARIA labels and keyboard navigation
+### Quote Management System - **Primary Focus**
+- **Quote Creation**: Multi-part quotes with vehicle and customer details
+- **Pricing Management**: Dynamic pricing with part selection
+- **Order Tracking**: Complete lifecycle from quote to delivery
+- **Customer Management**: Auto-fill customer information
+- **Business Analytics**: Dashboard with statistics and metrics
+- **Delivery Integration**: Photo proof and digital signatures
 
-## 🚀 Quick Start
+### Delivery System - **On Hold**
+- **Authentication**: Role-based access (Admin/Driver)
+- **Admin Features**:
+  - Add new deliveries with customer auto-fill
+  - Dashboard with delivery statistics
+  - Search and filter deliveries
+  - Overdue delivery alerts (24hrs)
+  - Real-time status tracking
+- **Driver Features**:
+  - Mobile-first interface
+  - Search and filter available deliveries
+  - Bulk assign deliveries to driver
+  - Mark deliveries as completed with photo proof
+  - Digital signature capture
+  - Invoice number verification
 
-### Prerequisites
-- Node.js 18+ 
-- npm or yarn
-- Supabase account
+## 🛠️ Technology Stack
 
-### Installation
+- **Frontend**: Next.js 14, TypeScript, Tailwind CSS
+- **Backend**: Supabase (PostgreSQL, Auth, Storage)
+- **UI Components**: Radix UI, Lucide Icons
+- **State Management**: React Hooks, Context API
+- **Authentication**: Supabase Auth with Row Level Security
+
+## 📊 Database Schema
+
+### Core Tables
+- `user_profiles` - User authentication and roles
+- `customers` - Customer information with account numbers
+- `deliveries` - Delivery records with status tracking
+- `driver_deliveries` - Driver assignment tracking
+
+### Legacy Tables
+- `quotes` - Quote management
+- `parts` - Part catalog
+- `deliveries` (legacy) - Previous delivery system
+
+## 🔐 Security
+
+- Row Level Security (RLS) policies
+- Role-based access control
+- Secure file uploads to Supabase Storage
+- Input validation and sanitization
+
+## 📱 Mobile-First Design
+
+The driver app is designed with a mobile-first approach:
+- Touch-friendly interface
+- Optimized for small screens
+- Offline-capable features
+- Camera integration for photo proof
+- Signature capture with canvas
+
+## 🚀 Getting Started
 
 1. **Clone the repository**
    ```bash
    git clone <repository-url>
-   cd auto-parts-quote-system
+   cd delivery-management
    ```
 
 2. **Install dependencies**
@@ -50,45 +92,15 @@ A modern, fast, and efficient quote management system designed for busy automoti
    npm install
    ```
 
-3. **Set up environment variables**
-   ```bash
-   cp .env.example .env.local
-   ```
-   
-   Add your Supabase credentials:
+3. **Set up Supabase**
+   - Create a Supabase project
+   - Run the SQL scripts in `src/supabase_delivery_tables.sql`
+   - Configure environment variables
+
+4. **Environment Variables**
    ```env
    NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
    NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
-   ```
-
-4. **Set up the database**
-   ```sql
-   -- Create quotes table
-   CREATE TABLE quotes (
-     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-     quoteRef TEXT NOT NULL,
-     vin TEXT,
-     make TEXT,
-     model TEXT,
-     series TEXT,
-     auto BOOLEAN DEFAULT false,
-     body TEXT,
-     mthyr TEXT,
-     rego TEXT,
-     partRequested TEXT,
-     createdAt TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-     status TEXT DEFAULT 'active'
-   );
-
-   -- Create parts table
-   CREATE TABLE parts (
-     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-     name TEXT NOT NULL,
-     number TEXT,
-     price DECIMAL(10,2),
-     note TEXT,
-     quoteId UUID REFERENCES quotes(id) ON DELETE CASCADE
-   );
    ```
 
 5. **Run the development server**
@@ -96,164 +108,56 @@ A modern, fast, and efficient quote management system designed for busy automoti
    npm run dev
    ```
 
-6. **Open your browser**
-   Navigate to [http://localhost:3000](http://localhost:3000)
-
-## 📖 Usage Guide
-
-### Creating Quotes
-
-1. **Navigate to the main page** (`/new`)
-2. **Choose your input method:**
-   - **Paste raw text** and click "Auto-Fill" to parse structured data
-   - **Fill the form manually** with vehicle and quote details
-3. **Select required parts** from the visual part selector
-4. **Click "Create Quote"** to save
-
-### Managing Quotes
-
-#### Active Quotes Page (`/new`)
-- **View all active quotes** in a sortable table
-- **Filter by status** (All, Unpriced, Priced)
-- **Search quotes** by reference, VIN, or make
-- **Expand rows** to view and edit parts
-- **Inline editing** for quick updates
-- **Mark as completed** when finished
-
-#### Completed Quotes Page (`/completed-quotes`)
-- **View archived quotes** sorted by latest first
-- **Read-only interface** for reference
-- **Copy functionality** for sharing details
-
-### Keyboard Shortcuts
-
-| Shortcut | Action |
-|----------|--------|
-| `Ctrl + F` | Focus search bar |
-| `Enter` | Save current edits |
-| `Esc` | Cancel current edits |
-
-### Part Management
-
-- **Visual part selection** with relevant icons
-- **Bulk part editing** for efficient updates
-- **Price and note fields** for detailed tracking
-- **Copy part numbers** with one click
-
-## 🛠️ Technology Stack
-
-### Frontend
-- **Next.js 14** - React framework with App Router
-- **TypeScript** - Type-safe development
-- **Tailwind CSS** - Utility-first styling
-- **Lucide React** - Beautiful icons
-- **React Hook Form** - Form management
-
-### Backend
-- **Supabase** - Real-time database and authentication
-- **PostgreSQL** - Reliable data storage
-- **Row Level Security** - Secure data access
-
-### Development
-- **ESLint** - Code linting
-- **Prettier** - Code formatting
-- **TypeScript** - Static type checking
-
-## 🏗️ Project Structure
+## 📁 File Structure
 
 ```
 src/
-├── app/                    # Next.js App Router
-│   ├── new/               # Main quote management page
-│   ├── completed-quotes/  # Completed quotes archive
-│   └── layout.tsx         # Root layout
+├── app/
+│   ├── delivery/           # New delivery-centric app
+│   │   ├── admin/         # Admin dashboard
+│   │   ├── driver/        # Driver mobile app
+│   │   └── auth/          # Authentication
+│   ├── quotes/            # Legacy quote management
+│   │   ├── new/          # Add quotes
+│   │   ├── pricing/      # Quote pricing
+│   │   ├── orders/       # Order management
+│   │   ├── dashboard/    # Business analytics
+│   │   └── delivery/     # Legacy delivery
+│   └── page.tsx          # Landing page
 ├── components/
-│   └── ui/               # Reusable UI components
-│       ├── QuoteForm.tsx     # Quote creation form
-│       ├── QuoteTable.tsx    # Quotes display table
-│       ├── ConnectionStatus.tsx # Health monitoring
-│       └── useQuotes.ts       # Data management hooks
-├── lib/
-│   └── utils.ts          # Utility functions
-└── utils/
-    └── supabase.ts       # Supabase client configuration
+│   ├── auth/             # Authentication components
+│   ├── ui/               # Reusable UI components
+│   └── delivery/         # Delivery-specific components
+├── hooks/                # Custom React hooks
+├── types/                # TypeScript type definitions
+└── utils/                # Utility functions
 ```
 
-## 🔧 Configuration
+## 🔄 Migration from Quote System
 
-### Environment Variables
+The original quote management system has been preserved in `/quotes/*` routes:
+- All existing functionality remains intact
+- Database tables and relationships preserved
+- UI components and styling maintained
+- Can be accessed via the landing page link
 
-| Variable | Description | Required |
-|----------|-------------|----------|
-| `NEXT_PUBLIC_SUPABASE_URL` | Your Supabase project URL | Yes |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Your Supabase anonymous key | Yes |
+## 📈 Future Enhancements
 
-### Database Schema
-
-The system uses two main tables:
-
-**quotes** - Stores quote information
-- `id` - Unique identifier
-- `quoteRef` - Quote reference number
-- `vin` - Vehicle identification number
-- `make`, `model`, `series` - Vehicle details
-- `auto` - Transmission type
-- `body`, `mthyr`, `rego` - Additional vehicle info
-- `partRequested` - Comma-separated part IDs
-- `createdAt` - Creation timestamp
-- `status` - Quote status (active/completed)
-
-**parts** - Stores part information
-- `id` - Unique identifier
-- `name` - Part name
-- `number` - Part number
-- `price` - Part price
-- `note` - Additional notes
-- `quoteId` - Reference to quote
-
-## 🚀 Deployment
-
-### Vercel (Recommended)
-
-1. **Connect your repository** to Vercel
-2. **Add environment variables** in Vercel dashboard
-3. **Deploy automatically** on push to main branch
-
-### Other Platforms
-
-The app can be deployed to any platform that supports Next.js:
-- Netlify
-- Railway
-- DigitalOcean App Platform
-- AWS Amplify
+- Real-time notifications
+- GPS tracking integration
+- Route optimization
+- Advanced analytics
+- Multi-language support
+- Offline mode improvements
 
 ## 🤝 Contributing
 
-1. **Fork the repository**
-2. **Create a feature branch** (`git checkout -b feature/amazing-feature`)
-3. **Commit your changes** (`git commit -m 'Add amazing feature'`)
-4. **Push to the branch** (`git push origin feature/amazing-feature`)
-5. **Open a Pull Request**
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Test thoroughly
+5. Submit a pull request
 
-## 📝 License
+## 📄 License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## 🆘 Support
-
-If you encounter any issues or have questions:
-
-1. **Check the documentation** above
-2. **Search existing issues** on GitHub
-3. **Create a new issue** with detailed information
-
-## 🙏 Acknowledgments
-
-- **Supabase** for the excellent real-time database
-- **Next.js team** for the amazing framework
-- **Tailwind CSS** for the utility-first styling
-- **Lucide** for the beautiful icons
-
----
-
-**Built with ❤️ for automotive parts businesses**
+This project is licensed under the MIT License.

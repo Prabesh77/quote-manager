@@ -3,6 +3,8 @@
 import { useQuotes } from '@/components/ui/useQuotes';
 import QuoteTable from '@/components/ui/QuoteTable';
 import { QuoteForm } from '@/components/ui/QuoteForm';
+import Navigation from '@/components/ui/Navigation';
+import DashboardSidebar from '@/components/ui/DashboardSidebar';
 
 export default function NewQuotePage() {
   const {
@@ -81,26 +83,29 @@ export default function NewQuotePage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="container mx-auto px-2 py-8">
+      <Navigation />
+      <DashboardSidebar />
+      
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900">Add Quote</h1>
           <p className="text-gray-600 mt-2">Create and manage new quotes</p>
-            </div>
-            
+        </div>
+          
         <div className="mb-8">
           <QuoteForm onSubmit={handleSubmit} />
         </div>
 
-          <QuoteTable
-            quotes={activeQuotes}
-            parts={parts}
-            onUpdateQuote={handleUpdateQuote}
-            onDeleteQuote={handleDeleteQuote}
-            onUpdatePart={handleUpdatePart}
-            onUpdateMultipleParts={handleUpdateMultipleParts}
-            onMarkCompleted={handleMarkCompleted}
+        <QuoteTable
+          quotes={activeQuotes}
+          parts={parts}
+          onUpdateQuote={handleUpdateQuote}
+          onDeleteQuote={handleDeleteQuote}
+          onUpdatePart={handleUpdatePart}
+          onUpdateMultipleParts={handleUpdateMultipleParts}
+          onMarkCompleted={handleMarkCompleted}
           onMarkAsOrderedWithParts={handleMarkAsOrderedWithParts}
-          />
+        />
       </div>
     </div>
   );

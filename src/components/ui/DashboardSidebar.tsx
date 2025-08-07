@@ -8,15 +8,15 @@ import { BarChart3, TrendingUp, DollarSign, Users, Package, Activity, Truck } fr
 const DashboardSidebar = () => {
   const pathname = usePathname();
 
-  const isDashboardActive = pathname === '/dashboard';
-  const isDeliveryActive = pathname === '/delivery';
+  const isDashboardActive = pathname === '/quotes/dashboard';
+  const isDeliveryActive = pathname === '/quotes/delivery';
 
   return (
     <div className="fixed left-0 top-1/2 h-full z-50">
       {/* Dashboard Button */}
       <div className="relative">
         <Link
-          href="/dashboard"
+          href="/quotes/dashboard"
           className={`
             group relative flex items-center justify-center w-8 h-10 bg-gradient-to-b from-blue-600 to-purple-600 
             hover:from-blue-700 hover:to-purple-700 transition-all duration-300 ease-in-out
@@ -42,7 +42,7 @@ const DashboardSidebar = () => {
       {/* Delivery Button */}
       <div className="relative mt-2">
         <Link
-          href="/delivery"
+          href="/quotes/delivery"
           className={`
             group relative flex items-center justify-center w-8 h-10 bg-gradient-to-b from-green-600 to-emerald-600 
             hover:from-green-700 hover:to-emerald-700 transition-all duration-300 ease-in-out

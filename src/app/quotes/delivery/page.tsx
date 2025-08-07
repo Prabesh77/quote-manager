@@ -2,12 +2,14 @@
 
 import React, { useState, useEffect } from 'react';
 import { Plus, Camera, FileText, User, Package, CheckCircle, Clock, MapPin, PenTool } from 'lucide-react';
-import { useDelivery, Delivery } from '../../components/ui/useDelivery';
-import { useQuotes } from '../../components/ui/useQuotes';
-import SignatureCanvas from '../../components/ui/SignatureCanvas';
-import { Button } from '../../components/ui/button';
-import { Input } from '../../components/ui/input';
-import { getAccessibleStorageUrl, testBucketAccess, ensureBucketExists } from '../../utils/storage';
+import { useDelivery, Delivery } from '@/components/ui/useDelivery';
+import { useQuotes } from '@/components/ui/useQuotes';
+import SignatureCanvas from '@/components/ui/SignatureCanvas';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { getAccessibleStorageUrl, testBucketAccess, ensureBucketExists } from '@/utils/storage';
+import Navigation from '@/components/ui/Navigation';
+import DashboardSidebar from '@/components/ui/DashboardSidebar';
 
 export default function DeliveryPage() {
   const [showAddModal, setShowAddModal] = useState(false);
@@ -16,6 +18,9 @@ export default function DeliveryPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <Navigation />
+      <DashboardSidebar />
+      
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8">
         <div className="flex items-center justify-between mb-6">

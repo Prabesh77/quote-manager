@@ -3,6 +3,8 @@
 import React from 'react';
 import QuoteTable from '@/components/ui/QuoteTable';
 import { useQuotes } from '@/components/ui/useQuotes';
+import Navigation from '@/components/ui/Navigation';
+import DashboardSidebar from '@/components/ui/DashboardSidebar';
 
 export default function PricedPage() {
   const {
@@ -49,8 +51,12 @@ export default function PricedPage() {
   };
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="relative">
+    <div className="min-h-screen bg-gray-50">
+      <Navigation />
+      <DashboardSidebar />
+      
+      <div className="container mx-auto px-4 py-8">
+        <div className="relative">
         {/* Header */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Priced Quotes</h1>
@@ -69,6 +75,7 @@ export default function PricedPage() {
           showCompleted={false}
           defaultFilter="priced"
         />
+        </div>
       </div>
     </div>
   );

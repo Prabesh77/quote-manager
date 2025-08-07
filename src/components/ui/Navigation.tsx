@@ -17,31 +17,31 @@ const Navigation = () => {
   const navItems = [
     {
       name: 'Add Quote',
-      href: '/new',
+      href: '/quotes/new',
       icon: Plus,
       description: 'Create new quotes'
     },
     {
       name: 'Add Price',
-      href: '/pricing',
+      href: '/quotes/pricing',
       icon: DollarSign,
       description: 'Price pending quotes'
     },
     {
       name: 'Priced',
-      href: '/priced',
+      href: '/quotes/priced',
       icon: FileText,
       description: 'Review priced quotes'
     },
     {
       name: 'Completed',
-      href: '/completed-quotes',
+      href: '/quotes/completed-quotes',
       icon: CheckCircle,
       description: 'View completed quotes'
     },
     {
       name: 'Orders',
-      href: '/orders',
+      href: '/quotes/orders',
       icon: ShoppingCart,
       description: 'Manage orders'
     }
@@ -70,11 +70,11 @@ const Navigation = () => {
           <div className="hidden md:flex items-center space-x-1">
             {navItems.map((item) => {
               const isActive = pathname === item.href || 
-                (item.href === '/new' && pathname === '/') ||
-                (item.href === '/pricing' && pathname.startsWith('/pricing')) ||
-                (item.href === '/priced' && pathname.startsWith('/priced')) ||
-                (item.href === '/completed-quotes' && pathname.startsWith('/completed-quotes')) ||
-                (item.href === '/orders' && pathname.startsWith('/orders'));
+                (item.href === '/quotes/new' && pathname === '/quotes/new') ||
+                (item.href === '/quotes/pricing' && pathname.startsWith('/quotes/pricing')) ||
+                (item.href === '/quotes/priced' && pathname.startsWith('/quotes/priced')) ||
+                (item.href === '/quotes/completed-quotes' && pathname.startsWith('/quotes/completed-quotes')) ||
+                (item.href === '/quotes/orders' && pathname.startsWith('/quotes/orders'));
               
               const IconComponent = item.icon;
 
@@ -149,11 +149,11 @@ const Navigation = () => {
                 <div className="space-y-2">
                   {navItems.map((item) => {
                     const isActive = pathname === item.href || 
-                      (item.href === '/new' && pathname === '/') ||
-                      (item.href === '/pricing' && pathname.startsWith('/pricing')) ||
-                      (item.href === '/priced' && pathname.startsWith('/priced')) ||
-                      (item.href === '/completed-quotes' && pathname.startsWith('/completed-quotes')) ||
-                      (item.href === '/orders' && pathname.startsWith('/orders'));
+                      (item.href === '/quotes/new' && pathname === '/quotes/new') ||
+                      (item.href === '/quotes/pricing' && pathname.startsWith('/quotes/pricing')) ||
+                      (item.href === '/quotes/priced' && pathname.startsWith('/quotes/priced')) ||
+                      (item.href === '/quotes/completed-quotes' && pathname.startsWith('/quotes/completed-quotes')) ||
+                      (item.href === '/quotes/orders' && pathname.startsWith('/quotes/orders'));
                     
                     const IconComponent = item.icon;
 

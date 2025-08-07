@@ -4,6 +4,8 @@ import { useQuotes } from '@/components/ui/useQuotes';
 import { useDelivery } from '@/components/ui/useDelivery';
 import { useEffect, useState, useMemo } from 'react';
 import type { Part } from '@/components/ui/useQuotes';
+import Navigation from '@/components/ui/Navigation';
+import DashboardSidebar from '@/components/ui/DashboardSidebar';
 import { 
   TrendingUp, 
   CheckCircle, 
@@ -270,7 +272,10 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 ml-8">
+      <Navigation />
+      <DashboardSidebar />
+      
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>

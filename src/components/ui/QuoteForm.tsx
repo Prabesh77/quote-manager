@@ -117,8 +117,11 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
         
         if (dateLine && timeLine) {
           try {
-            // Parse the date (format: "28/07/2025")
+            // Parse the date (format: "08/04/2025" - dd/mm/yyyy for Australian format)
             const [day, month, year] = dateLine.split('/');
+            
+            // Debug logging
+            console.log('Date parsing:', { dateLine, day, month, year });
             
             // Validate date components
             if (!day || !month || !year || isNaN(parseInt(day)) || isNaN(parseInt(month)) || isNaN(parseInt(year))) {
@@ -134,12 +137,16 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
               const time = timeStr.replace('pm', '');
               if (time.includes(':')) {
                 const [h, m] = time.split(':');
-                hours = parseInt(h) + 12;
+                const hour = parseInt(h);
+                // 12 PM should be 12, not 24
+                hours = hour === 12 ? 12 : hour + 12;
                 minutes = parseInt(m || '0');
               } else {
                 // Handle format like "1200pm"
                 const timeNum = parseInt(time);
-                hours = Math.floor(timeNum / 100) + 12;
+                const hour = Math.floor(timeNum / 100);
+                // 12 PM should be 12, not 24
+                hours = hour === 12 ? 12 : hour + 12;
                 minutes = timeNum % 100;
               }
             } else if (timeStr.includes('am')) {
@@ -163,6 +170,9 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
             
             // Create ISO timestamp
             const deadline = new Date(parseInt(year), parseInt(month) - 1, parseInt(day), hours, minutes);
+            
+            // Debug logging
+            console.log('Created deadline:', { deadline: deadline.toISOString(), year, month, day, hours, minutes });
             
             // Validate the created date
             if (isNaN(deadline.getTime())) {
@@ -512,13 +522,19 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
                     
                     if (dateLine && timeLine) {
                       try {
-                        // Parse the date (format: "28/07/2025")
+                        // Parse the date (format: "08/04/2025" - dd/mm/yyyy for Australian format)
                         const [day, month, year] = dateLine.split('/');
+                        
+                        // Debug logging
+                        console.log('Date parsing (second occurrence):', { dateLine, day, month, year });
                         
                         // Validate date components
                         if (!day || !month || !year || isNaN(parseInt(day)) || isNaN(parseInt(month)) || isNaN(parseInt(year))) {
+                          console.log('Date validation failed');
                           throw new Error('Invalid date format');
                         }
+                        
+                        console.log('Date validation passed');
                         
                         // Parse the time (format: "12:00pm" or "1200pm")
                         const timeStr = timeLine.toLowerCase();
@@ -529,12 +545,16 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
                           const time = timeStr.replace('pm', '');
                           if (time.includes(':')) {
                             const [h, m] = time.split(':');
-                            hours = parseInt(h) + 12;
+                            const hour = parseInt(h);
+                            // 12 PM should be 12, not 24
+                            hours = hour === 12 ? 12 : hour + 12;
                             minutes = parseInt(m || '0');
                           } else {
                             // Handle format like "1200pm"
                             const timeNum = parseInt(time);
-                            hours = Math.floor(timeNum / 100) + 12;
+                            const hour = Math.floor(timeNum / 100);
+                            // 12 PM should be 12, not 24
+                            hours = hour === 12 ? 12 : hour + 12;
                             minutes = timeNum % 100;
                           }
                         } else if (timeStr.includes('am')) {
@@ -553,21 +573,32 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
                         
                         // Validate time components
                         if (isNaN(hours) || isNaN(minutes) || hours < 0 || hours > 23 || minutes < 0 || minutes > 59) {
+                          console.log('Time validation failed:', { hours, minutes });
                           throw new Error('Invalid time format');
                         }
+                        
+                        console.log('Time validation passed:', { hours, minutes });
                         
                         // Create ISO timestamp
                         const deadline = new Date(parseInt(year), parseInt(month) - 1, parseInt(day), hours, minutes);
                         
+                        // Debug logging
+                        console.log('Created deadline (second occurrence):', { deadline: deadline.toISOString(), year, month, day, hours, minutes });
+                        
                         // Validate the created date
                         if (isNaN(deadline.getTime())) {
+                          console.log('Deadline validation failed');
                           throw new Error('Invalid date/time combination');
                         }
                         
+                        console.log('Deadline validation passed');
                         value = deadline.toISOString();
+                        console.log('Final value:', value);
                       } catch (error) {
                         // Fallback to original format if parsing fails
+                        console.log('Date parsing failed, using fallback:', error);
                         value = `${dateLine} ${timeLine}`;
+                        console.log('Fallback value:', value);
                       }
                       // Skip the lines we processed
                       i = lineIndex - 1;

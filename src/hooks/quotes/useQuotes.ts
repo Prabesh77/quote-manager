@@ -59,7 +59,7 @@ export const useQuotes = () => {
       
       if (result.error) {
         console.error('Error updating quote:', result.error);
-        return { error: new Error(result.error) };
+        return { error: result.error instanceof Error ? result.error : new Error(result.error) };
       }
 
       // Refresh quotes after update
@@ -78,10 +78,10 @@ export const useQuotes = () => {
       
       if (result.error) {
         console.error('Error deleting quote:', result.error);
-        return { error: new Error(result.error) };
+        return { error: result.error instanceof Error ? result.error : new Error(result.error) };
       }
 
-      // Refresh quotes after delete
+      // Refresh quotes after deletion
       await fetchQuotes();
       return { error: null };
     } catch (error) {
@@ -97,7 +97,7 @@ export const useQuotes = () => {
       
       if (result.error) {
         console.error('Error marking quote as completed:', result.error);
-        return { error: new Error(result.error) };
+        return { error: result.error instanceof Error ? result.error : new Error(result.error) };
       }
 
       // Refresh quotes after update
@@ -116,7 +116,7 @@ export const useQuotes = () => {
       
       if (result.error) {
         console.error('Error marking quote as ordered:', result.error);
-        return { error: new Error(result.error) };
+        return { error: result.error instanceof Error ? result.error : new Error(result.error) };
       }
 
       // Refresh quotes after update
@@ -128,6 +128,25 @@ export const useQuotes = () => {
     }
   }, [fetchQuotes]);
 
+  // Verify quote price (boss approval)
+  const verifyQuotePrice = useCallback(async (id: string) => {
+    try {
+      const result = await QuoteService.verifyQuotePrice(id);
+      
+      if (result.error) {
+        console.error('Error verifying quote price:', result.error);
+        return { error: result.error instanceof Error ? result.error : new Error(result.error) };
+      }
+
+      // Refresh quotes after update
+      await fetchQuotes();
+      return { error: null };
+    } catch (error) {
+      console.error('Error verifying quote price:', error);
+      return { error: error instanceof Error ? error : new Error('Unknown error') };
+    }
+  }, [fetchQuotes]);
+
   // Update part
   const updatePart = useCallback(async (id: string, updates: Partial<Part>) => {
     try {
@@ -135,7 +154,7 @@ export const useQuotes = () => {
       
       if (result.error) {
         console.error('Error updating part:', result.error);
-        return { data: null, error: new Error(result.error) };
+        return { data: null, error: result.error instanceof Error ? result.error : new Error(result.error) };
       }
 
       // Refresh parts after update
@@ -154,13 +173,14 @@ export const useQuotes = () => {
       
       if (result.error) {
         console.error('Error updating multiple parts:', result.error);
-        return;
+        return { error: result.error instanceof Error ? result.error : new Error(result.error) };
       }
 
       // Refresh parts after update
       await fetchParts();
     } catch (error) {
       console.error('Error updating multiple parts:', error);
+      throw error instanceof Error ? error : new Error('Unknown error');
     }
   }, [fetchParts]);
 
@@ -222,6 +242,7 @@ export const useQuotes = () => {
     deleteQuote,
     markQuoteCompleted,
     markQuoteAsOrdered,
+    verifyQuotePrice,
     updatePart,
     updateMultipleParts,
     fetchQuotes,

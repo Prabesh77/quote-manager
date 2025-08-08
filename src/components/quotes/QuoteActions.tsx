@@ -1,6 +1,6 @@
 'use client';
 
-import { Edit, Trash2, Save, X, CheckCircle, ShoppingCart } from 'lucide-react';
+import { Edit, Trash2, Save, X, CheckCircle, ShoppingCart, Check } from 'lucide-react';
 import { QuoteStatus } from '@/types/common';
 
 interface QuoteActionsProps {
@@ -13,7 +13,9 @@ interface QuoteActionsProps {
   onDelete: () => void;
   onMarkCompleted?: () => void;
   onMarkAsOrdered?: () => void;
+  onVerifyPrice?: () => void;
   showCompleted?: boolean;
+  showVerifyAction?: boolean;
   className?: string;
 }
 
@@ -27,7 +29,9 @@ export const QuoteActions = ({
   onDelete,
   onMarkCompleted,
   onMarkAsOrdered,
+  onVerifyPrice,
   showCompleted = false,
+  showVerifyAction = false,
   className = ''
 }: QuoteActionsProps) => {
   const shouldShowActions = (status !== 'completed' && status !== 'ordered') || showCompleted;
@@ -69,6 +73,16 @@ export const QuoteActions = ({
           >
             <Trash2 className="h-4 w-4" />
           </button>
+          
+          {status === 'waiting_verification' && showVerifyAction && onVerifyPrice && (
+            <button
+              onClick={onVerifyPrice}
+              className="p-1.5 bg-green-500 hover:bg-green-600 rounded-full transition-colors cursor-pointer"
+              title="Verify and approve price"
+            >
+              <Check className="h-5 w-5 text-white" />
+            </button>
+          )}
           
           {status === 'priced' && onMarkCompleted && (
             <button

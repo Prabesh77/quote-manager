@@ -5,7 +5,7 @@ import { Wifi, WifiOff, Loader2, CheckCircle, AlertCircle, XCircle } from 'lucid
 import supabase from '@/utils/supabase';
 
 interface ConnectionStatusProps {
-  status: 'checking' | 'connected' | 'error';
+  status: 'checking' | 'connected' | 'error' | 'disconnected';
 }
 
 interface HealthStatus {

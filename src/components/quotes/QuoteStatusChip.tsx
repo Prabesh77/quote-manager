@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { AlertTriangle, CheckCircle, ShoppingCart, Package, Clock } from 'lucide-react';
+import { AlertTriangle, CheckCircle, ShoppingCart, Package, Clock, Eye } from 'lucide-react';
 import { QuoteStatus } from '@/types/common';
 
 interface QuoteStatusChipProps {
@@ -24,6 +24,13 @@ export const QuoteStatusChip = ({ status, className = '' }: QuoteStatusChipProps
       border: 'border-yellow-200',
       icon: AlertTriangle,
       label: 'Waiting for Price'
+    },
+    waiting_verification: {
+      bg: 'bg-orange-100',
+      text: 'text-orange-800',
+      border: 'border-orange-200',
+      icon: Eye,
+      label: 'Waiting Verification'
     },
     priced: {
       bg: 'bg-green-100',

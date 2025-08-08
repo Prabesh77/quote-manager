@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { ChevronDown, ChevronRight, Edit, Trash2, Save, X, Copy, CheckCircle, ShoppingCart, Eye } from 'lucide-react';
+import { ChevronDown, ChevronRight, Edit, Trash2, Save, X, Copy, CheckCircle, ShoppingCart, Check, Package } from 'lucide-react';
 import { Quote } from '@/types/quote';
 import { Part } from '@/types/part';
 import { QuoteStatusChip, QuoteDeadlineIndicator } from './index';
@@ -25,6 +25,7 @@ interface QuoteRowProps {
   onDelete: () => void;
   onMarkCompleted?: () => void;
   onMarkAsOrdered?: () => void;
+  onVerifyPrice?: () => void;
   onQuoteEditChange: (field: string, value: string | number | boolean) => void;
   onPartEditChange: (partId: string, field: string, value: string | number | null) => void;
   onStartEditingParts: () => void;
@@ -32,6 +33,7 @@ interface QuoteRowProps {
   onCancelParts: () => void;
   status: string;
   showCompleted?: boolean;
+  showVerifyAction?: boolean;
   copyToClipboard: (text: string) => void;
   getVehicleLogo: (make: string) => string;
   getPartIcon: (partName: string) => string | null;
@@ -50,6 +52,7 @@ export const QuoteRow = ({
   onDelete,
   onMarkCompleted,
   onMarkAsOrdered,
+  onVerifyPrice,
   onQuoteEditChange,
   onPartEditChange,
   onStartEditingParts,
@@ -57,6 +60,7 @@ export const QuoteRow = ({
   onCancelParts,
   status,
   showCompleted = false,
+  showVerifyAction = false,
   copyToClipboard,
   getVehicleLogo,
   getPartIcon
@@ -324,6 +328,19 @@ export const QuoteRow = ({
                 </button>
               )}
               
+              {status === 'waiting_verification' && showVerifyAction && onVerifyPrice && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onVerifyPrice();
+                  }}
+                  className="p-1.5 bg-green-500 hover:bg-green-600 rounded-full transition-colors cursor-pointer"
+                  title="Verify and approve price"
+                >
+                  <Check className="h-5 w-5 text-white" />
+                </button>
+              )}
+              
               {status === 'priced' && onMarkCompleted && (
                 <button
                   onClick={(e) => {
@@ -359,7 +376,7 @@ export const QuoteRow = ({
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <h4 className="text-sm font-semibold text-gray-900 flex items-center space-x-2">
-                <Eye className="h-4 w-4" />
+                <Package className="h-4 w-4" />
                 <span>Parts Details ({quoteParts.length})</span>
               </h4>
               {quoteParts.length === 0 && (

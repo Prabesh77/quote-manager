@@ -29,11 +29,21 @@ export default function OrdersPage() {
     return { data: result.data || null as any, error: null };
   };
 
+  // Wrapper function for updateMultipleParts to match expected interface
+  const handleUpdateMultipleParts = async (updates: Array<{ id: string; updates: Partial<Part> }>): Promise<void> => {
+    try {
+      await updateMultipleParts(updates);
+    } catch (error) {
+      console.error('Error updating multiple parts:', error);
+      // The function expects void return, so we just log errors
+    }
+  };
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900">Orders</h1>
-        <p className="mt-2 text-gray-600">View and manage ordered quotes</p>
+        <p className="mt-2 text-gray-600">View and manage quotes that have been ordered</p>
       </div>
 
       <QuoteTable
@@ -42,7 +52,7 @@ export default function OrdersPage() {
         onUpdateQuote={updateQuote}
         onDeleteQuote={deleteQuote}
         onUpdatePart={handleUpdatePart}
-        onUpdateMultipleParts={updateMultipleParts}
+        onUpdateMultipleParts={handleUpdateMultipleParts}
         onMarkCompleted={markQuoteCompleted}
         onMarkAsOrdered={markQuoteAsOrdered}
         showCompleted={true}

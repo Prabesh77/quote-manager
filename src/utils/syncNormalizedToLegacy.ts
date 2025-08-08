@@ -1,71 +1,58 @@
-import supabase from '@/utils/supabase';
-import { Quote, Part } from '@/components/ui/useQuotes';
+import { Quote } from '@/types/quote';
+import { Part } from '@/types/part';
+import supabase from './supabase';
 
-// Function to convert normalized data to legacy format
-export const syncNormalizedToLegacy = async () => {
+/**
+ * Sync data from normalized tables to legacy format
+ * This is used to maintain compatibility with existing UI components
+ */
+export async function syncNormalizedToLegacy() {
   try {
-    // Get all normalized quotes with customer and vehicle details
+    // Fetch all normalized data
     const { data: normalizedQuotes, error: quotesError } = await supabase
       .from('quotes')
       .select(`
         *,
-        customer:customers(*),
-        vehicle:vehicles(*)
-      `)
-      .order('created_at', { ascending: false });
+        vehicle:vehicles(*),
+        customer:customers(*)
+      `);
 
     if (quotesError) {
       console.error('Error fetching normalized quotes:', quotesError);
-      return [];
+      return { success: false, error: quotesError };
     }
 
-    // Get all quote parts with part details
-    const { data: quoteParts, error: partsError } = await supabase
-      .from('quote_parts')
-      .select(`
-        *,
-        part:parts(*)
-      `);
+    // Transform to legacy format
+    const legacyQuotes: Quote[] = normalizedQuotes?.map(nq => ({
+      id: nq.id,
+      quoteRef: nq.quote_ref,
+      vin: nq.vehicle?.vin || '',
+      partRequested: nq.part_requested || '',
+      make: nq.vehicle?.make || '',
+      model: nq.vehicle?.model || '',
+      series: nq.vehicle?.series || '',
+      auto: nq.vehicle?.transmission === 'auto',
+      body: nq.vehicle?.body || '',
+      mthyr: nq.vehicle?.year || '',
+      rego: nq.vehicle?.registration || '',
+      requiredBy: undefined, // This field doesn't exist in normalized schema
+      customer: nq.customer?.name || '',
+      address: nq.customer?.address || '',
+      phone: nq.customer?.phone || '',
+      status: nq.status || 'active',
+      taxInvoiceNumber: nq.tax_invoice_number,
+      createdAt: nq.created_at,
+      updatedAt: nq.updated_at
+    })) || [];
 
-    if (partsError) {
-      console.error('Error fetching quote parts:', partsError);
-      return [];
-    }
+    console.log('Synced quotes to legacy format:', legacyQuotes.length);
+    return { success: true, data: legacyQuotes };
 
-    // Convert to legacy format
-    const legacyQuotes: Quote[] = (normalizedQuotes || []).map(normalizedQuote => {
-      // Get parts for this quote
-      const quotePartsForThisQuote = (quoteParts || []).filter(qp => qp.quote_id === normalizedQuote.id);
-      const partIds = quotePartsForThisQuote.map(qp => qp.part_id).join(',');
-
-      return {
-        id: normalizedQuote.id,
-        vin: normalizedQuote.vehicle?.vin || '',
-        partRequested: partIds,
-        quoteRef: `Q${normalizedQuote.id.slice(0, 8)}`, // Generate quote ref from ID
-        createdAt: normalizedQuote.created_at,
-        make: normalizedQuote.vehicle?.make || '',
-        model: normalizedQuote.vehicle?.model || '',
-        series: normalizedQuote.vehicle?.series || '',
-        auto: true, // Default value
-        body: normalizedQuote.vehicle?.body || '',
-        mthyr: normalizedQuote.vehicle?.year?.toString() || '',
-        rego: normalizedQuote.vehicle?.rego || '',
-        requiredBy: undefined, // Not in normalized structure
-        customer: normalizedQuote.customer?.name || '',
-        address: normalizedQuote.customer?.address || '',
-        phone: normalizedQuote.customer?.phone || '',
-        status: normalizedQuote.status as Quote['status'],
-        taxInvoiceNumber: normalizedQuote.tax_invoice_number || undefined,
-      };
-    });
-
-    return legacyQuotes;
   } catch (error) {
-    console.error('Error syncing normalized to legacy:', error);
-    return [];
+    console.error('Error in syncNormalizedToLegacy:', error);
+    return { success: false, error };
   }
-};
+}
 
 // Function to convert normalized parts to legacy format
 export const syncNormalizedPartsToLegacy = async (): Promise<Part[]> => {

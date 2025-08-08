@@ -1,8 +1,9 @@
 'use client';
 
 import React from 'react';
-import QuoteTable from '@/components/ui/QuoteTable';
-import { useQuotes } from '@/components/ui/useQuotes';
+import QuoteTable from '@/components/quotes/QuoteTable';
+import { useQuotes } from '@/hooks/quotes/useQuotes';
+import { Part } from '@/types/part';
 
 export default function PricedPage() {
   const {
@@ -13,63 +14,36 @@ export default function PricedPage() {
     updatePart,
     updateMultipleParts,
     markQuoteCompleted,
-    markQuoteAsOrderedWithParts,
+    markQuoteAsOrdered,
   } = useQuotes();
 
-  // Filter quotes to only show those that have been priced
-  const pricedQuotes = quotes.filter(quote => quote.status === 'priced');
-
-  // Wrapper functions to match QuoteTableProps interface
-  const onUpdateQuote = async (id: string, fields: Record<string, any>) => {
-    const result = await updateQuote(id, fields);
-    return { error: result.error as Error | null };
-  };
-
-  const onDeleteQuote = async (id: string) => {
-    const result = await deleteQuote(id);
-    return { error: result.error as Error | null };
-  };
-
-  const onUpdatePart = async (id: string, updates: any) => {
-    return await updatePart(id, updates);
-  };
-
-  const onUpdateMultipleParts = async (updates: any) => {
-    await updateMultipleParts(updates);
-  };
-
-  const onMarkAsOrderedWithParts = async (id: string, taxInvoiceNumber: string, partIds: string[]) => {
-    const result = await markQuoteAsOrderedWithParts(id, taxInvoiceNumber, partIds);
-    return { error: result.error as Error | null };
-  };
-
-  const onMarkCompleted = async (id: string) => {
-    const result = await markQuoteCompleted(id);
-    return { error: result.error };
+  // Wrapper function to match QuoteTable's expected interface
+  const handleUpdatePart = async (id: string, updates: Partial<Part>): Promise<{ data: Part; error: Error | null }> => {
+    const result = await updatePart(id, updates);
+    if (result.error) {
+      return { data: null as any, error: result.error };
+    }
+    return { data: result.data || null as any, error: null };
   };
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="relative">
-        {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Priced Quotes</h1>
-          <p className="text-gray-600">Review priced quotes and mark them as completed</p>
-        </div>
-
-        {/* Quote Table - Show only quotes that have been priced */}
-        <QuoteTable
-          quotes={pricedQuotes}
-          parts={parts}
-          onUpdateQuote={onUpdateQuote}
-          onDeleteQuote={onDeleteQuote}
-          onUpdatePart={onUpdatePart}
-          onUpdateMultipleParts={onUpdateMultipleParts}
-          onMarkCompleted={onMarkCompleted}
-          showCompleted={false}
-          defaultFilter="priced"
-        />
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold text-gray-900">Priced Quotes</h1>
+        <p className="mt-2 text-gray-600">View and manage quotes that have been priced</p>
       </div>
+
+      <QuoteTable
+        quotes={quotes}
+        parts={parts}
+        onUpdateQuote={updateQuote}
+        onDeleteQuote={deleteQuote}
+        onUpdatePart={handleUpdatePart}
+        onUpdateMultipleParts={updateMultipleParts}
+        onMarkCompleted={markQuoteCompleted}
+        onMarkAsOrdered={markQuoteAsOrdered}
+        defaultFilter="priced"
+      />
     </div>
   );
 } 

@@ -593,12 +593,19 @@ export const useQuotes = () => {
     }
   };
 
-  const getActiveQuotes = () => {
+  const getQuotesContainingPart = (partId: string): Quote[] => {
+    return quotes.filter(quote => {
+      const quoteParts = parts.filter(part => part.id === quote.id);
+      return quoteParts.length > 0;
+    });
+  };
+
+  const getActiveQuotes = (): Quote[] => {
     return quotes.filter(quote => quote.status !== 'completed' && quote.status !== 'ordered');
   };
 
-  const getCompletedQuotes = () => {
-    return quotes.filter(quote => quote.status === 'completed');
+  const getCompletedQuotes = (): Quote[] => {
+    return quotes.filter(quote => quote.status === 'completed' || quote.status === 'ordered');
   };
 
   const updateMultipleParts = async (updates: Array<{ id: string; updates: Partial<Part> }>) => {
@@ -699,55 +706,19 @@ export const useQuotes = () => {
     }
   };
 
-  const testUpdate = async () => {
-    if (quotes.length === 0) {
-      alert('No quotes available to test update');
-      return;
-    }
-    
-    const firstQuote = quotes[0];
-    
-    const testUpdateData = {
-      partRequested: 'test-part-id'
-    };
-    
-    const { data, error } = await supabase
-      .from('quotes')
-      .update(testUpdateData)
-      .eq('id', firstQuote.id)
-      .select();
-    
-    if (error) {
-      alert(`Test update failed: ${error.message}`);
-    } else {
-      alert('Test update successful');
-      fetchQuotes();
-    }
-  };
-
-  const getQuotesContainingPart = (partId: string): Quote[] => {
-    return quotes.filter(quote => {
-      const quoteParts = parts.filter(part => part.id === quote.id);
-      return quoteParts.some(part => part.id === partId);
-    });
-  };
-
   return {
     quotes,
     parts,
     connectionStatus,
     addQuote,
     updateQuote,
+    deleteQuote,
     addPart,
     updatePart,
     updateMultipleParts,
     deletePart,
-    deleteQuote,
     fetchQuotes,
     fetchParts,
-    testSupabaseConnection,
-    checkTableStructure,
-    testUpdate,
     markQuoteCompleted,
     markQuoteAsOrdered,
     markQuoteAsOrderedWithParts,

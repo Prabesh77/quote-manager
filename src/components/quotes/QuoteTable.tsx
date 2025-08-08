@@ -22,11 +22,10 @@ interface QuoteTableProps {
   onMarkCompleted?: (id: string) => Promise<{ error: Error | null }>;
   onMarkAsOrdered?: (id: string, taxInvoiceNumber: string) => Promise<{ error: Error | null }>;
   onMarkAsOrderedWithParts?: (id: string, taxInvoiceNumber: string, partIds: string[]) => Promise<{ error: Error | null }>;
+  onVerifyPrice?: (id: string) => Promise<{ error: Error | null }>;
   showCompleted?: boolean;
-  defaultFilter?: FilterType;
+  showVerifyAction?: boolean;
 }
-
-type FilterType = 'all' | 'unpriced' | 'priced';
 
 export default function QuoteTable({ 
   quotes, 
@@ -38,15 +37,15 @@ export default function QuoteTable({
   onMarkCompleted, 
   onMarkAsOrdered, 
   onMarkAsOrderedWithParts, 
+  onVerifyPrice,
   showCompleted = false, 
-  defaultFilter = 'all' 
+  showVerifyAction = false
 }: QuoteTableProps) {
   const [editingQuote, setEditingQuote] = useState<string | null>(null);
   const [editingParts, setEditingParts] = useState<string | null>(null);
   const [editData, setEditData] = useState<Record<string, any>>({});
   const [partEditData, setPartEditData] = useState<Record<string, any>>({});
   const [searchTerm, setSearchTerm] = useState('');
-  const [activeFilter, setActiveFilter] = useState<FilterType>(defaultFilter);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
   const [showOrderConfirm, setShowOrderConfirm] = useState<string | null>(null);
   const [taxInvoiceNumber, setTaxInvoiceNumber] = useState('');
@@ -149,10 +148,15 @@ export default function QuoteTable({
       return quoteStatus;
     }
     
+    // If quote status is explicitly set to waiting_verification or priced, use that
+    if (quoteStatus === 'waiting_verification' || quoteStatus === 'priced') {
+      return quoteStatus;
+    }
+    
     if (quoteParts.length === 0) return 'unpriced';
     
     const allPartsPriced = quoteParts.every(part => part.price && part.price > 0);
-    return allPartsPriced ? 'priced' : 'unpriced';
+    return allPartsPriced ? 'waiting_verification' : 'unpriced';
   };
 
   const copyToClipboard = async (text: string) => {
@@ -248,10 +252,10 @@ export default function QuoteTable({
 
   // Filter and sort quotes
   const filteredAndSortedQuotes = useMemo(() => {
-    let filtered = quotes;
+    let filtered = [...quotes];
 
     // Apply search filter
-    if (searchTerm) {
+    if (searchTerm.trim()) {
       const searchLower = searchTerm.toLowerCase();
       filtered = filtered.filter(quote => 
         quote.make?.toLowerCase().includes(searchLower) ||
@@ -262,16 +266,7 @@ export default function QuoteTable({
       );
     }
 
-    // Apply status filter
-    if (activeFilter !== 'all') {
-      filtered = filtered.filter(quote => {
-        const quoteParts = getQuoteParts(quote.partRequested);
-        const status = getQuoteStatus(quoteParts, quote.status);
-        return status === activeFilter;
-      });
-    }
-
-    // Sort by deadline priority and creation date
+    // Sort by status priority and creation date
     return filtered.sort((a, b) => {
       const aParts = getQuoteParts(a.partRequested);
       const bParts = getQuoteParts(b.partRequested);
@@ -279,7 +274,14 @@ export default function QuoteTable({
       const bStatus = getQuoteStatus(bParts, b.status);
       
       // Sort by status priority
-      const statusPriority = { 'unpriced': 0, 'priced': 1, 'completed': 2, 'ordered': 3, 'delivered': 4 };
+      const statusPriority = { 
+        'unpriced': 0, 
+        'waiting_verification': 1, 
+        'priced': 2, 
+        'completed': 3, 
+        'ordered': 4, 
+        'delivered': 5 
+      };
       const aPriority = statusPriority[aStatus as keyof typeof statusPriority] || 0;
       const bPriority = statusPriority[bStatus as keyof typeof statusPriority] || 0;
       
@@ -290,7 +292,7 @@ export default function QuoteTable({
       // Then by creation date (newest first)
       return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
     });
-  }, [quotes, searchTerm, activeFilter]);
+  }, [quotes, searchTerm]);
 
   return (
     <div className="space-y-4">
@@ -309,21 +311,7 @@ export default function QuoteTable({
             />
           </div>
           
-          <div className="flex space-x-2">
-            {['all', 'unpriced', 'priced'].map((filter) => (
-              <button
-                key={filter}
-                onClick={() => setActiveFilter(filter as FilterType)}
-                className={`px-3 py-1 text-sm font-medium rounded-md transition-colors ${
-                  activeFilter === filter
-                    ? 'bg-red-600 text-white'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
-              >
-                {filter.charAt(0).toUpperCase() + filter.slice(1)}
-              </button>
-            ))}
-          </div>
+          {/* Removed filter buttons */}
         </div>
         
         <div className="flex items-center space-x-2 text-sm text-gray-600">
@@ -342,9 +330,8 @@ export default function QuoteTable({
             </div>
             <h3 className="text-2xl font-semibold text-gray-900 mb-3">No quotes found</h3>
             <p className="text-gray-600 text-center max-w-lg mb-8 text-lg">
-              {activeFilter === 'unpriced' ? 'No quotes are waiting for pricing at the moment.' :
-               activeFilter === 'priced' ? 'No quotes have been priced yet.' :
-               showCompleted ? 'No quotes have been completed yet.' :
+              {/* Removed filter-specific messages */}
+              {showCompleted ? 'No quotes have been completed yet.' :
                'Get started by adding your first quote to track parts and pricing.'}
             </p>
             <div className="flex items-center space-x-3 text-base text-gray-500">
@@ -392,6 +379,7 @@ export default function QuoteTable({
                     onDelete={() => handleDeleteWithConfirm(quote.id)}
                     onMarkCompleted={onMarkCompleted ? () => onMarkCompleted(quote.id) : undefined}
                     onMarkAsOrdered={onMarkAsOrdered ? () => handleMarkAsOrder(quote.id) : undefined}
+                    onVerifyPrice={onVerifyPrice ? () => onVerifyPrice(quote.id) : undefined}
                     onQuoteEditChange={handleQuoteEditChange}
                     onPartEditChange={handlePartEditChange}
                     onStartEditingParts={() => startEditingParts(quoteParts, quote.id)}
@@ -402,6 +390,7 @@ export default function QuoteTable({
                     }}
                     status={status}
                     showCompleted={showCompleted}
+                    showVerifyAction={showVerifyAction}
                     copyToClipboard={copyToClipboard}
                     getVehicleLogo={getVehicleLogo}
                     getPartIcon={getPartIcon}

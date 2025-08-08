@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Plus, DollarSign, CheckCircle, ShoppingCart, FileText, BarChart3, Menu, X } from 'lucide-react';
+import { Plus, DollarSign, CheckCircle, ShoppingCart, FileText, BarChart3, Menu, X, Eye } from 'lucide-react';
 import { ConnectionStatus } from '@/components/common';
 import { useQuotes } from '@/hooks/quotes/useQuotes';
 
@@ -26,6 +26,12 @@ const Navigation = () => {
       href: '/pricing',
       icon: DollarSign,
       description: 'Price pending quotes'
+    },
+    {
+      name: 'Verify Price',
+      href: '/verify-price',
+      icon: Eye,
+      description: 'Verify price for boss approval'
     },
     {
       name: 'Priced',

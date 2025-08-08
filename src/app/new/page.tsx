@@ -5,6 +5,7 @@ import QuoteTable from '@/components/quotes/QuoteTable';
 import { QuoteForm } from '@/components/ui/QuoteForm';
 import { createNormalizedQuote } from '@/utils/normalizedQuoteCreation';
 import { syncNormalizedToLegacy, syncNormalizedPartsToLegacy } from '@/utils/syncNormalizedToLegacy';
+import { Part } from '@/types/part';
 
 // Function to validate and clean date string
 const validateDateString = (dateString: string): string | undefined => {
@@ -62,104 +63,121 @@ export default function NewQuotePage() {
     fetchParts
   } = useQuotes();
 
-  const activeQuotes = quotes.filter(quote => quote.status !== 'completed' && quote.status !== 'ordered');
+  // Filter to only show quotes waiting for pricing
+  const getQuoteParts = (partRequested: string): Part[] => {
+    if (!partRequested) return [];
+    const partIds = partRequested.split(',').filter(id => id.trim());
+    return parts.filter(part => partIds.includes(part.id));
+  };
+
+  const getQuoteStatus = (quoteParts: Part[], quoteStatus?: string): string => {
+    if (quoteStatus === 'completed' || quoteStatus === 'ordered' || quoteStatus === 'delivered') {
+      return quoteStatus;
+    }
+    
+    // If quote status is explicitly set to waiting_verification or priced, use that
+    if (quoteStatus === 'waiting_verification' || quoteStatus === 'priced') {
+      return quoteStatus;
+    }
+    
+    if (quoteParts.length === 0) return 'unpriced';
+    
+    const allPartsPriced = quoteParts.every(part => part.price && part.price > 0);
+    return allPartsPriced ? 'waiting_verification' : 'unpriced';
+  };
+
+  // Filter quotes to only show those waiting for pricing
+  const unpricedQuotes = quotes.filter(quote => {
+    const quoteParts = getQuoteParts(quote.partRequested);
+    const status = getQuoteStatus(quoteParts, quote.status);
+    return status === 'unpriced';
+  });
 
   // Wrapper functions to match QuoteTableProps interface
   const handleUpdateQuote = async (id: string, fields: Record<string, any>) => {
-    const result = await updateQuote(id, fields);
-    return { error: result.error as Error | null };
+    return await updateQuote(id, fields);
   };
 
   const handleDeleteQuote = async (id: string) => {
-    const result = await deleteQuote(id);
-    return { error: result.error as Error | null };
+    return await deleteQuote(id);
   };
 
-  const handleUpdatePart = async (id: string, updates: any) => {
-    try {
-      const result = await updatePart(id, updates);
-      
-      if (result.error) {
-        console.error('Error updating part:', result.error);
-        return { data: null as any, error: result.error };
-      }
+  const handleUpdatePart = async (id: string, updates: Partial<Part>): Promise<{ data: Part; error: Error | null }> => {
+    const result = await updatePart(id, updates);
+    if (result.error) {
+      return { data: null as any, error: result.error };
+    }
+    return { data: result.data || null as any, error: null };
+  };
 
-      return { data: result.data || null as any, error: null };
+  const handleUpdateMultipleParts = async (updates: Array<{ id: string; updates: Partial<Part> }>): Promise<void> => {
+    try {
+      await updateMultipleParts(updates);
     } catch (error) {
-      console.error('Error in handleUpdatePart:', error);
-      return { data: null as any, error: error instanceof Error ? error : new Error('Unknown error') };
+      console.error('Error updating multiple parts:', error);
+      // The function expects void return, so we just log errors
     }
   };
 
-  const handleUpdateMultipleParts = async (updates: any) => {
-    await updateMultipleParts(updates);
-  };
-
   const handleMarkCompleted = async (id: string) => {
-    const result = await markQuoteCompleted(id);
-    return { error: result.error as Error | null };
+    return await markQuoteCompleted(id);
   };
 
   const handleMarkAsOrdered = async (id: string, taxInvoiceNumber: string) => {
-    const result = await markQuoteAsOrdered(id, taxInvoiceNumber);
-    return { error: result.error as Error | null };
+    return await markQuoteAsOrdered(id, taxInvoiceNumber);
   };
 
-  const handleSubmit = async (fields: Record<string, string>, parts: any[]) => {
+  const handleSubmit = async (data: any) => {
     try {
-      console.log('Form fields received:', fields);
-      console.log('Parts received:', parts);
+      console.log('Form submission data:', data);
 
-      // Validate and clean the mthyr field
-      const validatedMthyr = validateDateString(fields.mthyr);
-
-      const normalizedQuoteData = {
+      // Validate mthyr field
+      const validatedMthyr = validateDateString(data.mthyr);
+      
+      const result = await createNormalizedQuote({
         customer: {
-          name: fields.customer || '',
-          phone: fields.phone || '',
-          address: fields.address || '',
+          name: data.customer || '',
+          phone: data.phone || '',
+          address: data.address || ''
         },
         vehicle: {
-          make: fields.make || '',
-          model: fields.model || '',
-          series: fields.series || '',
-          year: validatedMthyr ? validatedMthyr.split('/')[1] : undefined, // Keep as string
-          vin: fields.vin || undefined,
-          color: undefined, // Not in current form
-          transmission: fields.auto === 'true' ? 'auto' : 'manual', // Map auto field to transmission
-          body: fields.body || undefined, // Added body field
-          notes: undefined, // Not in current form
+          vin: data.vin || '',
+          make: data.make || '',
+          model: data.model || '',
+          series: data.series || '',
+          year: validatedMthyr ? validatedMthyr.split('/')[1] : undefined,
+          rego: data.rego || '',
+          transmission: data.auto ? 'auto' : 'manual',
+          body: data.body || '',
+          color: data.color || '',
+          notes: data.vehicleNotes || ''
         },
-        parts: parts.map(part => ({
-          name: part.name,
-          number: part.number || '',
+        parts: data.parts?.map((part: any) => ({
+          name: part.partName || '',
+          number: part.partNumber || '',
           price: part.price || null,
-          note: part.note || '',
-        })),
-        requiredBy: fields.requiredBy || undefined,
-      };
+          note: part.note || ''
+        })) || [],
+        notes: data.notes || '',
+        requiredBy: data.requiredBy || ''
+      });
 
-      console.log('Normalized quote data:', normalizedQuoteData);
-
-      const result = await createNormalizedQuote(normalizedQuoteData);
-      
       if (result.error) {
-        console.error('Error creating quote:', result.error);
         alert('Error creating quote: ' + result.error);
         return;
       }
 
       console.log('Quote created successfully:', result);
       
-      // Refresh data after creating quote
+      // Refresh the quotes list
       await fetchQuotes();
       await fetchParts();
       
-      // Reset form (this will be handled by the QuoteForm component)
+      // Removed success alert to reduce friction
       
     } catch (error) {
-      console.error('Error in handleSubmit:', error);
-      alert('Error creating quote: ' + (error instanceof Error ? error.message : 'Unknown error'));
+      console.error('Error creating quote:', error);
+      alert('Error creating quote. Please try again.');
     }
   };
 
@@ -172,11 +190,11 @@ export default function NewQuotePage() {
           <QuoteForm onSubmit={handleSubmit} />
         </div>
         
-        {/* Quote Table */}
+        {/* Quote Table - Only Unpriced Quotes */}
         <div className="bg-white rounded-lg shadow-md p-6">
-          <h2 className="text-xl font-semibold text-gray-900 mb-6">Active Quotes</h2>
+          <h2 className="text-xl font-semibold text-gray-900 mb-6">Quotes Waiting for Pricing</h2>
           <QuoteTable
-            quotes={activeQuotes}
+            quotes={unpricedQuotes}
             parts={parts}
             onUpdateQuote={handleUpdateQuote}
             onDeleteQuote={handleDeleteQuote}
@@ -185,7 +203,6 @@ export default function NewQuotePage() {
             onMarkCompleted={handleMarkCompleted}
             onMarkAsOrdered={handleMarkAsOrdered}
             showCompleted={false}
-            defaultFilter="all"
           />
         </div>
       </div>

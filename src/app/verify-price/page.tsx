@@ -5,7 +5,7 @@ import QuoteTable from '@/components/quotes/QuoteTable';
 import { useQuotes } from '@/hooks/quotes/useQuotes';
 import { Part } from '@/types/part';
 
-export default function PricedPage() {
+export default function VerifyPricePage() {
   const {
     quotes,
     parts,
@@ -15,10 +15,11 @@ export default function PricedPage() {
     updateMultipleParts,
     markQuoteCompleted,
     markQuoteAsOrdered,
+    verifyQuotePrice,
   } = useQuotes();
 
-  // Filter quotes to only show priced ones
-  const pricedQuotes = quotes.filter(quote => quote.status === 'priced');
+  // Filter quotes to only show those waiting for verification
+  const waitingVerificationQuotes = quotes.filter(quote => quote.status === 'waiting_verification');
 
   // Wrapper function to match QuoteTable's expected interface
   const handleUpdatePart = async (id: string, updates: Partial<Part>): Promise<{ data: Part; error: Error | null }> => {
@@ -42,12 +43,12 @@ export default function PricedPage() {
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">Priced Quotes</h1>
-        <p className="mt-2 text-gray-600">View and manage quotes that have been verified and priced</p>
+        <h1 className="text-3xl font-bold text-gray-900">Verify Prices</h1>
+        <p className="mt-2 text-gray-600">Review and approve quotes that are waiting for price verification</p>
       </div>
 
       <QuoteTable
-        quotes={pricedQuotes}
+        quotes={waitingVerificationQuotes}
         parts={parts}
         onUpdateQuote={updateQuote}
         onDeleteQuote={deleteQuote}
@@ -55,6 +56,9 @@ export default function PricedPage() {
         onUpdateMultipleParts={handleUpdateMultipleParts}
         onMarkCompleted={markQuoteCompleted}
         onMarkAsOrdered={markQuoteAsOrdered}
+        onVerifyPrice={verifyQuotePrice}
+        showVerifyAction={true}
+        showCompleted={false}
       />
     </div>
   );

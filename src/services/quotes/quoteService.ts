@@ -227,4 +227,26 @@ export class QuoteService {
       return { data: null, error: 'Failed to mark quote as ordered' };
     }
   }
+
+  /**
+   * Verify quote price (move from waiting_verification to priced)
+   */
+  static async verifyQuotePrice(id: string): Promise<ApiResponse<null>> {
+    try {
+      const { error } = await supabase
+        .from('quotes')
+        .update({ status: 'priced' })
+        .eq('id', id);
+      
+      if (error) {
+        console.error('Verify price error:', error);
+        return { data: null, error: error.message };
+      }
+      
+      return { data: null, error: null };
+    } catch (error) {
+      console.error('Verify price error:', error);
+      return { data: null, error: 'Failed to verify quote price' };
+    }
+  }
 } 

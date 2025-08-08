@@ -1,7 +1,7 @@
 'use client';
 
-import { useQuotes } from '@/components/ui/useQuotes';
-import QuoteTable from '@/components/ui/QuoteTable';
+import { useQuotes } from '@/hooks/quotes/useQuotes';
+import QuoteTable from '@/components/quotes/QuoteTable';
 import { QuoteForm } from '@/components/ui/QuoteForm';
 import { createNormalizedQuote } from '@/utils/normalizedQuoteCreation';
 import { syncNormalizedToLegacy, syncNormalizedPartsToLegacy } from '@/utils/syncNormalizedToLegacy';
@@ -52,14 +52,12 @@ export default function NewQuotePage() {
   const {
     quotes,
     parts,
-    addQuote,
-    addPart,
     updateQuote,
     deleteQuote,
     updatePart,
     updateMultipleParts,
     markQuoteCompleted,
-    markQuoteAsOrderedWithParts,
+    markQuoteAsOrdered,
     fetchQuotes,
     fetchParts
   } = useQuotes();
@@ -78,7 +76,19 @@ export default function NewQuotePage() {
   };
 
   const handleUpdatePart = async (id: string, updates: any) => {
-    return await updatePart(id, updates);
+    try {
+      const result = await updatePart(id, updates);
+      
+      if (result.error) {
+        console.error('Error updating part:', result.error);
+        return { data: null as any, error: result.error };
+      }
+
+      return { data: result.data || null as any, error: null };
+    } catch (error) {
+      console.error('Error in handleUpdatePart:', error);
+      return { data: null as any, error: error instanceof Error ? error : new Error('Unknown error') };
+    }
   };
 
   const handleUpdateMultipleParts = async (updates: any) => {
@@ -90,90 +100,94 @@ export default function NewQuotePage() {
     return { error: result.error as Error | null };
   };
 
-  const handleMarkAsOrderedWithParts = async (id: string, taxInvoiceNumber: string, partIds: string[]) => {
-    const result = await markQuoteAsOrderedWithParts(id, taxInvoiceNumber, partIds);
+  const handleMarkAsOrdered = async (id: string, taxInvoiceNumber: string) => {
+    const result = await markQuoteAsOrdered(id, taxInvoiceNumber);
     return { error: result.error as Error | null };
   };
 
   const handleSubmit = async (fields: Record<string, string>, parts: any[]) => {
     try {
       console.log('Form fields received:', fields);
-      
-      // Parse year from mthyr field
-      const parsedYear = fields.mthyr ? validateDateString(fields.mthyr) : undefined;
-      console.log('Original mthyr:', fields.mthyr, 'Parsed year:', parsedYear);
-      
-      // Transform form data to normalized structure
+      console.log('Parts received:', parts);
+
+      // Validate and clean the mthyr field
+      const validatedMthyr = validateDateString(fields.mthyr);
+
       const normalizedQuoteData = {
         customer: {
           name: fields.customer || '',
-          phone: fields.phone || undefined,
-          address: fields.address || undefined,
+          phone: fields.phone || '',
+          address: fields.address || '',
         },
         vehicle: {
-          rego: fields.rego || undefined,
           make: fields.make || '',
           model: fields.model || '',
-          series: fields.series || undefined,
-          year: parsedYear,
+          series: fields.series || '',
+          year: validatedMthyr ? validatedMthyr.split('/')[1] : undefined, // Keep as string
           vin: fields.vin || undefined,
           color: undefined, // Not in current form
+          transmission: fields.auto === 'true' ? 'auto' : 'manual', // Map auto field to transmission
           body: fields.body || undefined, // Added body field
           notes: undefined, // Not in current form
         },
         parts: parts.map(part => ({
           name: part.name,
-          number: part.number,
-          price: part.price,
-          note: part.note,
+          number: part.number || '',
+          price: part.price || null,
+          note: part.note || '',
         })),
-        notes: fields.notes || undefined,
         requiredBy: fields.requiredBy || undefined,
       };
-      
+
       console.log('Normalized quote data:', normalizedQuoteData);
 
-      // Create quote using normalized structure
       const result = await createNormalizedQuote(normalizedQuoteData);
       
       if (result.error) {
-        console.error('Error creating normalized quote:', result.error);
+        console.error('Error creating quote:', result.error);
+        alert('Error creating quote: ' + result.error);
         return;
       }
 
-      console.log('Successfully created normalized quote:', result.quote?.id);
+      console.log('Quote created successfully:', result);
       
-      // Refresh the quotes list to show the new quote
-      fetchQuotes();
-      fetchParts();
+      // Refresh data after creating quote
+      await fetchQuotes();
+      await fetchParts();
+      
+      // Reset form (this will be handled by the QuoteForm component)
       
     } catch (error) {
-      console.error('Error creating quote:', error);
+      console.error('Error in handleSubmit:', error);
+      alert('Error creating quote: ' + (error instanceof Error ? error.message : 'Unknown error'));
     }
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="container mx-auto px-2 py-8">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">Add Quote</h1>
-          <p className="text-gray-600 mt-2">Create and manage new quotes</p>
-            </div>
-            
-        <div className="mb-8">
+    <div className="container mx-auto px-4 py-8 max-w-7xl">
+      <div className="space-y-8">
+        {/* Quote Form */}
+        <div className="bg-white rounded-lg shadow-md p-6">
+          <h2 className="text-xl font-semibold text-gray-900 mb-6">Create New Quote</h2>
           <QuoteForm onSubmit={handleSubmit} />
         </div>
-
-        <QuoteTable
-          quotes={activeQuotes}
-          parts={parts}
-          onUpdateQuote={handleUpdateQuote}
-          onDeleteQuote={handleDeleteQuote}
-          onUpdatePart={handleUpdatePart}
-          onUpdateMultipleParts={handleUpdateMultipleParts}
-          onMarkCompleted={handleMarkCompleted}
-          onMarkAsOrderedWithParts={handleMarkAsOrderedWithParts}
-        />
+        
+        {/* Quote Table */}
+        <div className="bg-white rounded-lg shadow-md p-6">
+          <h2 className="text-xl font-semibold text-gray-900 mb-6">Active Quotes</h2>
+          <QuoteTable
+            quotes={activeQuotes}
+            parts={parts}
+            onUpdateQuote={handleUpdateQuote}
+            onDeleteQuote={handleDeleteQuote}
+            onUpdatePart={handleUpdatePart}
+            onUpdateMultipleParts={handleUpdateMultipleParts}
+            onMarkCompleted={handleMarkCompleted}
+            onMarkAsOrdered={handleMarkAsOrdered}
+            showCompleted={false}
+            defaultFilter="all"
+          />
+        </div>
       </div>
     </div>
   );

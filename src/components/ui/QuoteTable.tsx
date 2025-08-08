@@ -30,16 +30,16 @@ type QuoteStatus = 'unpriced' | 'priced' | 'completed' | 'ordered' | 'delivered'
 
 export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote, onUpdatePart, onUpdateMultipleParts, onMarkCompleted, onMarkAsOrdered, onMarkAsOrderedWithParts, showCompleted = false, defaultFilter = 'all' }: QuoteTableProps) {
   const [editingQuote, setEditingQuote] = useState<string | null>(null);
-  const [editData, setEditData] = useState<Record<string, any>>({});
   const [editingParts, setEditingParts] = useState<string | null>(null);
-  const [partsEditData, setPartsEditData] = useState<Record<string, Record<string, any>>>({});
+  const [editData, setEditData] = useState<Record<string, any>>({});
+  const [partEditData, setPartEditData] = useState<Record<string, any>>({});
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedQuote, setSelectedQuote] = useState<string | null>(null);
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
-  const [showOrderModal, setShowOrderModal] = useState<string | null>(null);
-  const [taxInvoiceNumber, setTaxInvoiceNumber] = useState('');
-  const [selectedPartsForOrder, setSelectedPartsForOrder] = useState<Set<string>>(new Set());
+  const [activeFilter, setActiveFilter] = useState<FilterType>(defaultFilter);
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
+  const [showOrderConfirm, setShowOrderConfirm] = useState<string | null>(null);
+  const [taxInvoiceNumber, setTaxInvoiceNumber] = useState('');
+  const [selectedPartIds, setSelectedPartIds] = useState<string[]>([]);
 
   // Brand colors
   const brandRed = '#d0202d';
@@ -83,6 +83,13 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [editingQuote, editingParts]);
 
+  // Debug: Log body values
+  useEffect(() => {
+    quotes.forEach(quote => {
+      console.log('Quote', quote.id, 'body value:', quote.body);
+    });
+  }, [quotes]);
+
   const handleSave = async () => {
     if (editingQuote) {
       await onUpdateQuote(editingQuote, editData);
@@ -90,13 +97,13 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
       setEditData({});
     }
     if (editingParts) {
-      const updates = Object.keys(partsEditData).map(id => ({
+      const updates = Object.keys(partEditData).map(id => ({
         id,
-        updates: partsEditData[id] || {}
+        updates: partEditData[id] || {}
       }));
       await onUpdateMultipleParts(updates);
       setEditingParts(null);
-      setPartsEditData({});
+      setPartEditData({});
     }
   };
 
@@ -116,16 +123,16 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
   };
 
   const startEditingParts = (quoteParts: Part[], quoteId: string) => {
-    const newPartsEditData: Record<string, Record<string, any>> = {};
+    const newPartEditData: Record<string, Record<string, any>> = {};
     quoteParts.forEach(part => {
-      newPartsEditData[part.id] = {
+      newPartEditData[part.id] = {
         name: part.name,
         number: part.number,
         price: part.price,
         note: part.note
       };
     });
-    setPartsEditData(newPartsEditData);
+    setPartEditData(newPartEditData);
     setEditingParts(quoteId);
   };
 
@@ -134,7 +141,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
   };
 
   const handlePartEditChange = (partId: string, field: string, value: string | number | null) => {
-    setPartsEditData(prev => ({
+    setPartEditData(prev => ({
       ...prev,
       [partId]: {
         ...prev[partId],
@@ -554,7 +561,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
   };
 
   const handleMarkAsOrder = (quoteId: string) => {
-    setShowOrderModal(quoteId);
+    setShowOrderConfirm(quoteId);
     setTaxInvoiceNumber('');
     
     // Auto-select all orderable parts (parts with price > 0)
@@ -563,40 +570,40 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
       const quoteParts = getQuoteParts(quote.partRequested);
       const orderableParts = quoteParts.filter(part => part.price && part.price > 0);
       const orderablePartIds = orderableParts.map(part => part.id);
-      setSelectedPartsForOrder(new Set(orderablePartIds));
+      setSelectedPartIds(orderablePartIds);
     } else {
-      setSelectedPartsForOrder(new Set());
+      setSelectedPartIds([]);
     }
   };
 
   const confirmOrder = async () => {
-    if (!showOrderModal || !taxInvoiceNumber.trim() || !onMarkAsOrderedWithParts) return;
+    if (!showOrderConfirm || !taxInvoiceNumber.trim() || !onMarkAsOrderedWithParts) return;
     
     // Validate that at least one part is selected
-    if (selectedPartsForOrder.size === 0) {
+    if (selectedPartIds.length === 0) {
       alert('Please select at least one part to order');
       return;
     }
     
-    // console.log('Marking quote as ordered:', showOrderModal, 'with tax invoice:', taxInvoiceNumber);
+    // console.log('Marking quote as ordered:', showOrderConfirm, 'with tax invoice:', taxInvoiceNumber);
     
     const result = await onMarkAsOrderedWithParts(
-      showOrderModal,
+      showOrderConfirm,
       taxInvoiceNumber.trim(),
-      Array.from(selectedPartsForOrder)
+      selectedPartIds
     );
     
     if (!result.error) {
-      setShowOrderModal(null);
+      setShowOrderConfirm(null);
       setTaxInvoiceNumber('');
-      setSelectedPartsForOrder(new Set());
+      setSelectedPartIds([]);
     }
   };
 
   const cancelOrder = () => {
-    setShowOrderModal(null);
+    setShowOrderConfirm(null);
     setTaxInvoiceNumber('');
-    setSelectedPartsForOrder(new Set());
+    setSelectedPartIds([]);
   };
 
   // Timer to update deadline indicators every minute
@@ -1032,7 +1039,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                               onClick={(e) => {
                                 e.stopPropagation();
                                 setEditingParts(null);
-                                setPartsEditData({});
+                                setPartEditData({});
                               }}
                               className="px-3 py-1 text-xs bg-gray-600 text-white rounded hover:bg-gray-700 transition-colors cursor-pointer flex items-center space-x-1"
                               title="Cancel editing and discard changes"
@@ -1075,7 +1082,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                               {isPartEditing ? (
                                                 <input
                                                   type="text"
-                                                  value={partsEditData[part.id]?.name || ''}
+                                                  value={partEditData[part.id]?.name || ''}
                                                   onChange={(e) => handlePartEditChange(part.id, 'name', e.target.value)}
                                                   className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:ring-1 focus:ring-red-500 focus:border-transparent"
                                                   autoFocus
@@ -1091,7 +1098,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                             {isPartEditing ? (
                                               <input
                                                 type="text"
-                                                value={partsEditData[part.id]?.number || ''}
+                                                value={partEditData[part.id]?.number || ''}
                                                 onChange={(e) => handlePartEditChange(part.id, 'number', e.target.value)}
                                                 className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:ring-1 focus:ring-red-500 focus:border-transparent"
                                               />
@@ -1114,7 +1121,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                             {isPartEditing ? (
                                               <input
                                                 type="number"
-                                                value={partsEditData[part.id]?.price || ''}
+                                                value={partEditData[part.id]?.price || ''}
                                                 onChange={(e) => handlePartEditChange(part.id, 'price', e.target.value ? Number(e.target.value) : null)}
                                                 className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:ring-1 focus:ring-red-500 focus:border-transparent"
                                               />
@@ -1139,7 +1146,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                             {isPartEditing ? (
                                               <input
                                                 type="text"
-                                                value={partsEditData[part.id]?.note || ''}
+                                                value={partEditData[part.id]?.note || ''}
                                                 onChange={(e) => handlePartEditChange(part.id, 'note', e.target.value)}
                                                 className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:ring-1 focus:ring-red-500 focus:border-transparent"
                                               />
@@ -1185,7 +1192,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                           {isPartEditing ? (
                                             <input
                                               type="text"
-                                              value={partsEditData[part.id]?.name || ''}
+                                              value={partEditData[part.id]?.name || ''}
                                               onChange={(e) => handlePartEditChange(part.id, 'name', e.target.value)}
                                               className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-1 focus:ring-red-500 focus:border-transparent"
                                               autoFocus
@@ -1201,7 +1208,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                             {isPartEditing ? (
                                               <input
                                                 type="text"
-                                                value={partsEditData[part.id]?.number || ''}
+                                                value={partEditData[part.id]?.number || ''}
                                                 onChange={(e) => handlePartEditChange(part.id, 'number', e.target.value)}
                                                 className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-1 focus:ring-red-500 focus:border-transparent"
                                               />
@@ -1228,7 +1235,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                             {isPartEditing ? (
                                               <input
                                                 type="number"
-                                                value={partsEditData[part.id]?.price || ''}
+                                                value={partEditData[part.id]?.price || ''}
                                                 onChange={(e) => handlePartEditChange(part.id, 'price', e.target.value ? Number(e.target.value) : null)}
                                                 className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-1 focus:ring-red-500 focus:border-transparent"
                                               />
@@ -1255,7 +1262,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                             {isPartEditing ? (
                                               <input
                                                 type="text"
-                                                value={partsEditData[part.id]?.note || ''}
+                                                value={partEditData[part.id]?.note || ''}
                                                 onChange={(e) => handlePartEditChange(part.id, 'note', e.target.value)}
                                                 className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-1 focus:ring-red-500 focus:border-transparent"
                                               />
@@ -1651,7 +1658,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   setEditingParts(null);
-                                        setPartsEditData({});
+                                        setPartEditData({});
                                       }}
                                 className="px-3 py-1 text-xs bg-gray-600 text-white rounded hover:bg-gray-700 transition-colors cursor-pointer flex items-center space-x-1"
                                 title="Cancel editing and discard changes"
@@ -1683,7 +1690,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                               {isPartEditing ? (
                                                 <input
                                                   type="text"
-                                                  value={partsEditData[part.id]?.name || ''}
+                                                  value={partEditData[part.id]?.name || ''}
                                                   onChange={(e) => handlePartEditChange(part.id, 'name', e.target.value)}
                                               className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-1 focus:ring-red-500 focus:border-transparent"
                                                   autoFocus
@@ -1699,7 +1706,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                                 {isPartEditing ? (
                                                   <input
                                                     type="text"
-                                                    value={partsEditData[part.id]?.number || ''}
+                                                    value={partEditData[part.id]?.number || ''}
                                                     onChange={(e) => handlePartEditChange(part.id, 'number', e.target.value)}
                                                 className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-1 focus:ring-red-500 focus:border-transparent"
                                                   />
@@ -1726,7 +1733,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                                 {isPartEditing ? (
                                                   <input
                                                     type="number"
-                                                    value={partsEditData[part.id]?.price || ''}
+                                                    value={partEditData[part.id]?.price || ''}
                                                     onChange={(e) => handlePartEditChange(part.id, 'price', e.target.value ? Number(e.target.value) : null)}
                                                 className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-1 focus:ring-red-500 focus:border-transparent"
                                                   />
@@ -1753,7 +1760,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                                 {isPartEditing ? (
                                                   <input
                                                     type="text"
-                                                    value={partsEditData[part.id]?.note || ''}
+                                                    value={partEditData[part.id]?.note || ''}
                                                     onChange={(e) => handlePartEditChange(part.id, 'note', e.target.value)}
                                                 className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-1 focus:ring-red-500 focus:border-transparent"
                                                   />
@@ -1835,7 +1842,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
       )}
 
       {/* Order Confirmation Modal */}
-      {showOrderModal && (
+      {showOrderConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           {/* Backdrop */}
           <div 
@@ -1874,7 +1881,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
             
             {/* Parts Selection */}
             {(() => {
-              const quote = quotes.find(q => q.id === showOrderModal);
+              const quote = quotes.find(q => q.id === showOrderConfirm);
               if (!quote) return null;
               const quoteParts = getQuoteParts(quote.partRequested);
               
@@ -1894,15 +1901,15 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                       <label key={part.id} className="flex items-center space-x-3 p-2 hover:bg-gray-50 rounded cursor-pointer">
                         <input
                           type="checkbox"
-                          checked={selectedPartsForOrder.has(part.id)}
+                          checked={selectedPartIds.includes(part.id)}
                           onChange={(e) => {
-                            const newSelected = new Set(selectedPartsForOrder);
+                            const newSelected = [...selectedPartIds];
                             if (e.target.checked) {
-                              newSelected.add(part.id);
+                              newSelected.push(part.id);
                             } else {
-                              newSelected.delete(part.id);
+                              newSelected.splice(newSelected.indexOf(part.id), 1);
                             }
-                            setSelectedPartsForOrder(newSelected);
+                            setSelectedPartIds(newSelected);
                           }}
                           className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded"
                         />
@@ -1942,7 +1949,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                   )}
                   
                   <p className="text-xs text-gray-500 mt-2">
-                    Selected {selectedPartsForOrder.size} of {orderableParts.length} orderable parts
+                    Selected {selectedPartIds.length} of {orderableParts.length} orderable parts
                   </p>
                 </div>
               );

@@ -1,9 +1,9 @@
 'use client';
 
-import { useQuotes } from '@/components/ui/useQuotes';
+import { useQuotes } from '@/hooks/quotes/useQuotes';
 import { useDelivery } from '@/components/ui/useDelivery';
 import { useEffect, useState, useMemo } from 'react';
-import type { Part } from '@/components/ui/useQuotes';
+import type { Part } from '@/types/part';
 import { 
   TrendingUp, 
   CheckCircle, 

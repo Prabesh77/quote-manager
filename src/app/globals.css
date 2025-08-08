@@ -48,6 +48,99 @@
   }
 }
 
+@keyframes border-blink {
+  0%, 50% {
+    border-color: white;
+  }
+  51%, 100% {
+    border-color: transparent;
+  }
+}
+
+@keyframes gradient-border {
+  0% {
+    background: linear-gradient(0deg, #ff6b6b, #4ecdc4, #45b7d1, #96ceb4, #feca57, #ff9ff3, #54a0ff, #ff6b6b);
+    background-size: 400% 400%;
+    background-position: 0% 50%;
+  }
+  25% {
+    background: linear-gradient(90deg, #ff6b6b, #4ecdc4, #45b7d1, #96ceb4, #feca57, #ff9ff3, #54a0ff, #ff6b6b);
+    background-size: 400% 400%;
+    background-position: 100% 50%;
+  }
+  50% {
+    background: linear-gradient(180deg, #ff6b6b, #4ecdc4, #45b7d1, #96ceb4, #feca57, #ff9ff3, #54a0ff, #ff6b6b);
+    background-size: 400% 400%;
+    background-position: 100% 100%;
+  }
+  75% {
+    background: linear-gradient(270deg, #ff6b6b, #4ecdc4, #45b7d1, #96ceb4, #feca57, #ff9ff3, #54a0ff, #ff6b6b);
+    background-size: 400% 400%;
+    background-position: 0% 100%;
+  }
+  100% {
+    background: linear-gradient(360deg, #ff6b6b, #4ecdc4, #45b7d1, #96ceb4, #feca57, #ff9ff3, #54a0ff, #ff6b6b);
+    background-size: 400% 400%;
+    background-position: 0% 50%;
+  }
+}
+
+@keyframes gradient-border-red {
+  0% {
+    background: linear-gradient(0deg, #ff4757, #ff3838, #ff6348, #ff3838, #ff4757);
+    background-size: 400% 400%;
+    background-position: 0% 50%;
+  }
+  25% {
+    background: linear-gradient(90deg, #ff4757, #ff3838, #ff6348, #ff3838, #ff4757);
+    background-size: 400% 400%;
+    background-position: 100% 50%;
+  }
+  50% {
+    background: linear-gradient(180deg, #ff4757, #ff3838, #ff6348, #ff3838, #ff4757);
+    background-size: 400% 400%;
+    background-position: 100% 100%;
+  }
+  75% {
+    background: linear-gradient(270deg, #ff4757, #ff3838, #ff6348, #ff3838, #ff4757);
+    background-size: 400% 400%;
+    background-position: 0% 100%;
+  }
+  100% {
+    background: linear-gradient(360deg, #ff4757, #ff3838, #ff6348, #ff3838, #ff4757);
+    background-size: 400% 400%;
+    background-position: 0% 50%;
+  }
+}
+
+@keyframes gradient-border-yellow {
+  0% {
+    background: linear-gradient(0deg, #ffa502, #ffb142, #ffc048, #ffb142, #ffa502);
+    background-size: 400% 400%;
+    background-position: 0% 50%;
+  }
+  25% {
+    background: linear-gradient(90deg, #ffa502, #ffb142, #ffc048, #ffb142, #ffa502);
+    background-size: 400% 400%;
+    background-position: 100% 50%;
+  }
+  50% {
+    background: linear-gradient(180deg, #ffa502, #ffb142, #ffc048, #ffb142, #ffa502);
+    background-size: 400% 400%;
+    background-position: 100% 100%;
+  }
+  75% {
+    background: linear-gradient(270deg, #ffa502, #ffb142, #ffc048, #ffb142, #ffa502);
+    background-size: 400% 400%;
+    background-position: 0% 100%;
+  }
+  100% {
+    background: linear-gradient(360deg, #ffa502, #ffb142, #ffc048, #ffb142, #ffa502);
+    background-size: 400% 400%;
+    background-position: 0% 50%;
+  }
+}
+
 .animate-accordion-down {
   animation: accordion-down 0.2s ease-out;
 }
@@ -66,6 +159,22 @@
 
 .animate-glow-pulse-red {
   animation: glow-pulse-red 2s ease-in-out infinite;
+}
+
+.animate-border-blink {
+  animation: border-blink 1.5s ease-in-out infinite;
+}
+
+.animate-gradient-border {
+  animation: gradient-border 3s ease-in-out infinite;
+}
+
+.animate-gradient-border-red {
+  animation: gradient-border-red 2s ease-in-out infinite;
+}
+
+.animate-gradient-border-yellow {
+  animation: gradient-border-yellow 2.5s ease-in-out infinite;
 }
 
 @theme inline {

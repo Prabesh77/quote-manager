@@ -52,6 +52,15 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
     error: brandRed,
   };
 
+  // Update current time every minute for deadline indicators
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 60000); // Update every minute
+
+    return () => clearInterval(timer);
+  }, []);
+
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -224,31 +233,33 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
     if (!requiredBy) return null;
     
     try {
-      // Check if it's an ISO timestamp (contains 'T' and 'Z' or timezone)
-      if (requiredBy.includes('T')) {
-        // ISO timestamp format
-        const deadline = new Date(requiredBy);
-        const now = currentTime; // Use currentTime from state instead of new Date()
-        const diffMs = deadline.getTime() - now.getTime();
-        const diffMins = Math.floor(diffMs / (1000 * 60));
-        
-        let color = 'bg-green-500';
-        let animation = '';
-        
-        if (diffMins < 0) {
-          // Overdue
-          color = 'bg-red-500';
-          animation = 'animate-blink-warning';
-        } else if (diffMins < 15) {
-          // Less than 15 minutes
-          color = 'bg-red-500';
-        } else if (diffMins < 30) {
-          // Less than 30 minutes
-          color = 'bg-yellow-500';
-        } else {
-          // More than 30 minutes
-          color = 'bg-green-500';
-        }
+              // Check if it's an ISO timestamp (contains 'T' and 'Z' or timezone)
+        if (requiredBy.includes('T')) {
+          // ISO timestamp format
+          const deadline = new Date(requiredBy);
+          const now = currentTime; // Use currentTime from state instead of new Date()
+          const diffMs = deadline.getTime() - now.getTime();
+          const diffMins = Math.floor(diffMs / (1000 * 60));
+          
+          let color = 'bg-green-500';
+          let animation = '';
+          
+          if (diffMins < 0) {
+            // Overdue
+            color = 'bg-red-500';
+            animation = 'animate-glow-pulse-red';
+          } else if (diffMins < 15) {
+            // Less than 15 minutes
+            color = 'bg-red-500';
+            animation = 'animate-glow-pulse-red';
+          } else if (diffMins < 30) {
+            // Less than 30 minutes
+            color = 'bg-yellow-500';
+            animation = 'animate-glow-pulse';
+          } else {
+            // More than 30 minutes
+            color = 'bg-green-500';
+          }
         
         // Format the time display
         let timeDisplay = '';
@@ -300,7 +311,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
         
         return { color, animation, timeDisplay };
       } else {
-        // Legacy format (date and time as string)
+        // Legacy format (date and time as string) - Australian dd/mm/yyyy format
         const [datePart, timePart] = requiredBy.split(' ');
         const [day, month, year] = datePart.split('/');
         const timeStr = timePart.toLowerCase();
@@ -312,12 +323,16 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
           const time = timeStr.replace('pm', '');
           if (time.includes(':')) {
             const [h, m] = time.split(':');
-            hours = parseInt(h) + 12;
+            const hour = parseInt(h);
+            // 12 PM should be 12, not 24
+            hours = hour === 12 ? 12 : hour + 12;
             minutes = parseInt(m || '0');
           } else {
             // Handle format like "1200pm"
             const timeNum = parseInt(time);
-            hours = Math.floor(timeNum / 100) + 12;
+            const hour = Math.floor(timeNum / 100);
+            // 12 PM should be 12, not 24
+            hours = hour === 12 ? 12 : hour + 12;
             minutes = timeNum % 100;
           }
         } else if (timeStr.includes('am')) {
@@ -345,13 +360,15 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
         if (diffMins < 0) {
           // Overdue
           color = 'bg-red-500';
-          animation = 'animate-blink-warning';
+          animation = 'animate-glow-pulse-red';
         } else if (diffMins < 15) {
           // Less than 15 minutes
           color = 'bg-red-500';
+          animation = 'animate-glow-pulse-red';
         } else if (diffMins < 30) {
           // Less than 30 minutes
           color = 'bg-yellow-500';
+          animation = 'animate-glow-pulse';
         } else {
           // More than 30 minutes
           color = 'bg-green-500';
@@ -661,16 +678,25 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                   
                   return (
                     <>
-                      <div className={`absolute left-0 top-0 bottom-0 w-1 ${deadlineInfo.color} ${deadlineInfo.animation}`}></div>
-                      <div className="absolute left-0 top-[11px] transform -translate-y-1/2 z-10 flex items-center space-x-2">
+                      {/* Desktop: Full left border and indicator */}
+                      <div className={`absolute left-0 top-0 bottom-0 w-1 ${deadlineInfo.color} ${deadlineInfo.animation} hidden sm:block`}></div>
+                      <div className="absolute left-0 top-[11px] transform -translate-y-1/2 z-10 flex items-center space-x-2 hidden sm:flex">
                         <div className={`px-2 py-[2px] text-[12px] font-semibold text-white shadow-sm ${deadlineInfo.color} ${deadlineInfo.animation}`}>
                           {deadlineInfo.timeDisplay}
                         </div>
                         {quote.customer && (
-                          <div className="px-2 py-[2px] text-[10px] text-gray-600 bg-gray-100 rounded shadow-sm">
+                          <div className="px-2 py-[2px] text-[10px] text-orange-600 font-medium rounded shadow-sm">
                             {quote.customer}
                           </div>
                         )}
+                      </div>
+                      
+                      {/* Mobile: Small rectangle indicator at top-left */}
+                      <div className={`absolute top-0 left-0 w-6 h-6 ${deadlineInfo.color} ${deadlineInfo.animation} block sm:hidden z-50`}></div>
+                      <div className="absolute top-0 left-0 z-50 block sm:hidden">
+                        <div className={`px-1 py-[1px] text-[8px] font-semibold text-white ${deadlineInfo.color} ${deadlineInfo.animation} rounded-sm shadow-sm`}>
+                          {deadlineInfo.timeDisplay}
+                        </div>
                       </div>
                     </>
                   );
@@ -679,12 +705,6 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                 <AccordionTrigger className="grid grid-cols-6 gap-4 w-full px-3 hover:bg-gray-50 transition-colors cursor-pointer" style={{ gridTemplateColumns: '1fr 1fr 2fr 1fr 0.5fr 0.5fr' }}>
                   {/* Quote Ref */}
                   <div>
-                  {/* Customer Name - Always Visible */}
-                  {quote.customer && (
-                    <div className="text-[10px] text-orange-600 font-medium mb-1 text-left pl-2">
-                      {quote.customer}
-                    </div>
-                  )}
                   <div className="flex items-center space-x-2 w-[160px]">
                     <ChevronDown className="h-4 w-4 text-gray-400 flex-shrink-0" />
                     {editingQuote === quote.id ? (

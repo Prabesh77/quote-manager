@@ -92,22 +92,107 @@ export const useQuotes = () => {
   };
 
   const fetchQuotes = async () => {
-    const { data, error } = await supabase.from('quotes').select('*').order('createdAt', { ascending: false });
-    if (error) {
-      console.error('Fetch quotes error:', error);
-      setConnectionStatus('error');
-    } else {
-      setQuotes(data || []);
+    try {
+      // Get normalized quotes with customer and vehicle details
+      const { data: normalizedQuotes, error: quotesError } = await supabase
+        .from('quotes')
+        .select(`
+          *,
+          customer:customers(*),
+          vehicle:vehicles(*)
+        `)
+        .order('created_at', { ascending: false });
+
+      if (quotesError) {
+        console.error('Error fetching normalized quotes:', quotesError);
+        setConnectionStatus('error');
+        return;
+      }
+
+      // Get all quote parts with part details
+      const { data: quoteParts, error: partsError } = await supabase
+        .from('quote_parts')
+        .select(`
+          *,
+          part:parts(*)
+        `);
+
+      if (partsError) {
+        console.error('Error fetching quote parts:', partsError);
+        setConnectionStatus('error');
+        return;
+      }
+
+      console.log('Normalized quotes found:', normalizedQuotes?.length || 0);
+      console.log('Quote parts found:', quoteParts?.length || 0);
+
+      // Convert normalized quotes to legacy format for QuoteTable compatibility
+      const legacyQuotes: Quote[] = (normalizedQuotes || []).map(normalizedQuote => {
+        // Get parts for this quote
+        const quotePartsForThisQuote = (quoteParts || []).filter(qp => qp.quote_id === normalizedQuote.id);
+        const partIds = quotePartsForThisQuote.map(qp => qp.part_id).join(',');
+
+        const legacyQuote = {
+          id: normalizedQuote.id,
+          vin: normalizedQuote.vehicle?.vin || '',
+          partRequested: partIds,
+          quoteRef: `Q${normalizedQuote.id.slice(0, 8)}`, // Generate quote ref from ID
+          createdAt: normalizedQuote.created_at,
+          make: normalizedQuote.vehicle?.make || '',
+          model: normalizedQuote.vehicle?.model || '',
+          series: normalizedQuote.vehicle?.series || '',
+          auto: true, // Default value
+          body: normalizedQuote.vehicle?.body || '',
+          mthyr: normalizedQuote.vehicle?.year?.toString() || '',
+          rego: normalizedQuote.vehicle?.rego || '',
+          requiredBy: normalizedQuote.required_by || undefined,
+          customer: normalizedQuote.customer?.name || '',
+          address: normalizedQuote.customer?.address || '',
+          phone: normalizedQuote.customer?.phone || '',
+          status: normalizedQuote.status as Quote['status'],
+          taxInvoiceNumber: normalizedQuote.tax_invoice_number || undefined,
+        };
+
+        console.log('Converted quote:', legacyQuote.id, 'with parts:', partIds);
+        return legacyQuote;
+      });
+
+      console.log('Final legacy quotes:', legacyQuotes.length);
+      setQuotes(legacyQuotes);
       setConnectionStatus('connected');
+      console.log('Loaded normalized quotes:', legacyQuotes.length);
+    } catch (error) {
+      console.error('Error fetching normalized quotes:', error);
+      setConnectionStatus('error');
     }
   };
 
   const fetchParts = async () => {
-    const { data, error } = await supabase.from('parts').select('*').order('createdAt', { ascending: false });
-    if (error) {
-      console.error('Fetch parts error:', error);
-    } else {
-      setParts(data || []);
+    try {
+      const { data: normalizedParts, error } = await supabase
+        .from('parts')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching normalized parts:', error);
+        return;
+      }
+
+      // Convert normalized parts to legacy format for QuoteTable compatibility
+      const legacyParts: Part[] = (normalizedParts || []).map(part => ({
+        id: part.id,
+        name: part.part_name,
+        number: part.part_number || '',
+        price: part.price,
+        note: part.note || '',
+        createdAt: part.created_at,
+      }));
+
+      setParts(legacyParts);
+      console.log('Loaded normalized parts:', legacyParts.length);
+    } catch (error) {
+      console.error('Error fetching normalized parts:', error);
     }
   };
 
@@ -167,35 +252,26 @@ export const useQuotes = () => {
   }, []);
 
   const addQuote = async (fields: Record<string, string>, partIds: string[]) => {
-    const partRequested = partIds.join(',');
-    
-    const { data, error } = await supabase.from('quotes').insert({
-      ...fields,
-      partRequested,
-      createdAt: new Date().toISOString(),
-      status: 'unpriced', // Set initial status as unpriced
-    }).select();
-    
-    if (!error) {
-      fetchQuotes();
-    }
-    return { data, error };
+    // This function is kept for compatibility but should not be used
+    // New quotes should be created using the normalized structure
+    console.warn('addQuote called - use normalized quote creation instead');
+    return { data: null, error: new Error('Use normalized quote creation') };
   };
 
-  const updateQuote = async (id: string, fields: Record<string, string | number | boolean>) => {
+    const updateQuote = async (id: string, fields: Record<string, string | number | boolean>) => {
     try {
-    const validatedFields = validateQuoteData(fields);
-    
+      const validatedFields = validateQuoteData(fields);
+      
       const { error } = await supabase
-      .from('quotes')
-      .update(validatedFields)
+        .from('quotes')
+        .update(validatedFields)
         .eq('id', id);
-    
-    if (error) {
+      
+      if (error) {
         console.error('Update quote error:', error);
         return { error };
-    } else {
-      fetchQuotes();
+      } else {
+        fetchQuotes();
         return { error: null };
       }
     } catch (error) {
@@ -205,10 +281,16 @@ export const useQuotes = () => {
   };
 
   const addPart = async (partData: Omit<Part, 'id' | 'createdAt'>) => {
-    const { data, error } = await supabase.from('parts').insert({
-      ...partData,
-      createdAt: new Date().toISOString(),
-    }).select();
+    // Convert legacy part format to normalized format
+    const normalizedPart = {
+      part_name: partData.name,
+      part_number: partData.number,
+      price: partData.price,
+      note: partData.note,
+      created_at: new Date().toISOString(),
+    };
+    
+    const { data, error } = await supabase.from('parts').insert(normalizedPart).select();
     
     if (!error) {
       fetchParts();
@@ -218,20 +300,36 @@ export const useQuotes = () => {
 
   const updateQuoteStatus = async (quoteId: string) => {
     try {
-      // Get the quote to find its parts
-      const { data: quote, error: quoteError } = await supabase
-        .from('quotes')
-        .select('partRequested')
-        .eq('id', quoteId)
-        .single();
+      // Get the parts for this quote using the normalized structure
+      const { data: quoteParts, error: quotePartsError } = await supabase
+        .from('quote_parts')
+        .select('part_id')
+        .eq('quote_id', quoteId);
 
-      if (quoteError) {
-        console.error('Error fetching quote for status update:', quoteError);
+      if (quotePartsError) {
+        console.error('Error fetching quote parts for status update:', quotePartsError);
         return;
       }
 
-      // Get the parts for this quote
-      const partIds = quote.partRequested?.split(',').map((id: string) => id.trim()) || [];
+      if (!quoteParts || quoteParts.length === 0) {
+        // No parts found, set status to unpriced
+        const { error: updateError } = await supabase
+          .from('quotes')
+          .update({ status: 'unpriced' })
+          .eq('id', quoteId);
+
+        if (updateError) {
+          console.error('Error updating quote status:', updateError);
+        } else {
+          fetchQuotes();
+        }
+        return;
+      }
+
+      // Get the part IDs
+      const partIds = quoteParts.map(qp => qp.part_id);
+      
+      // Get the parts with their prices
       const { data: parts, error: partsError } = await supabase
         .from('parts')
         .select('price')
@@ -299,58 +397,38 @@ export const useQuotes = () => {
   };
 
   const updatePart = async (id: string, updates: Partial<Part>) => {
+    // Convert legacy part format to normalized format
+    const normalizedUpdates: any = {};
+    if (updates.name !== undefined) normalizedUpdates.part_name = updates.name;
+    if (updates.number !== undefined) normalizedUpdates.part_number = updates.number;
+    if (updates.price !== undefined) normalizedUpdates.price = updates.price;
+    if (updates.note !== undefined) normalizedUpdates.note = updates.note;
     
     const { data, error } = await supabase
       .from('parts')
-      .update(updates)
+      .update(normalizedUpdates)
       .eq('id', id)
       .select()
       .single();
     
     if (!error) {
-      
       // Update parts immediately
       fetchParts();
       
-      // Find which quote this part belongs to and update its status
-      // Try different approaches to find quotes containing this part
-      let quoteData = null;
+      // Find which quotes this part belongs to using the normalized structure
+      const { data: quoteParts, error: quotePartsError } = await supabase
+        .from('quote_parts')
+        .select('quote_id')
+        .eq('part_id', id);
       
-      // First try: exact match
-      const { data: exactMatches } = await supabase
-        .from('quotes')
-        .select('id, partRequested')
-        .eq('partRequested', id);
-      
-      if (exactMatches && exactMatches.length > 0) {
-        quoteData = exactMatches;
-      } else {
-        // Second try: contains the part ID
-        const { data: containsMatches } = await supabase
-          .from('quotes')
-          .select('id, partRequested')
-          .contains('partRequested', [id]);
+      if (!quotePartsError && quoteParts && quoteParts.length > 0) {
+        // Get unique quote IDs
+        const quoteIds = [...new Set(quoteParts.map(qp => qp.quote_id))];
         
-        if (containsMatches && containsMatches.length > 0) {
-          quoteData = containsMatches;
-        } else {
-          // Third try: like query
-          const { data: likeMatches } = await supabase
-            .from('quotes')
-            .select('id, partRequested')
-            .like('partRequested', `%${id}%`);
-          
-          quoteData = likeMatches;
+        // Update status for each quote that contains this part
+        for (const quoteId of quoteIds) {
+          await updateQuoteStatus(quoteId);
         }
-      }
-      
-      
-      if (quoteData && quoteData.length > 0) {
-        for (const quote of quoteData) {
-          updateQuoteStatusInState(quote.id);
-        }
-      } else {
-        // console.log('No quotes found containing this part');
       }
     } else {
       console.error('Error updating part:', error);
@@ -375,9 +453,9 @@ export const useQuotes = () => {
   const markQuoteAsOrdered = async (id: string, taxInvoiceNumber: string) => {
     const { error } = await supabase
       .from('quotes')
-      .update({ 
+      .update({
         status: 'ordered',
-        taxInvoiceNumber: taxInvoiceNumber
+        tax_invoice_number: taxInvoiceNumber
       })
       .eq('id', id);
     
@@ -391,23 +469,28 @@ export const useQuotes = () => {
 
   const markQuoteAsOrderedWithParts = async (id: string, taxInvoiceNumber: string, selectedPartIds: string[]) => {
     try {
-      // First, get the current quote to find its parts
-      const { data: quoteData, error: quoteError } = await supabase
-        .from('quotes')
-        .select('*')
-        .eq('id', id)
-        .single();
+      // Get all parts for this quote using the normalized structure
+      const { data: quoteParts, error: quotePartsError } = await supabase
+        .from('quote_parts')
+        .select('part_id')
+        .eq('quote_id', id);
       
-      if (quoteError) {
-        console.error('Error fetching quote:', quoteError);
-        return { error: quoteError };
+      if (quotePartsError) {
+        console.error('Error fetching quote parts:', quotePartsError);
+        return { error: quotePartsError };
+      }
+      
+      if (!quoteParts || quoteParts.length === 0) {
+        console.error('No parts found for quote');
+        return { error: new Error('No parts found for quote') };
       }
       
       // Get all parts for this quote
+      const partIds = quoteParts.map(qp => qp.part_id);
       const { data: allParts, error: partsError } = await supabase
         .from('parts')
         .select('*')
-        .in('id', quoteData.partRequested.split(',').map((id: string) => id.trim()));
+        .in('id', partIds);
       
       if (partsError) {
         console.error('Error fetching parts:', partsError);
@@ -417,16 +500,12 @@ export const useQuotes = () => {
       // Filter to only selected parts
       const selectedParts = allParts.filter(part => selectedPartIds.includes(part.id));
       
-      // Create new part IDs string with only selected parts
-      const newPartIds = selectedParts.map(part => part.id).join(',');
-      
-      // Update the quote with new parts list and order status
+      // Update the quote with order status
       const { error: updateError } = await supabase
         .from('quotes')
-        .update({ 
+        .update({
           status: 'ordered',
-          taxInvoiceNumber: taxInvoiceNumber,
-          partRequested: newPartIds
+          tax_invoice_number: taxInvoiceNumber
         })
         .eq('id', id);
       
@@ -457,50 +536,31 @@ export const useQuotes = () => {
     const affectedQuoteIds = new Set<string>();
     
     for (const { id, updates: partUpdates } of updates) {
+      // Convert legacy part format to normalized format
+      const normalizedUpdates: any = {};
+      if (partUpdates.name !== undefined) normalizedUpdates.part_name = partUpdates.name;
+      if (partUpdates.number !== undefined) normalizedUpdates.part_number = partUpdates.number;
+      if (partUpdates.price !== undefined) normalizedUpdates.price = partUpdates.price;
+      if (partUpdates.note !== undefined) normalizedUpdates.note = partUpdates.note;
       
       const { data, error } = await supabase
         .from('parts')
-        .update(partUpdates)
+        .update(normalizedUpdates)
         .eq('id', id)
         .select()
         .single();
       
       results.push({ id, data, error });
       
-      // Find which quotes this part belongs to - use the same logic as updatePart
-      let quoteData = null;
+      // Find which quotes this part belongs to using the normalized structure
+      const { data: quoteParts, error: quotePartsError } = await supabase
+        .from('quote_parts')
+        .select('quote_id')
+        .eq('part_id', id);
       
-      // First try: exact match
-      const { data: exactMatches } = await supabase
-        .from('quotes')
-        .select('id, partRequested')
-        .eq('partRequested', id);
-      
-      if (exactMatches && exactMatches.length > 0) {
-        quoteData = exactMatches;
-      } else {
-        // Second try: contains the part ID
-        const { data: containsMatches } = await supabase
-          .from('quotes')
-          .select('id, partRequested')
-          .contains('partRequested', [id]);
-        
-        if (containsMatches && containsMatches.length > 0) {
-          quoteData = containsMatches;
-        } else {
-          // Third try: like query
-          const { data: likeMatches } = await supabase
-            .from('quotes')
-            .select('id, partRequested')
-            .like('partRequested', `%${id}%`);
-          
-          quoteData = likeMatches;
-        }
-      }
-      
-      
-      if (quoteData && quoteData.length > 0) {
-        quoteData.forEach(quote => affectedQuoteIds.add(quote.id));
+      if (!quotePartsError && quoteParts && quoteParts.length > 0) {
+        // Add all quote IDs that contain this part
+        quoteParts.forEach(qp => affectedQuoteIds.add(qp.quote_id));
       }
     }
     
@@ -509,7 +569,7 @@ export const useQuotes = () => {
             
       // Update status for all affected quotes
       for (const quoteId of affectedQuoteIds) {
-        updateQuoteStatusInState(quoteId);
+        await updateQuoteStatus(quoteId);
       }
     }
     
@@ -613,6 +673,8 @@ export const useQuotes = () => {
     updateMultipleParts,
     deletePart,
     deleteQuote,
+    fetchQuotes,
+    fetchParts,
     testSupabaseConnection,
     checkTableStructure,
     testUpdate,

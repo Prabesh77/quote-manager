@@ -14,6 +14,7 @@ interface VehicleData {
   year?: string; // Changed to string to store "9/2017" format
   vin?: string;
   color?: string;
+  transmission?: string; // auto/manual transmission
   body?: string; // Added body field
   notes?: string;
 }
@@ -77,7 +78,7 @@ export const createNormalizedQuote = async (quoteData: QuoteData) => {
     
     let vehicleQuery = supabase
       .from('vehicles')
-      .select('id, make, model, series, year, color, body')
+      .select('id, make, model, series, year, color, transmission, body')
       .eq('make', quoteData.vehicle.make)
       .eq('model', quoteData.vehicle.model);
     
@@ -100,6 +101,13 @@ export const createNormalizedQuote = async (quoteData: QuoteData) => {
       vehicleQuery = vehicleQuery.eq('color', quoteData.vehicle.color);
     } else {
       vehicleQuery = vehicleQuery.is('color', null);
+    }
+    
+    // Add transmission filter if provided
+    if (quoteData.vehicle.transmission) {
+      vehicleQuery = vehicleQuery.eq('transmission', quoteData.vehicle.transmission);
+    } else {
+      vehicleQuery = vehicleQuery.is('transmission', null);
     }
     
     // Add body filter if provided
@@ -134,6 +142,7 @@ export const createNormalizedQuote = async (quoteData: QuoteData) => {
             year: quoteData.vehicle.year || null,
             vin: quoteData.vehicle.vin || null,
             color: quoteData.vehicle.color || null,
+            transmission: quoteData.vehicle.transmission || null,
             body: quoteData.vehicle.body || null,
             notes: quoteData.vehicle.notes || null,
           })

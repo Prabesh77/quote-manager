@@ -35,6 +35,23 @@ export const DB_COLUMNS = {
     PHONE: 'phone',
     STATUS: 'status',
     TAX_INVOICE_NUMBER: 'tax_invoice_number'
+  },
+  
+  // Vehicles table
+  VEHICLES: {
+    ID: 'id',
+    REGO: 'rego',
+    MAKE: 'make',
+    MODEL: 'model',
+    SERIES: 'series',
+    YEAR: 'year',
+    VIN: 'vin',
+    COLOR: 'color',
+    TRANSMISSION: 'transmission',
+    BODY: 'body',
+    NOTES: 'notes',
+    CREATED_AT: 'created_at',
+    UPDATED_AT: 'updated_at'
   }
 };
 

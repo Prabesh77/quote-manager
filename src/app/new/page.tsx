@@ -118,6 +118,7 @@ export default function NewQuotePage() {
           year: parsedYear,
           vin: fields.vin || undefined,
           color: undefined, // Not in current form
+          transmission: fields.auto === 'true' ? 'auto' : 'manual', // Map auto field to transmission
           body: fields.body || undefined, // Added body field
           notes: undefined, // Not in current form
         },

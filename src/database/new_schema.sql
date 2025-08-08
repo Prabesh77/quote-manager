@@ -24,6 +24,8 @@ CREATE TABLE IF NOT EXISTS vehicles (
   year INTEGER,
   vin TEXT,
   color TEXT,
+  transmission TEXT, -- auto/manual transmission type
+  body TEXT, -- vehicle body type
   notes TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()

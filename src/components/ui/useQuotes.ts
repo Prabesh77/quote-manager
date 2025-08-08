@@ -132,6 +132,9 @@ export const useQuotes = () => {
         const quotePartsForThisQuote = (quoteParts || []).filter(qp => qp.quote_id === normalizedQuote.id);
         const partIds = quotePartsForThisQuote.map(qp => qp.part_id).join(',');
 
+        // Debug: Log the vehicle data to see what's available
+        console.log('Vehicle data for quote', normalizedQuote.id, ':', normalizedQuote.vehicle);
+
         const legacyQuote = {
           id: normalizedQuote.id,
           vin: normalizedQuote.vehicle?.vin || '',
@@ -141,8 +144,8 @@ export const useQuotes = () => {
           make: normalizedQuote.vehicle?.make || '',
           model: normalizedQuote.vehicle?.model || '',
           series: normalizedQuote.vehicle?.series || '',
-          auto: true, // Default value
-          body: normalizedQuote.vehicle?.body || '',
+          auto: normalizedQuote.vehicle?.transmission === 'auto', // Map transmission to auto boolean
+          body: normalizedQuote.vehicle?.body || '', // Map body field correctly
           mthyr: normalizedQuote.vehicle?.year?.toString() || '',
           rego: normalizedQuote.vehicle?.rego || '',
           requiredBy: normalizedQuote.required_by || undefined,
@@ -154,6 +157,7 @@ export const useQuotes = () => {
         };
 
         console.log('Converted quote:', legacyQuote.id, 'with parts:', partIds);
+        console.log('Body value:', legacyQuote.body);
         return legacyQuote;
       });
 
@@ -258,22 +262,88 @@ export const useQuotes = () => {
     return { data: null, error: new Error('Use normalized quote creation') };
   };
 
-    const updateQuote = async (id: string, fields: Record<string, string | number | boolean>) => {
+  const updateQuote = async (id: string, fields: Record<string, string | number | boolean>) => {
     try {
-      const validatedFields = validateQuoteData(fields);
+      // Separate fields for different tables
+      const quoteFields: Record<string, any> = {};
+      const vehicleUpdateFields: Record<string, any> = {};
+      const customerUpdateFields: Record<string, any> = {};
       
-      const { error } = await supabase
+      // Define which fields go to which table
+      const quoteOnlyFields = ['status', 'notes', 'tax_invoice_number', 'required_by'];
+      const vehicleFieldNames = ['make', 'model', 'series', 'vin', 'rego', 'year', 'color', 'notes'];
+      const customerFieldNames = ['name', 'phone', 'address'];
+      
+      Object.entries(fields).forEach(([key, value]) => {
+        if (quoteOnlyFields.includes(key)) {
+          quoteFields[key] = value;
+        } else if (vehicleFieldNames.includes(key)) {
+          // Map legacy field names to normalized field names
+          const fieldMap: Record<string, string> = {
+            'auto': 'transmission', // Map auto to transmission field
+            'body': 'notes', // Map body to notes field
+            'mthyr': 'year' // Map mthyr to year field
+          };
+          const normalizedKey = fieldMap[key] || key;
+          vehicleUpdateFields[normalizedKey] = value;
+        } else if (customerFieldNames.includes(key)) {
+          customerUpdateFields[key] = value;
+        }
+      });
+
+      // Get the quote to find related vehicle and customer IDs
+      const { data: quote, error: fetchError } = await supabase
         .from('quotes')
-        .update(validatedFields)
-        .eq('id', id);
-      
-      if (error) {
-        console.error('Update quote error:', error);
-        return { error };
-      } else {
-        fetchQuotes();
-        return { error: null };
+        .select('vehicle_id, customer_id')
+        .eq('id', id)
+        .single();
+
+      if (fetchError) {
+        console.error('Error fetching quote for update:', fetchError);
+        return { error: fetchError };
       }
+
+      // Update quotes table if there are quote fields
+      if (Object.keys(quoteFields).length > 0) {
+        const { error: quoteError } = await supabase
+          .from('quotes')
+          .update(quoteFields)
+          .eq('id', id);
+        
+        if (quoteError) {
+          console.error('Error updating quote:', quoteError);
+          return { error: quoteError };
+        }
+      }
+
+      // Update vehicles table if there are vehicle fields
+      if (Object.keys(vehicleUpdateFields).length > 0 && quote.vehicle_id) {
+        const { error: vehicleError } = await supabase
+          .from('vehicles')
+          .update(vehicleUpdateFields)
+          .eq('id', quote.vehicle_id);
+        
+        if (vehicleError) {
+          console.error('Error updating vehicle:', vehicleError);
+          return { error: vehicleError };
+        }
+      }
+
+      // Update customers table if there are customer fields
+      if (Object.keys(customerUpdateFields).length > 0 && quote.customer_id) {
+        const { error: customerError } = await supabase
+          .from('customers')
+          .update(customerUpdateFields)
+          .eq('id', quote.customer_id);
+        
+        if (customerError) {
+          console.error('Error updating customer:', customerError);
+          return { error: customerError };
+        }
+      }
+
+      fetchQuotes();
+      return { error: null };
     } catch (error) {
       console.error('Update quote error:', error);
       return { error };

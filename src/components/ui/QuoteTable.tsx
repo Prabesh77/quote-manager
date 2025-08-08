@@ -678,8 +678,9 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                   
                   return (
                     <>
-                      <div className={`absolute left-0 top-0 bottom-0 w-1 ${deadlineInfo.color} ${deadlineInfo.animation}`}></div>
-                      <div className="absolute left-0 top-[11px] transform -translate-y-1/2 z-10 flex items-center space-x-2">
+                      {/* Desktop: Full left border and indicator */}
+                      <div className={`absolute left-0 top-0 bottom-0 w-1 ${deadlineInfo.color} ${deadlineInfo.animation} hidden sm:block`}></div>
+                      <div className="absolute left-0 top-[11px] transform -translate-y-1/2 z-10 flex items-center space-x-2 hidden sm:flex">
                         <div className={`px-2 py-[2px] text-[12px] font-semibold text-white shadow-sm ${deadlineInfo.color} ${deadlineInfo.animation}`}>
                           {deadlineInfo.timeDisplay}
                         </div>
@@ -688,6 +689,14 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                             {quote.customer}
                           </div>
                         )}
+                      </div>
+                      
+                      {/* Mobile: Small rectangle indicator at top-left */}
+                      <div className={`absolute top-0 left-0 w-6 h-6 ${deadlineInfo.color} ${deadlineInfo.animation} block sm:hidden z-50`}></div>
+                      <div className="absolute top-0 left-0 z-50 block sm:hidden">
+                        <div className={`px-1 py-[1px] text-[8px] font-semibold text-white ${deadlineInfo.color} ${deadlineInfo.animation} rounded-sm shadow-sm`}>
+                          {deadlineInfo.timeDisplay}
+                        </div>
                       </div>
                     </>
                   );

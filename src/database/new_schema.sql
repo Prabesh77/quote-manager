@@ -61,7 +61,6 @@ CREATE TABLE IF NOT EXISTS quote_parts (
   part_id UUID NOT NULL REFERENCES parts(id) ON DELETE CASCADE,
   final_price NUMERIC(10,2),
   note TEXT,
-  status TEXT NOT NULL DEFAULT 'WaitingForPrice' CHECK (status IN ('WaitingForPrice', 'Priced', 'Ordered')),
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   UNIQUE(quote_id, part_id) -- Prevent duplicate parts in same quote
@@ -97,7 +96,6 @@ CREATE INDEX IF NOT EXISTS idx_parts_number ON parts(part_number);
 
 CREATE INDEX IF NOT EXISTS idx_quote_parts_quote_id ON quote_parts(quote_id);
 CREATE INDEX IF NOT EXISTS idx_quote_parts_part_id ON quote_parts(part_id);
-CREATE INDEX IF NOT EXISTS idx_quote_parts_status ON quote_parts(status);
 
 CREATE INDEX IF NOT EXISTS idx_deliveries_quote_id ON deliveries(quote_id);
 CREATE INDEX IF NOT EXISTS idx_deliveries_delivered_on ON deliveries(delivered_on);
@@ -211,8 +209,7 @@ RETURNS TABLE (
   part_number TEXT,
   base_price NUMERIC,
   final_price NUMERIC,
-  note TEXT,
-  status TEXT
+  note TEXT
 ) AS $$
 BEGIN
   RETURN QUERY
@@ -223,8 +220,7 @@ BEGIN
     p.part_number,
     p.price as base_price,
     qp.final_price,
-    qp.note,
-    qp.status
+    qp.note
   FROM quote_parts qp
   JOIN parts p ON qp.part_id = p.id
   WHERE qp.quote_id = quote_uuid

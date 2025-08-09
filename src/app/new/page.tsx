@@ -5,6 +5,14 @@ import QuoteTable from '@/components/ui/QuoteTable';
 import { QuoteForm } from '@/components/ui/QuoteForm';
 import { createNormalizedQuote } from '@/utils/normalizedQuoteCreation';
 import { Part } from '@/components/ui/useQuotes';
+import { useSnackbar } from '@/components/ui/Snackbar';
+
+interface PartDetails {
+  name: string;
+  number: string;
+  price: number | null;
+  note: string;
+}
 
 // Function to validate and clean date string
 const validateDateString = (dateString: string): string | undefined => {
@@ -49,6 +57,7 @@ const validateDateString = (dateString: string): string | undefined => {
 };
 
 export default function NewQuotePage() {
+  const { showSnackbar } = useSnackbar();
   const {
     quotes,
     parts,
@@ -129,57 +138,80 @@ export default function NewQuotePage() {
     return await markQuoteAsOrdered(id, taxInvoiceNumber);
   };
 
-  const handleSubmit = async (data: any) => {
+  const handleSubmit = async (fields: Record<string, string>, parts: PartDetails[]) => {
     try {
-      console.log('Form submission data:', data);
+      console.log('Form submission data:', { fields, parts });
 
       // Validate mthyr field
-      const validatedMthyr = validateDateString(data.mthyr);
+      const validatedMthyr = validateDateString(fields.mthyr);
       
       const result = await createNormalizedQuote({
         customer: {
-          name: data.customer || '',
-          phone: data.phone || '',
-          address: data.address || ''
+          name: fields.customer || '',
+          phone: fields.phone || '',
+          address: fields.address || ''
         },
         vehicle: {
-          vin: data.vin || '',
-          make: data.make || '',
-          model: data.model || '',
-          series: data.series || '',
+          vin: fields.vin || '',
+          make: fields.make || '',
+          model: fields.model || '',
+          series: fields.series || '',
           year: validatedMthyr ? validatedMthyr.split('/')[1] : undefined,
-          rego: data.rego || '',
-          transmission: data.auto ? 'auto' : 'manual',
-          body: data.body || '',
-          color: data.color || '',
-          notes: data.vehicleNotes || ''
+          rego: fields.rego || '',
+          transmission: fields.auto ? 'auto' : 'manual',
+          body: fields.body || '',
+          color: fields.color || '',
+          notes: fields.vehicleNotes || ''
         },
-        parts: data.parts?.map((part: any) => ({
-          name: part.partName || '',
-          number: part.partNumber || '',
+        parts: parts?.map((part: any) => ({
+          name: part.name || '',
+          number: part.number || '',
           price: part.price || null,
           note: part.note || ''
         })) || [],
-        notes: data.notes || '',
-        requiredBy: data.requiredBy || ''
+        notes: fields.notes || '',
+        requiredBy: fields.requiredBy || ''
       });
 
       if (result.error) {
-        alert('Error creating quote: ' + result.error);
+        console.error('Quote creation failed with error:', result.error);
+        showSnackbar(`Error creating quote: ${result.error}`, 'error');
         return;
       }
 
       console.log('Quote created successfully:', result);
       
-      // Refresh the quotes list
-      await fetchQuotes();
-      await fetchParts();
+      // Refresh the quotes list with detailed error handling
+      try {
+        console.log('Fetching quotes after creation...');
+        await fetchQuotes();
+        console.log('✅ Quotes fetched successfully');
+      } catch (fetchQuotesError) {
+        console.error('❌ Error fetching quotes after creation:', fetchQuotesError);
+        showSnackbar(`Error refreshing quotes: ${fetchQuotesError instanceof Error ? fetchQuotesError.message : String(fetchQuotesError)}`, 'error');
+      }
       
+      try {
+        console.log('Fetching parts after creation...');
+        await fetchParts();
+        console.log('✅ Parts fetched successfully');
+      } catch (fetchPartsError) {
+        console.error('❌ Error fetching parts after creation:', fetchPartsError);
+        showSnackbar(`Error refreshing parts: ${fetchPartsError instanceof Error ? fetchPartsError.message : String(fetchPartsError)}`, 'error');
+      }
+      
+      console.log('🎉 Quote creation and refresh completed successfully');
       // Removed success alert to reduce friction
       
     } catch (error) {
       console.error('Error creating quote:', error);
-      alert('Error creating quote. Please try again.');
+      console.error('Error details:', {
+        name: error instanceof Error ? error.name : 'Unknown',
+        message: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined
+      });
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred. Please try again.';
+      showSnackbar(`Error creating quote: ${errorMessage}`, 'error');
     }
   };
 

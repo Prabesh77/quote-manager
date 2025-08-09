@@ -194,7 +194,7 @@ export const useQuotes = () => {
         name: part.part_name,
         number: part.part_number || '',
         price: part.price,
-        note: part.note || '',
+        note: part.notes || part.note || '', // Handle both 'notes' and 'note' columns
         createdAt: part.created_at,
       }));
 

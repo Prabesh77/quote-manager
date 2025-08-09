@@ -105,10 +105,10 @@ const fetchParts = async (): Promise<Part[]> => {
     // Convert normalized parts to legacy format
     const legacyParts: Part[] = (normalizedParts || []).map(part => ({
       id: part.id,
-      name: part.name,
-      number: part.number,
+      name: part.part_name,
+      number: part.part_number || '',
       price: part.price,
-      note: part.notes || '',
+      note: part.notes || part.note || '',
       createdAt: part.created_at,
     }));
 
@@ -209,8 +209,8 @@ export const useUpdatePartMutation = () => {
       const { data, error } = await supabase
         .from('parts')
         .update({
-          name: updates.name,
-          number: updates.number,
+          part_name: updates.name,
+          part_number: updates.number,
           price: updates.price,
           notes: updates.note,
         })
@@ -225,10 +225,10 @@ export const useUpdatePartMutation = () => {
       // Convert back to legacy format
       const legacyPart: Part = {
         id: data.id,
-        name: data.name,
-        number: data.number,
+        name: data.part_name,
+        number: data.part_number || '',
         price: data.price,
-        note: data.notes || '',
+        note: data.notes || data.note || '',
         createdAt: data.created_at,
       };
       
@@ -255,8 +255,8 @@ export const useAddPartMutation = () => {
       const { data, error } = await supabase
         .from('parts')
         .insert({
-          name: partData.name,
-          number: partData.number,
+          part_name: partData.name,
+          part_number: partData.number,
           price: partData.price,
           notes: partData.note,
         })
@@ -270,10 +270,10 @@ export const useAddPartMutation = () => {
       // Convert back to legacy format
       const legacyPart: Part = {
         id: data.id,
-        name: data.name,
-        number: data.number,
+        name: data.part_name,
+        number: data.part_number || '',
         price: data.price,
-        note: data.notes || '',
+        note: data.notes || data.note || '',
         createdAt: data.created_at,
       };
       
@@ -328,8 +328,8 @@ export const useUpdateMultiplePartsMutation = () => {
           const { data, error } = await supabase
             .from('parts')
             .update({
-              name: partUpdates.name,
-              number: partUpdates.number,
+              part_name: partUpdates.name,
+              part_number: partUpdates.number,
               price: partUpdates.price,
               notes: partUpdates.note,
             })
@@ -343,10 +343,10 @@ export const useUpdateMultiplePartsMutation = () => {
           
           return {
             id: data.id,
-            name: data.name,
-            number: data.number,
+            name: data.part_name,
+            number: data.part_number || '',
             price: data.price,
-            note: data.notes || '',
+            note: data.notes || data.note || '',
             createdAt: data.created_at,
           };
         })

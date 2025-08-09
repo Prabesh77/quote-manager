@@ -17,8 +17,8 @@ export default function VerifyPricePage() {
     isRefetching,
   } = useQuotes();
 
-  // Filter quotes to only show those that are priced (waiting for verification)
-  const waitingVerificationQuotes = quotes.filter(quote => quote.status === 'priced');
+  // Filter quotes to show those that are waiting for verification
+  const waitingVerificationQuotes = quotes.filter(quote => quote.status === 'waiting_verification');
 
   // Wrapper function to match QuoteTable's expected interface for updateQuote
   const handleUpdateQuote = async (id: string, fields: Record<string, any>): Promise<{ error: Error | null }> => {
@@ -49,7 +49,7 @@ export default function VerifyPricePage() {
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900">Verify Prices</h1>
-        <p className="mt-2 text-gray-600">Review and approve quotes that are waiting for price verification</p>
+        <p className="mt-2 text-gray-600">Review and verify quotes that have received initial pricing</p>
       </div>
 
       <QuoteTable

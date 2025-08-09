@@ -13,6 +13,8 @@ export default function CompletedQuotesPage() {
     deleteQuote,
     updatePart,
     updateMultipleParts,
+    markQuoteAsOrdered,
+    markQuoteAsOrderedWithParts,
     isLoading,
     isRefetching,
   } = useQuotes();
@@ -45,6 +47,18 @@ export default function CompletedQuotesPage() {
     }
   };
 
+  // Wrapper function to match QuoteTable's expected interface for markQuoteAsOrdered
+  const handleMarkAsOrdered = async (id: string, taxInvoiceNumber: string): Promise<{ error: Error | null }> => {
+    const result = await markQuoteAsOrdered(id, taxInvoiceNumber);
+    return { error: result.error ? new Error(String(result.error)) : null };
+  };
+
+  // Wrapper function to match QuoteTable's expected interface for markQuoteAsOrderedWithParts
+  const handleMarkAsOrderedWithParts = async (id: string, taxInvoiceNumber: string, partIds: string[]): Promise<{ error: Error | null }> => {
+    const result = await markQuoteAsOrderedWithParts(id, taxInvoiceNumber, partIds);
+    return { error: result.error ? new Error(String(result.error)) : null };
+  };
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="mb-8">
@@ -59,6 +73,8 @@ export default function CompletedQuotesPage() {
         onDeleteQuote={deleteQuote}
         onUpdatePart={handleUpdatePart}
         onUpdateMultipleParts={handleUpdateMultipleParts}
+        onMarkAsOrdered={handleMarkAsOrdered}
+        onMarkAsOrderedWithParts={handleMarkAsOrderedWithParts}
         showCompleted={true}
         isLoading={isLoading}
         isRefetching={isRefetching}

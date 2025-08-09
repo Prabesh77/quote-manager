@@ -939,7 +939,7 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
                     </button>
                   </div>
                   
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <div className="grid grid-cols-1 gap-3">
                     <div>
                       <label className="block text-xs font-medium text-gray-600 mb-1">
                         Part Number *
@@ -952,30 +952,7 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
                       />
                     </div>
                     
-                    <div>
-                      <label className="block text-xs font-medium text-gray-600 mb-1">
-                        Price
-                      </label>
-                      <Input
-                        type="number"
-                        value={part.price || ''}
-                        onChange={(e) => updatePartDetail(partName, 'price', e.target.value ? Number(e.target.value) : null)}
-                        placeholder="0.00"
-                        className="w-full h-8 text-sm"
-                      />
-                    </div>
-                    
-                    <div>
-                      <label className="block text-xs font-medium text-gray-600 mb-1">
-                        Notes
-                      </label>
-                      <Input
-                        value={part.note}
-                        onChange={(e) => updatePartDetail(partName, 'note', e.target.value)}
-                        placeholder="Additional notes"
-                        className="w-full h-8 text-sm"
-                      />
-                    </div>
+                    {/* Price and Notes fields hidden in quote creation - will be added during pricing workflow */}
                   </div>
                 </div>
               );

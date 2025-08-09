@@ -9,7 +9,9 @@ import {
   useUpdatePartMutation,
   useAddPartMutation,
   useDeletePartMutation,
-  useUpdateMultiplePartsMutation
+  useUpdateMultiplePartsMutation,
+  useQuotePartsQuery,
+  useUpdateQuotePartMutation
 } from './queries/useQuotesQuery';
 import { Quote, Part } from '@/components/ui/useQuotes';
 
@@ -54,6 +56,7 @@ export const useQuotes = () => {
       await updateQuoteMutation.mutateAsync({ id, fields });
       return { error: null };
     } catch (error) {
+      console.error('❌ updateQuote failed for quote:', id, 'error:', error);
       return { error: error instanceof Error ? error : new Error(String(error)) };
     }
   };
@@ -111,6 +114,13 @@ export const useQuotes = () => {
     return updateQuote(id, { status: 'ordered', tax_invoice_number: taxInvoiceNumber });
   };
 
+  const markQuoteAsOrderedWithParts = async (id: string, taxInvoiceNumber: string, selectedPartIds: string[]) => {
+    // This function marks a quote as ordered and can optionally handle selected parts
+    // For now, we'll just mark the quote as ordered with the tax invoice number
+    // The selectedPartIds parameter is available for future enhancement if needed
+    return updateQuote(id, { status: 'ordered', tax_invoice_number: taxInvoiceNumber });
+  };
+
   const fetchQuotes = async () => {
     // With TanStack Query, this is handled automatically
     // Just trigger a refetch if needed
@@ -128,17 +138,17 @@ export const useQuotes = () => {
     parts,
     connectionStatus,
     isLoading,
-    addQuote: updateQuote, // Keep original addQuote for compatibility
     updateQuote,
     deleteQuote,
-    addPart,
     updatePart,
     updateMultipleParts,
+    addPart,
     deletePart,
     fetchQuotes,
     fetchParts,
     markQuoteCompleted,
     markQuoteAsOrdered,
+    markQuoteAsOrderedWithParts,
     // Additional TanStack Query specific properties for advanced usage
     quotesQuery,
     partsQuery,

@@ -74,34 +74,39 @@ export default function NewQuotePage() {
   } = useQuotes();
 
   // Filter to only show quotes waiting for pricing
-  const getQuoteParts = (partRequested: string): Part[] => {
-    if (!partRequested) return [];
-    const partIds = partRequested.split(',').filter(id => id.trim());
-    return parts.filter(part => partIds.includes(part.id));
+  const getQuoteParts = (quote: any): Part[] => {
+    // For now, return empty array since parts are now handled through quote_parts
+    // The status logic will be based on the quote status directly
+    return [];
   };
 
   const getQuoteStatus = (quoteParts: Part[], quoteStatus?: string): string => {
+    // Simplified status logic - use the quote status directly from database
     if (quoteStatus === 'completed' || quoteStatus === 'ordered' || quoteStatus === 'delivered') {
       return quoteStatus;
     }
     
-    // If quote status is explicitly set to waiting_verification or priced, use that
-    if (quoteStatus === 'waiting_verification' || quoteStatus === 'priced') {
+    if (quoteStatus === 'priced') {
       return quoteStatus;
     }
     
-    if (quoteParts.length === 0) return 'unpriced';
+    if (quoteStatus === 'waiting_verification') {
+      return quoteStatus;
+    }
     
-    const allPartsPriced = quoteParts.every(part => part.price && part.price > 0);
-    return allPartsPriced ? 'waiting_verification' : 'unpriced';
+    // Default to unpriced for new quotes
+    return 'unpriced';
   };
 
-  // Filter quotes to only show those waiting for pricing
+  // Filter quotes to only show those waiting for pricing (unpriced and waiting_verification)
   const unpricedQuotes = quotes.filter(quote => {
-    const quoteParts = getQuoteParts(quote.partRequested);
+    const quoteParts = getQuoteParts(quote);
     const status = getQuoteStatus(quoteParts, quote.status);
-    return status === 'unpriced';
+    console.log(`Quote ${quote.id}: status="${quote.status}" -> computed="${status}"`);
+    return status === 'unpriced' || status === 'waiting_verification';
   });
+
+  console.log(`Total quotes: ${quotes.length}, Unpriced quotes: ${unpricedQuotes.length}`);
 
   // Wrapper functions to match QuoteTableProps interface
   const handleUpdateQuote = async (id: string, fields: Record<string, any>): Promise<{ error: Error | null }> => {

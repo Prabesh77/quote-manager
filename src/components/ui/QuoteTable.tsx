@@ -10,6 +10,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
+import supabase from '@/utils/supabase';
 
 interface QuoteTableProps {
   quotes: Quote[];
@@ -29,20 +30,82 @@ interface QuoteTableProps {
 
 type FilterType = 'all' | 'unpriced' | 'priced';
 
-type QuoteStatus = 'unpriced' | 'priced' | 'completed' | 'ordered' | 'delivered';
+type QuoteStatus = 'unpriced' | 'priced' | 'completed' | 'ordered' | 'delivered' | 'waiting_verification';
 
 export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote, onUpdatePart, onUpdateMultipleParts, onMarkCompleted, onMarkAsOrdered, onMarkAsOrderedWithParts, showCompleted = false, defaultFilter = 'all', isLoading = false, isRefetching = false }: QuoteTableProps) {
+  const [filter, setFilter] = useState<FilterType>(defaultFilter);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const [editingQuote, setEditingQuote] = useState<string | null>(null);
   const [editingParts, setEditingParts] = useState<string | null>(null);
   const [editData, setEditData] = useState<Record<string, any>>({});
-  const [partEditData, setPartEditData] = useState<Record<string, any>>({});
-  const [searchTerm, setSearchTerm] = useState('');
-  const [activeFilter, setActiveFilter] = useState<FilterType>(defaultFilter);
-  const [currentTime, setCurrentTime] = useState(new Date());
+  const [partEditData, setPartEditData] = useState<Record<string, Record<string, any>>>({});
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
   const [showOrderConfirm, setShowOrderConfirm] = useState<string | null>(null);
   const [taxInvoiceNumber, setTaxInvoiceNumber] = useState('');
   const [selectedPartIds, setSelectedPartIds] = useState<string[]>([]);
+  const [currentTime, setCurrentTime] = useState(new Date());
+  const [quotePartsWithNotes, setQuotePartsWithNotes] = useState<Record<string, Part[]>>({});
+
+  // Function to get parts with their quote-specific notes merged in
+  const getQuotePartsWithNotes = async (quoteId: string, partRequested: string): Promise<Part[]> => {
+    if (!partRequested) return [];
+    
+    const partIds = partRequested.split(',').map(id => id.trim());
+    const baseParts = parts.filter(part => partIds.includes(String(part.id)));
+    
+    try {
+      // Fetch quote-specific data from quote_parts table
+      const { data: quotePartsData, error } = await supabase
+        .from('quote_parts')
+        .select('part_id, final_price, note')
+        .eq('quote_id', quoteId)
+        .in('part_id', partIds);
+      
+      if (error) {
+        console.error('Error fetching quote parts notes:', error);
+        return baseParts; // Return without notes if error
+      }
+      
+      // Merge notes and final prices into parts
+      const partsWithNotes = baseParts.map(part => {
+        const quotePart = quotePartsData?.find(qp => qp.part_id === part.id);
+        return {
+          ...part,
+          note: quotePart?.note || '',
+          price: quotePart?.final_price ?? part.price, // Use final_price if available
+        };
+      });
+      
+      return partsWithNotes;
+    } catch (error) {
+      console.error('Error merging quote parts notes:', error);
+      return baseParts; // Return without notes if error
+    }
+  };
+
+  // Function to get parts with notes for a specific quote (synchronous)
+  const getQuotePartsWithNotesSync = (quoteId: string): Part[] => {
+    return quotePartsWithNotes[quoteId] || getQuoteParts(quotes.find(q => q.id === quoteId)?.partRequested || '');
+  };
+
+  const getQuoteParts = (partRequested: string): Part[] => {
+    if (!partRequested) {
+      return [];
+    }
+    
+    const partIds = partRequested.split(',').map(id => id.trim());
+    
+    const foundParts = parts.filter(part => {
+      const isFound = partIds.includes(String(part.id));
+      return isFound;
+    });
+    
+    // TODO: This function returns parts without quote-specific notes
+    // Use getQuotePartsWithNotes() for parts with notes merged in
+    
+    return foundParts;
+  };
 
   // Brand colors
   const brandRed = '#d0202d';
@@ -153,33 +216,19 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
     }));
   };
 
-  const getQuoteParts = (partRequested: string): Part[] => {
-    if (!partRequested) {
-      return [];
-    }
-    
-    const partIds = partRequested.split(',').map(id => id.trim());
-    
-    const foundParts = parts.filter(part => {
-      const isFound = partIds.includes(String(part.id));
-      return isFound;
-    });
-    
-    return foundParts;
-  };
-
   const getQuoteStatus = (quoteParts: Part[], quoteStatus?: string): QuoteStatus => {
     // Prioritize database status over calculated status
     if (quoteStatus === 'delivered') return 'delivered';
     if (quoteStatus === 'ordered') return 'ordered';
     if (quoteStatus === 'completed') return 'completed';
     if (quoteStatus === 'priced') return 'priced';
+    if (quoteStatus === 'waiting_verification') return 'waiting_verification';
     if (quoteStatus === 'unpriced') return 'unpriced';
     if (quoteStatus === 'active') {
       // Fallback to calculation for legacy quotes
-    if (quoteParts.length === 0) return 'unpriced';
-    const hasPricedParts = quoteParts.some(part => part.price && part.price > 0);
-    return hasPricedParts ? 'priced' : 'unpriced';
+      if (quoteParts.length === 0) return 'unpriced';
+      const hasPricedParts = quoteParts.some(part => part.price && part.price > 0);
+      return hasPricedParts ? 'priced' : 'unpriced';
     }
     return 'unpriced';
   };
@@ -439,6 +488,16 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
     }
   };
 
+  // Function to handle quote verification confirmation
+  const handleVerifyQuote = async (quoteId: string) => {
+    try {
+      await onUpdateQuote(quoteId, { status: 'priced' });
+      console.log('✅ Quote verified and moved to priced status:', quoteId);
+    } catch (error) {
+      console.error('❌ Error verifying quote:', error);
+    }
+  };
+
   const getStatusChip = (status: QuoteStatus) => {
     const statusConfig = {
       unpriced: {
@@ -475,6 +534,13 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
         border: 'border-orange-200',
         icon: Package,
         label: 'Delivered'
+      },
+      waiting_verification: {
+        bg: 'bg-gray-100',
+        text: 'text-gray-800',
+        border: 'border-gray-200',
+        icon: AlertTriangle,
+        label: 'Waiting for Verification'
       }
     };
 
@@ -510,12 +576,17 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
   };
 
   const filteredQuotes = quotes.filter(quote => {
-    const quoteParts = getQuoteParts(quote.partRequested);
+    const quoteParts = getQuotePartsWithNotesSync(quote.id);
     const status = getQuoteStatus(quoteParts, quote.status);
     
     // Filter by completion status
-    if (showCompleted && quote.status !== 'completed') return false;
-    if (!showCompleted && quote.status === 'completed') return false;
+    if (showCompleted) {
+      // When showCompleted is true, show completed, ordered, and delivered quotes
+      if (quote.status !== 'completed' && quote.status !== 'ordered' && quote.status !== 'delivered') return false;
+    } else {
+      // When showCompleted is false, hide completed, ordered, and delivered quotes
+      if (quote.status === 'completed' || quote.status === 'ordered' || quote.status === 'delivered') return false;
+    }
     
     // Apply search filter
     const matchesSearch = 
@@ -570,7 +641,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
     // Auto-select all orderable parts (parts with price > 0)
     const quote = quotes.find(q => q.id === quoteId);
     if (quote) {
-      const quoteParts = getQuoteParts(quote.partRequested);
+      const quoteParts = getQuotePartsWithNotesSync(quote.id);
       const orderableParts = quoteParts.filter(part => part.price && part.price > 0);
       const orderablePartIds = orderableParts.map(part => part.id);
       setSelectedPartIds(orderablePartIds);
@@ -580,21 +651,35 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
   };
 
   const confirmOrder = async () => {
-    if (!showOrderConfirm || !taxInvoiceNumber.trim() || !onMarkAsOrderedWithParts) return;
+    if (!showOrderConfirm || !taxInvoiceNumber.trim()) return;
     
-    // Validate that at least one part is selected
-    if (selectedPartIds.length === 0) {
-      alert('Please select at least one part to order');
+    let result: { error: Error | null } = { error: null };
+    
+    // Use onMarkAsOrderedWithParts if available (with part selection)
+    if (onMarkAsOrderedWithParts) {
+      // Validate that at least one part is selected
+      if (selectedPartIds.length === 0) {
+        alert('Please select at least one part to order');
+        return;
+      }
+      
+      result = await onMarkAsOrderedWithParts(
+        showOrderConfirm,
+        taxInvoiceNumber.trim(),
+        selectedPartIds
+      );
+    } 
+    // Fall back to onMarkAsOrdered (simple case without part selection)
+    else if (onMarkAsOrdered) {
+      result = await onMarkAsOrdered(
+        showOrderConfirm,
+        taxInvoiceNumber.trim()
+      );
+    }
+    else {
+      // Neither function is available
       return;
     }
-    
-    // console.log('Marking quote as ordered:', showOrderConfirm, 'with tax invoice:', taxInvoiceNumber);
-    
-    const result = await onMarkAsOrderedWithParts(
-      showOrderConfirm,
-      taxInvoiceNumber.trim(),
-      selectedPartIds
-    );
     
     if (!result.error) {
       setShowOrderConfirm(null);
@@ -617,6 +702,26 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
 
     return () => clearInterval(timer);
   }, []);
+
+  // Load parts with notes for all quotes
+  useEffect(() => {
+    const loadQuotePartsWithNotes = async () => {
+      const quotePartsMap: Record<string, Part[]> = {};
+      
+      for (const quote of quotes) {
+        if (quote.partRequested) {
+          const partsWithNotes = await getQuotePartsWithNotes(quote.id, quote.partRequested);
+          quotePartsMap[quote.id] = partsWithNotes;
+        }
+      }
+      
+      setQuotePartsWithNotes(quotePartsMap);
+    };
+
+    if (quotes.length > 0) {
+      loadQuotePartsWithNotes();
+    }
+  }, [quotes, parts]);
 
   return (
     <div className="space-y-4">
@@ -696,7 +801,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
           {/* Quotes List */}
           <Accordion type="multiple" className="w-full">
               {filteredQuotes.map((quote) => {
-                const quoteParts = getQuoteParts(quote.partRequested);
+                const quoteParts = getQuotePartsWithNotesSync(quote.id);
                 const status = getQuoteStatus(quoteParts, quote.status);
 
                 return (
@@ -999,6 +1104,20 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                           </button>
                         )}
                         
+                        {/* Confirmation button for waiting_verification status */}
+                        {status === 'waiting_verification' && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleVerifyQuote(quote.id);
+                            }}
+                            className="p-1 bg-green-600 hover:bg-green-700 text-white rounded-full transition-colors cursor-pointer"
+                            title="Confirm pricing and move to priced status"
+                          >
+                            <CheckCircle className="h-5 w-5 font-bold" />
+                          </button>
+                        )}
+                        
                         {status === 'priced' && onMarkCompleted && (
                           <button
                             onClick={(e) => {
@@ -1012,7 +1131,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                           </button>
                         )}
                         
-                        {status === 'completed' && onMarkAsOrderedWithParts && (
+                        {status === 'completed' && (onMarkAsOrdered || onMarkAsOrderedWithParts) && (
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
@@ -1355,7 +1474,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
         ) : (
           <Accordion type="multiple" className="w-full">
             {filteredQuotes.map((quote) => {
-              const quoteParts = getQuoteParts(quote.partRequested);
+              const quoteParts = getQuotePartsWithNotesSync(quote.id);
               const status = getQuoteStatus(quoteParts, quote.status);
               
               return (
@@ -1591,11 +1710,25 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                     e.stopPropagation();
                                 handleDeleteWithConfirm(quote.id);
                                   }}
-                              className="p-2 text-red-600 hover:text-red-700 hover:bg-red-100 rounded transition-colors cursor-pointer"
+                              className="p-1 text-red-600 hover:text-red-700 hover:bg-red-100 rounded transition-colors cursor-pointer"
                               title="Delete quote"
                                 >
                               <Trash2 className="h-4 w-4" />
                                 </button>
+                          )}
+                          
+                          {/* Confirmation button for waiting_verification status */}
+                          {status === 'waiting_verification' && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleVerifyQuote(quote.id);
+                              }}
+                              className="p-1 bg-green-600 hover:bg-green-700 text-white rounded-full transition-colors cursor-pointer"
+                              title="Confirm pricing and move to priced status"
+                            >
+                              <CheckCircle className="h-5 w-5 font-bold" />
+                            </button>
                           )}
                           
                           {status === 'priced' && onMarkCompleted && (
@@ -1611,7 +1744,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                   </button>
                                 )}
                           
-                          {status === 'completed' && onMarkAsOrderedWithParts && (
+                          {status === 'completed' && (onMarkAsOrdered || onMarkAsOrderedWithParts) && (
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation();
@@ -1914,7 +2047,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
             {(() => {
               const quote = quotes.find(q => q.id === showOrderConfirm);
               if (!quote) return null;
-              const quoteParts = getQuoteParts(quote.partRequested);
+              const quoteParts = getQuotePartsWithNotesSync(quote.id);
               
               // Filter out parts with no price or zero price
               const orderableParts = quoteParts.filter(part => part.price && part.price > 0);

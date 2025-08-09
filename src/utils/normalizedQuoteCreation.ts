@@ -204,7 +204,6 @@ export const createNormalizedQuote = async (quoteData: QuoteData) => {
             part_name: partData.name,
             part_number: partData.number || null,
             price: partData.price || null,
-            note: partData.note || null,
           })
           .select()
           .single();
@@ -224,7 +223,7 @@ export const createNormalizedQuote = async (quoteData: QuoteData) => {
         .insert({
           quote_id: quote.id,
           part_id: partId,
-          final_price: partData.price || null,
+          final_price: null, // Prices should be set manually later, not during quote creation
           note: partData.note || null,
         })
         .select()

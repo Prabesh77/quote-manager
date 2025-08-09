@@ -12,6 +12,21 @@ export interface Part {
   createdAt: string;
 }
 
+export interface QuotePart {
+  // Quote_parts table fields
+  quotePartId: string;  // ID from quote_parts table
+  quoteId: string;
+  partId: string;
+  finalPrice: number | null;
+  note: string;  // Quote-specific note
+  
+  // Part table fields (for display)
+  partName: string;
+  partNumber: string;
+  basePrice: number | null;
+  createdAt: string;
+}
+
 export interface Quote {
   id: string;
   vin: string;
@@ -29,7 +44,7 @@ export interface Quote {
   customer?: string; // Customer name
   address?: string; // Customer address
   phone?: string; // Customer phone
-  status: 'active' | 'completed' | 'unpriced' | 'priced' | 'ordered' | 'delivered'; // Updated status field
+  status: 'active' | 'completed' | 'unpriced' | 'waiting_verification' | 'priced' | 'ordered' | 'delivered'; // Updated status field
   taxInvoiceNumber?: string; // Tax invoice number for orders
   [key: string]: any; // Allow string indexing
 }
@@ -250,6 +265,26 @@ export const useQuotes = () => {
         // console.log('Parts subscription status:', status);
       });
 
+    // Subscribe to quote_parts table changes
+    const quotePartsSubscription = supabase
+      .channel('quote-parts-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'quote_parts'
+        },
+        (payload) => {
+          // Refresh quotes when quote_parts change since pricing affects quote status
+          fetchQuotes();
+          fetchParts();
+        }
+      )
+      .subscribe((status) => {
+        // console.log('Quote parts subscription status:', status);
+      });
+
     // Initial data fetch
     fetchQuotes();
     fetchParts();
@@ -259,6 +294,7 @@ export const useQuotes = () => {
     return () => {
       quotesSubscription.unsubscribe();
       partsSubscription.unsubscribe();
+      quotePartsSubscription.unsubscribe();
     };
   }, []);
 

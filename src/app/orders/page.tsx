@@ -19,6 +19,8 @@ export default function OrdersPage() {
 
   // Filter quotes to only show ordered ones
   const orderedQuotes = quotes.filter(quote => quote.status === 'ordered');
+  
+
 
   // Wrapper function to match QuoteTable's expected interface for updateQuote
   const handleUpdateQuote = async (id: string, fields: Record<string, any>): Promise<{ error: Error | null }> => {

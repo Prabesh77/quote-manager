@@ -158,7 +158,14 @@ export const createNormalizedQuote = async (quoteData: QuoteData) => {
       console.log('Created new vehicle:', `${quoteData.vehicle.make} ${quoteData.vehicle.model} ${quoteData.vehicle.series || ''} ${quoteData.vehicle.year || ''} ${quoteData.vehicle.color || ''}`);
     }
 
-    // Step 3: Create quote
+    // Step 3: Create quote with JSON parts structure
+    // Build the parts_requested JSON array
+    const partsRequestedJson = quoteData.parts.map(partData => ({
+      part_id: '', // Will be filled after creating parts
+      note: partData.note || '',
+      final_price: null // Initially null, will be set during pricing
+    }));
+
     const { data: quote, error: quoteError } = await supabase
       .from('quotes')
       .insert({
@@ -167,6 +174,7 @@ export const createNormalizedQuote = async (quoteData: QuoteData) => {
         status: 'unpriced',
         notes: quoteData.notes || null,
         required_by: quoteData.requiredBy || null,
+        parts_requested: partsRequestedJson, // Re-enabled for fresh JSON setup
       })
       .select()
       .single();
@@ -178,13 +186,14 @@ export const createNormalizedQuote = async (quoteData: QuoteData) => {
 
     console.log('Created quote:', quote.id);
 
-    // Step 4: Create parts and quote_parts
-    const quoteParts = [];
+    // Step 4: Create parts and update the JSON array with actual part IDs
+    const finalPartsRequested = [];
     
-    for (const partData of quoteData.parts) {
-      // Check if part already exists for this vehicle
+    for (let i = 0; i < quoteData.parts.length; i++) {
+      const partData = quoteData.parts[i];
       let partId: string;
       
+      // Check if part already exists for this vehicle
       const { data: existingPart, error: partCheckError } = await supabase
         .from('parts')
         .select('id')
@@ -217,55 +226,46 @@ export const createNormalizedQuote = async (quoteData: QuoteData) => {
         console.log('Created new part:', partData.name);
       }
 
-      // Create quote_part relationship
-      const { data: quotePart, error: quotePartError } = await supabase
-        .from('quote_parts')
-        .insert({
-          quote_id: quote.id,
-          part_id: partId,
-          final_price: null, // Prices should be set manually later, not during quote creation
-          note: partData.note || null,
-        })
-        .select()
-        .single();
-
-      if (quotePartError) {
-        console.error('Error creating quote_part:', quotePartError);
-        throw quotePartError;
-      }
-
-      quoteParts.push({
-        part: { id: partId, ...partData },
-        quote_part: quotePart
+      // Add to final JSON array
+      finalPartsRequested.push({
+        part_id: partId,
+        note: partData.note || '',
+        final_price: null // Initially null, will be set during pricing
       });
     }
 
-    console.log(`Created ${quoteParts.length} quote parts`);
+    // Step 5: Update quote with final parts_requested JSON array
+    const { error: updateQuoteError } = await supabase
+      .from('quotes')
+      .update({
+        parts_requested: finalPartsRequested
+      })
+      .eq('id', quote.id);
 
-    // Return the complete quote with all related data
+    if (updateQuoteError) {
+      console.error('Error updating quote with parts:', updateQuoteError);
+      throw updateQuoteError;
+    }
+
+    console.log('✅ Successfully created normalized quote with JSON parts structure');
+    console.log('Quote ID:', quote.id);
+    console.log('Parts in quote:', finalPartsRequested.length);
+
     return {
-      quote,
-      customer: { id: customerId, ...quoteData.customer },
-      vehicle: { id: vehicleId, ...quoteData.vehicle },
-      quote_parts: quoteParts,
-      error: null
+      success: true,
+      quoteId: quote.id,
+      customerId,
+      vehicleId,
+      partsCount: finalPartsRequested.length
     };
-
   } catch (error) {
-    console.error('Error in createNormalizedQuote:', error);
+    console.error('❌ Error in createNormalizedQuote:', error);
     console.error('Error details:', {
-      name: error instanceof Error ? error.name : 'Unknown',
       message: error instanceof Error ? error.message : String(error),
       stack: error instanceof Error ? error.stack : undefined,
-      quoteData: JSON.stringify(quoteData, null, 2)
+      supabaseError: error
     });
-    return {
-      quote: null,
-      customer: null,
-      vehicle: null,
-      quote_parts: [],
-      error: error instanceof Error ? error.message : String(error)
-    };
+    throw error;
   }
 };
 

@@ -11,6 +11,7 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import supabase from '@/utils/supabase';
+import { getQuotePartsFromJson } from '@/utils/quotePartsHelpers';
 
 interface QuoteTableProps {
   quotes: Quote[];
@@ -48,44 +49,61 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
 
   // Function to get parts with their quote-specific notes merged in
   const getQuotePartsWithNotes = async (quoteId: string, partRequested: string): Promise<Part[]> => {
-    if (!partRequested) return [];
+    // First try to find the quote with JSON structure
+    const quote = quotes.find(q => q.id === quoteId);
+    if (quote && quote.partsRequested && Array.isArray(quote.partsRequested)) {
+      // Use new JSON structure - much faster and more reliable
+      return getQuotePartsFromJson(quote, parts);
+    }
     
-    const partIds = partRequested.split(',').map(id => id.trim());
-    const baseParts = parts.filter(part => partIds.includes(String(part.id)));
-    
+    // If no JSON structure found, fetch the quote directly from database
     try {
-      // Fetch quote-specific data from quote_parts table
-      const { data: quotePartsData, error } = await supabase
-        .from('quote_parts')
-        .select('part_id, final_price, note')
-        .eq('quote_id', quoteId)
-        .in('part_id', partIds);
+      const { data: freshQuote, error: quoteError } = await supabase
+        .from('quotes')
+        .select('parts_requested')
+        .eq('id', quoteId)
+        .single();
       
-      if (error) {
-        console.error('Error fetching quote parts notes:', error);
-        return baseParts; // Return without notes if error
+      if (quoteError) {
+        console.error('Error fetching quote:', quoteError);
+        return getQuoteParts(partRequested); // Fallback to basic parts
       }
       
-      // Merge notes and final prices into parts
-      const partsWithNotes = baseParts.map(part => {
-        const quotePart = quotePartsData?.find(qp => qp.part_id === part.id);
-        return {
-          ...part,
-          note: quotePart?.note || '',
-          price: quotePart?.final_price ?? part.price, // Use final_price if available
-        };
-      });
+      if (freshQuote?.parts_requested && Array.isArray(freshQuote.parts_requested)) {
+        // Create a temporary quote object for the helper function
+        const tempQuote = {
+          ...quote,
+          id: quoteId,
+          partsRequested: freshQuote.parts_requested
+        } as any;
+        return getQuotePartsFromJson(tempQuote, parts);
+      }
       
-      return partsWithNotes;
+      return getQuoteParts(partRequested);
+      
     } catch (error) {
-      console.error('Error merging quote parts notes:', error);
-      return baseParts; // Return without notes if error
+      console.error('Error fetching quote parts:', error);
+      return getQuoteParts(partRequested); // Fallback to basic parts
     }
   };
 
   // Function to get parts with notes for a specific quote (synchronous)
   const getQuotePartsWithNotesSync = (quoteId: string): Part[] => {
-    return quotePartsWithNotes[quoteId] || getQuoteParts(quotes.find(q => q.id === quoteId)?.partRequested || '');
+    // First try to find the quote with JSON structure
+    const quote = quotes.find(q => q.id === quoteId);
+    if (quote && quote.partsRequested && Array.isArray(quote.partsRequested)) {
+      // Use new JSON structure - this is much faster as it's synchronous
+      return getQuotePartsFromJson(quote, parts);
+    }
+    
+    // Fallback to cached data or basic parts lookup
+    const cachedParts = quotePartsWithNotes[quoteId];
+    if (cachedParts && cachedParts.length > 0) {
+      return cachedParts;
+    }
+    
+    // Last resort - basic parts without quote-specific data
+    return getQuoteParts(quote?.partRequested || '');
   };
 
   const getQuoteParts = (partRequested: string): Part[] => {
@@ -100,8 +118,8 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
       return isFound;
     });
     
-    // TODO: This function returns parts without quote-specific notes
-    // Use getQuotePartsWithNotes() for parts with notes merged in
+    // TODO: This legacy function returns parts without quote-specific notes
+    // The new JSON structure in getQuotePartsFromJson() includes notes
     
     return foundParts;
   };
@@ -166,6 +184,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
         id,
         updates: partEditData[id] || {}
       }));
+      
       await onUpdateMultipleParts(updates);
       setEditingParts(null);
       setPartEditData({});

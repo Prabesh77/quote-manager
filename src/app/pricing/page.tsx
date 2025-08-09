@@ -18,35 +18,10 @@ export default function PricingPage() {
     isLoading,
   } = useQuotes();
 
-  // Filter to only show unpriced quotes
-  const getQuoteParts = (partRequested: string): Part[] => {
-    if (!partRequested) return [];
-    const partIds = partRequested.split(',').filter(id => id.trim());
-    return parts.filter(part => partIds.includes(part.id));
-  };
-
-  const getQuoteStatus = (quoteParts: Part[], quoteStatus?: string): string => {
-    if (quoteStatus === 'completed' || quoteStatus === 'ordered' || quoteStatus === 'delivered') {
-      return quoteStatus;
-    }
-    
-    // If quote status is explicitly set to waiting_verification or priced, use that
-    if (quoteStatus === 'waiting_verification' || quoteStatus === 'priced') {
-      return quoteStatus;
-    }
-    
-    if (quoteParts.length === 0) return 'unpriced';
-    
-    const allPartsPriced = quoteParts.every(part => part.price && part.price > 0);
-    return allPartsPriced ? 'waiting_verification' : 'unpriced';
-  };
-
-  // Filter quotes to only show unpriced quotes (quotes that need pricing)
+  // Filter quotes to only show unpriced quotes (quotes that need initial pricing)
   const unpricedQuotes = quotes.filter(quote => {
-    const quoteParts = getQuoteParts(quote.partRequested);
-    const status = getQuoteStatus(quoteParts, quote.status);
-    
-    return status === 'unpriced';
+    // Use the database status directly - much simpler and more reliable
+    return quote.status === 'unpriced';
   });
 
   // Wrapper function to match QuoteTable's expected interface for updateQuote
@@ -59,9 +34,9 @@ export default function PricingPage() {
   const handleUpdatePart = async (id: string, updates: Partial<Part>): Promise<{ data: Part; error: Error | null }> => {
     const result = await updatePart(id, updates);
     if (result.error) {
-      return { data: null as any, error: result.error };
+      return { data: {} as Part, error: result.error };
     }
-    return { data: result.data || null as any, error: null };
+    return { data: result.data || {} as Part, error: null };
   };
 
   // Wrapper function for updateMultipleParts to match expected interface
@@ -74,13 +49,23 @@ export default function PricingPage() {
     }
   };
 
-  return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">Pricing Dashboard</h1>
-        <p className="mt-2 text-gray-600">Add prices to quotes that are waiting for initial pricing</p>
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-lg">Loading quotes...</div>
       </div>
+    );
+  }
 
+  return (
+    <div className="container mx-auto px-4 py-8">
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-3xl font-bold text-gray-900">Add Pricing</h1>
+        <div className="text-sm text-gray-600">
+          {unpricedQuotes.length} quote{unpricedQuotes.length !== 1 ? 's' : ''} awaiting pricing
+        </div>
+      </div>
+      
       <QuoteTable
         quotes={unpricedQuotes}
         parts={parts}
@@ -90,7 +75,7 @@ export default function PricingPage() {
         onUpdateMultipleParts={handleUpdateMultipleParts}
         onMarkCompleted={markQuoteCompleted}
         onMarkAsOrdered={markQuoteAsOrdered}
-        isLoading={isLoading}
+        showCompleted={false}
       />
     </div>
   );

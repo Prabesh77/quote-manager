@@ -52,12 +52,12 @@ const validateDateString = (dateString: string): string | undefined => {
     }
   }
   
-  console.warn('Could not validate date string:', dateString);
   return undefined;
 };
 
 export default function NewQuotePage() {
   const { showSnackbar } = useSnackbar();
+  
   const {
     quotes,
     parts,
@@ -67,45 +67,14 @@ export default function NewQuotePage() {
     updateMultipleParts,
     markQuoteCompleted,
     markQuoteAsOrdered,
-    fetchQuotes,
-    fetchParts,
     isLoading,
   } = useQuotes();
 
-  // Filter to only show quotes waiting for pricing
-  const getQuoteParts = (quote: any): Part[] => {
-    // For now, return empty array since parts are now handled through quote_parts
-    // The status logic will be based on the quote status directly
-    return [];
-  };
-
-  const getQuoteStatus = (quoteParts: Part[], quoteStatus?: string): string => {
-    // Simplified status logic - use the quote status directly from database
-    if (quoteStatus === 'completed' || quoteStatus === 'ordered' || quoteStatus === 'delivered') {
-      return quoteStatus;
-    }
-    
-    if (quoteStatus === 'priced') {
-      return quoteStatus;
-    }
-    
-    if (quoteStatus === 'waiting_verification') {
-      return quoteStatus;
-    }
-    
-    // Default to unpriced for new quotes
-    return 'unpriced';
-  };
-
   // Filter quotes to only show those waiting for initial pricing (unpriced only)
   const unpricedQuotes = quotes.filter(quote => {
-    const quoteParts = getQuoteParts(quote);
-    const status = getQuoteStatus(quoteParts, quote.status);
-    console.log(`Quote ${quote.id}: status="${quote.status}" -> computed="${status}"`);
-    return status === 'unpriced';
+    // Use the database status directly - much simpler and more reliable
+    return quote.status === 'unpriced';
   });
-
-  console.log(`Total quotes: ${quotes.length}, Unpriced quotes: ${unpricedQuotes.length}`);
 
   // Wrapper functions to match QuoteTableProps interface
   const handleUpdateQuote = async (id: string, fields: Record<string, any>): Promise<{ error: Error | null }> => {
@@ -144,28 +113,23 @@ export default function NewQuotePage() {
 
   const handleSubmit = async (fields: Record<string, string>, parts: PartDetails[]) => {
     try {
-      console.log('Form submission data:', { fields, parts });
-
-      // Validate mthyr field
-      const validatedMthyr = validateDateString(fields.mthyr);
-      
       const result = await createNormalizedQuote({
         customer: {
-          name: fields.customer || '',
+          name: fields.customer,
           phone: fields.phone || '',
           address: fields.address || ''
         },
         vehicle: {
-          vin: fields.vin || '',
-          make: fields.make || '',
-          model: fields.model || '',
-          series: fields.series || '',
-          year: validatedMthyr ? validatedMthyr.split('/')[1] : undefined,
           rego: fields.rego || '',
+          make: fields.make,
+          model: fields.model,
+          series: fields.series || '',
+          year: fields.mthyr ? validateDateString(fields.mthyr) : undefined,
+          vin: fields.vin || '',
+          color: fields.color || '',
           transmission: fields.auto ? 'auto' : 'manual',
           body: fields.body || '',
-          color: fields.color || '',
-          notes: fields.vehicleNotes || ''
+          notes: fields.notes || ''
         },
         parts: parts?.map((part: any) => ({
           name: part.name || '',
@@ -177,44 +141,17 @@ export default function NewQuotePage() {
         requiredBy: fields.requiredBy || ''
       });
 
-      if (result.error) {
-        console.error('Quote creation failed with error:', result.error);
-        showSnackbar(`Error creating quote: ${result.error}`, 'error');
-        return;
-      }
-
       console.log('Quote created successfully:', result);
       
-      // Refresh the quotes list with detailed error handling
-      try {
-        console.log('Fetching quotes after creation...');
-        await fetchQuotes();
-        console.log('✅ Quotes fetched successfully');
-      } catch (fetchQuotesError) {
-        console.error('❌ Error fetching quotes after creation:', fetchQuotesError);
-        showSnackbar(`Error refreshing quotes: ${fetchQuotesError instanceof Error ? fetchQuotesError.message : String(fetchQuotesError)}`, 'error');
-      }
+      // Show success message
+      showSnackbar('Quote created successfully!', 'success');
       
-      try {
-        console.log('Fetching parts after creation...');
-        await fetchParts();
-        console.log('✅ Parts fetched successfully');
-      } catch (fetchPartsError) {
-        console.error('❌ Error fetching parts after creation:', fetchPartsError);
-        showSnackbar(`Error refreshing parts: ${fetchPartsError instanceof Error ? fetchPartsError.message : String(fetchPartsError)}`, 'error');
-      }
-      
-      console.log('🎉 Quote creation and refresh completed successfully');
-      // Removed success alert to reduce friction
+      // Reset form or redirect
+      // You might want to redirect to the quote details or reset the form here
       
     } catch (error) {
-      console.error('Error creating quote:', error);
-      console.error('Error details:', {
-        name: error instanceof Error ? error.name : 'Unknown',
-        message: error instanceof Error ? error.message : String(error),
-        stack: error instanceof Error ? error.stack : undefined
-      });
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred. Please try again.';
+      console.error('Quote creation failed with error:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       showSnackbar(`Error creating quote: ${errorMessage}`, 'error');
     }
   };

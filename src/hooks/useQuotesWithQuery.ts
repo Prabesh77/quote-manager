@@ -13,7 +13,7 @@ import {
   useQuotePartsQuery,
   useUpdateQuotePartMutation
 } from './queries/useQuotesQuery';
-import { Quote, Part } from '@/components/ui/useQuotes';
+import { Quote, Part, QuotePartItem } from '@/components/ui/useQuotes';
 import supabase from '@/utils/supabase';
 
 type ConnectionStatus = 'checking' | 'connected' | 'error' | 'disconnected';
@@ -124,52 +124,101 @@ export const useQuotes = () => {
         return updateQuote(id, { status: 'ordered', tax_invoice_number: taxInvoiceNumber });
       }
       
-      // Get all quote_parts for this quote
-      const { data: allQuoteParts, error: fetchError } = await supabase
-        .from('quote_parts')
-        .select('*')
-        .eq('quote_id', id);
+      // Get the quote to check which structure it uses
+      const { data: quote, error: quoteError } = await supabase
+        .from('quotes')
+        .select('parts_requested')
+        .eq('id', id)
+        .single();
       
-      if (fetchError) {
-        console.error('❌ Error fetching quote parts:', fetchError);
-        return { error: fetchError };
+      if (quoteError) {
+        console.error('❌ Error fetching quote:', quoteError);
+        return { error: quoteError };
       }
       
-      if (!allQuoteParts || allQuoteParts.length === 0) {
-        console.error('❌ No parts found for quote');
-        return { error: new Error('No parts found for quote') };
-      }
-      
-      // Separate selected and unselected parts
-      const selectedQuoteParts = allQuoteParts.filter((qp: any) => selectedPartIds.includes(qp.part_id));
-      const unselectedQuoteParts = allQuoteParts.filter((qp: any) => !selectedPartIds.includes(qp.part_id));
-      
-      console.log('📦 Selected parts:', selectedQuoteParts.length, 'Unselected parts:', unselectedQuoteParts.length);
-      
-      // Remove unselected parts from the quote
-      if (unselectedQuoteParts.length > 0) {
-        const unselectedQuotePartIds = unselectedQuoteParts.map((qp: any) => qp.id);
-        const { error: deleteError } = await supabase
-          .from('quote_parts')
-          .delete()
-          .in('id', unselectedQuotePartIds);
+      if (quote?.parts_requested && Array.isArray(quote.parts_requested)) {
+        // New JSON structure
+        console.log('📦 Using JSON structure for partial order');
         
-        if (deleteError) {
-          console.error('❌ Error removing unselected parts:', deleteError);
-          return { error: deleteError };
+        const currentParts = quote.parts_requested as QuotePartItem[];
+        const selectedParts = currentParts.filter((p: QuotePartItem) => selectedPartIds.includes(p.part_id));
+        
+        if (selectedParts.length === 0) {
+          console.error('❌ No selected parts found in quote');
+          return { error: new Error('No selected parts found in quote') };
         }
         
-        console.log('✅ Removed', unselectedQuoteParts.length, 'unselected parts from quote');
+        console.log('📦 Selected parts from JSON:', selectedParts.length, 'Total parts:', currentParts.length);
+        
+        // Update the quote with only selected parts and mark as ordered
+        const { error: updateError } = await supabase
+          .from('quotes')
+          .update({
+            parts_requested: selectedParts,
+            status: 'ordered',
+            tax_invoice_number: taxInvoiceNumber
+          })
+          .eq('id', id);
+        
+        if (updateError) {
+          console.error('❌ Error updating quote with selected parts:', updateError);
+          return { error: updateError };
+        }
+        
+        console.log('✅ Quote marked as ordered with', selectedParts.length, 'selected parts (JSON)');
+        return { error: null };
+        
+      } else {
+        // Legacy quote_parts structure
+        console.log('📦 Using legacy quote_parts structure for partial order');
+        
+        // Get all quote_parts for this quote
+        const { data: allQuoteParts, error: fetchError } = await supabase
+          .from('quote_parts')
+          .select('*')
+          .eq('quote_id', id);
+        
+        if (fetchError) {
+          console.error('❌ Error fetching quote parts:', fetchError);
+          return { error: fetchError };
+        }
+        
+        if (!allQuoteParts || allQuoteParts.length === 0) {
+          console.error('❌ No parts found for quote');
+          return { error: new Error('No parts found for quote') };
+        }
+        
+        // Separate selected and unselected parts
+        const selectedQuoteParts = allQuoteParts.filter((qp: any) => selectedPartIds.includes(qp.part_id));
+        const unselectedQuoteParts = allQuoteParts.filter((qp: any) => !selectedPartIds.includes(qp.part_id));
+        
+        console.log('📦 Selected parts:', selectedQuoteParts.length, 'Unselected parts:', unselectedQuoteParts.length);
+        
+        // Remove unselected parts from the quote
+        if (unselectedQuoteParts.length > 0) {
+          const unselectedQuotePartIds = unselectedQuoteParts.map((qp: any) => qp.id);
+          const { error: deleteError } = await supabase
+            .from('quote_parts')
+            .delete()
+            .in('id', unselectedQuotePartIds);
+          
+          if (deleteError) {
+            console.error('❌ Error removing unselected parts:', deleteError);
+            return { error: deleteError };
+          }
+          
+          console.log('✅ Removed', unselectedQuoteParts.length, 'unselected parts from quote');
+        }
+        
+        // Mark the quote as ordered
+        const result = await updateQuote(id, { status: 'ordered', tax_invoice_number: taxInvoiceNumber });
+        
+        if (!result.error) {
+          console.log('✅ Quote marked as ordered with', selectedQuoteParts.length, 'parts (legacy)');
+        }
+        
+        return result;
       }
-      
-      // Mark the quote as ordered
-      const result = await updateQuote(id, { status: 'ordered', tax_invoice_number: taxInvoiceNumber });
-      
-      if (!result.error) {
-        console.log('✅ Quote marked as ordered with', selectedQuoteParts.length, 'parts');
-      }
-      
-      return result;
       
     } catch (error) {
       console.error('❌ Error in markQuoteAsOrderedWithParts:', error);

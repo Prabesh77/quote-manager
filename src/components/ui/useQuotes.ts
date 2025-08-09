@@ -3,6 +3,13 @@
 import { useState, useEffect } from 'react';
 import supabase from '@/utils/supabase';
 
+// New interface for individual parts in the JSON array
+export interface QuotePartItem {
+  part_id: string;
+  note: string;
+  final_price: number | null;
+}
+
 export interface Part {
   id: string;
   name: string;
@@ -13,7 +20,7 @@ export interface Part {
 }
 
 export interface QuotePart {
-  // Quote_parts table fields
+  // Quote_parts table fields (for backward compatibility)
   quotePartId: string;  // ID from quote_parts table
   quoteId: string;
   partId: string;
@@ -30,7 +37,8 @@ export interface QuotePart {
 export interface Quote {
   id: string;
   vin: string;
-  partRequested: string; // References parts table
+  partRequested: string; // Legacy field - comma-separated string (for backward compatibility)
+  partsRequested: QuotePartItem[]; // New field - JSON array of parts with notes and prices
   quoteRef: string;
   createdAt: string;
   make: string;
@@ -156,6 +164,11 @@ export const useQuotes = () => {
           id: normalizedQuote.id,
           vin: normalizedQuote.vehicle?.vin || '',
           partRequested: partIds,
+          partsRequested: (quotePartsForThisQuote || []).map(qp => ({
+            part_id: qp.part_id,
+            note: qp.note || '',
+            final_price: qp.final_price || null,
+          })),
           quoteRef: `Q${normalizedQuote.id.slice(0, 8)}`, // Generate quote ref from ID
           createdAt: normalizedQuote.created_at,
           make: normalizedQuote.vehicle?.make || '',

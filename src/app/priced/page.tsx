@@ -16,7 +16,6 @@ export default function PricedPage() {
     markQuoteCompleted,
     markQuoteAsOrdered,
     isLoading,
-    isRefetching,
   } = useQuotes();
 
   // Filter quotes to only show priced ones
@@ -64,7 +63,6 @@ export default function PricedPage() {
         onMarkCompleted={markQuoteCompleted}
         onMarkAsOrdered={markQuoteAsOrdered}
         isLoading={isLoading}
-        isRefetching={isRefetching}
       />
     </div>
   );

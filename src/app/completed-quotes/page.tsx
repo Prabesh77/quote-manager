@@ -16,7 +16,6 @@ export default function CompletedQuotesPage() {
     markQuoteAsOrdered,
     markQuoteAsOrderedWithParts,
     isLoading,
-    isRefetching,
   } = useQuotes();
 
   // Filter quotes to only show completed ones
@@ -77,7 +76,6 @@ export default function CompletedQuotesPage() {
         onMarkAsOrderedWithParts={handleMarkAsOrderedWithParts}
         showCompleted={true}
         isLoading={isLoading}
-        isRefetching={isRefetching}
       />
     </div>
   );

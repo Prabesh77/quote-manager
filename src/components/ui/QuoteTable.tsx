@@ -25,14 +25,13 @@ interface QuoteTableProps {
   showCompleted?: boolean;
   defaultFilter?: FilterType;
   isLoading?: boolean;
-  isRefetching?: boolean; // New prop for background loading
 }
 
 type FilterType = 'all' | 'unpriced' | 'priced';
 
 type QuoteStatus = 'unpriced' | 'priced' | 'completed' | 'ordered' | 'delivered' | 'waiting_verification';
 
-export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote, onUpdatePart, onUpdateMultipleParts, onMarkCompleted, onMarkAsOrdered, onMarkAsOrderedWithParts, showCompleted = false, defaultFilter = 'all', isLoading = false, isRefetching = false }: QuoteTableProps) {
+export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote, onUpdatePart, onUpdateMultipleParts, onMarkCompleted, onMarkAsOrdered, onMarkAsOrderedWithParts, showCompleted = false, defaultFilter = 'all', isLoading = false }: QuoteTableProps) {
   const [filter, setFilter] = useState<FilterType>(defaultFilter);
   const [searchTerm, setSearchTerm] = useState('');
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
@@ -745,10 +744,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
 
       {/* Quotes Accordion */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden hidden lg:block relative">
-        {/* Subtle refetching indicator */}
-        {isRefetching && !isLoading && (
-          <div className="absolute top-0 left-0 right-0 h-1 bg-blue-500 animate-pulse z-20"></div>
-        )}
+
         
         {isLoading && filteredQuotes.length === 0 ? (
           <>

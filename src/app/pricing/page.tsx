@@ -16,7 +16,6 @@ export default function PricingPage() {
     markQuoteCompleted,
     markQuoteAsOrdered,
     isLoading,
-    isRefetching,
   } = useQuotes();
 
   // Filter to only show unpriced quotes
@@ -92,7 +91,6 @@ export default function PricingPage() {
         onMarkCompleted={markQuoteCompleted}
         onMarkAsOrdered={markQuoteAsOrdered}
         isLoading={isLoading}
-        isRefetching={isRefetching}
       />
     </div>
   );

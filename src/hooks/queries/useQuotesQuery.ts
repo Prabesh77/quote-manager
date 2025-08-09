@@ -127,10 +127,10 @@ export const useQuotesQuery = () => {
   return useQuery({
     queryKey: queryKeys.quotes,
     queryFn: fetchQuotes,
-    staleTime: 0, // Always consider data stale - refetch immediately
+    staleTime: 30 * 1000, // Consider data fresh for 30 seconds
     gcTime: 5 * 60 * 1000, // 5 minutes cache time
-    refetchOnWindowFocus: true, // Refetch when user comes back to the app
-    refetchOnMount: true, // Always refetch when component mounts
+    refetchOnWindowFocus: false, // Don't refetch on window focus
+    refetchOnMount: 'always', // Refetch when component mounts if data is stale
     retry: 2, // Retry twice on failure
   });
 };

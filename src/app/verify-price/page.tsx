@@ -14,7 +14,6 @@ export default function VerifyPricePage() {
     updatePart,
     updateMultipleParts,
     isLoading,
-    isRefetching,
   } = useQuotes();
 
   // Filter quotes to show those that are waiting for verification
@@ -61,7 +60,6 @@ export default function VerifyPricePage() {
         onUpdateMultipleParts={handleUpdateMultipleParts}
         showCompleted={false}
         isLoading={isLoading}
-        isRefetching={isRefetching}
       />
     </div>
   );

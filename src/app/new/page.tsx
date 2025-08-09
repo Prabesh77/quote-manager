@@ -70,7 +70,6 @@ export default function NewQuotePage() {
     fetchQuotes,
     fetchParts,
     isLoading,
-    isRefetching
   } = useQuotes();
 
   // Filter to only show quotes waiting for pricing
@@ -243,7 +242,6 @@ export default function NewQuotePage() {
             onMarkAsOrdered={handleMarkAsOrdered}
             showCompleted={false}
             isLoading={isLoading}
-            isRefetching={isRefetching}
           />
         </div>
       </div>

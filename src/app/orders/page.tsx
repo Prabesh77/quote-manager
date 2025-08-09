@@ -14,7 +14,6 @@ export default function OrdersPage() {
     updatePart,
     updateMultipleParts,
     isLoading,
-    isRefetching,
   } = useQuotes();
 
   // Filter quotes to only show ordered ones
@@ -63,7 +62,6 @@ export default function OrdersPage() {
         onUpdateMultipleParts={handleUpdateMultipleParts}
         showCompleted={true}
         isLoading={isLoading}
-        isRefetching={isRefetching}
       />
     </div>
   );

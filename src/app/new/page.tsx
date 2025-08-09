@@ -98,12 +98,12 @@ export default function NewQuotePage() {
     return 'unpriced';
   };
 
-  // Filter quotes to only show those waiting for pricing (unpriced and waiting_verification)
+  // Filter quotes to only show those waiting for initial pricing (unpriced only)
   const unpricedQuotes = quotes.filter(quote => {
     const quoteParts = getQuoteParts(quote);
     const status = getQuoteStatus(quoteParts, quote.status);
     console.log(`Quote ${quote.id}: status="${quote.status}" -> computed="${status}"`);
-    return status === 'unpriced' || status === 'waiting_verification';
+    return status === 'unpriced';
   });
 
   console.log(`Total quotes: ${quotes.length}, Unpriced quotes: ${unpricedQuotes.length}`);

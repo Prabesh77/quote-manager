@@ -536,9 +536,9 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
         label: 'Delivered'
       },
       waiting_verification: {
-        bg: 'bg-gray-100',
-        text: 'text-gray-800',
-        border: 'border-gray-200',
+        bg: 'bg-amber-100',
+        text: 'text-amber-800',
+        border: 'border-amber-200',
         icon: AlertTriangle,
         label: 'Waiting for Verification'
       }

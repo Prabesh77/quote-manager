@@ -12,7 +12,8 @@ import {
 } from "@/components/ui/accordion";
 import supabase from '@/utils/supabase';
 import { getQuotePartsFromJson } from '@/utils/quotePartsHelpers';
-import { QuoteEditModal } from '@/components/quotes/QuoteEditModal';
+import { QuoteEditModal } from './QuoteEditModal';
+
 
 interface QuoteTableProps {
   quotes: Quote[];
@@ -1258,26 +1259,15 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                     return (
                                       <tr key={part.id} className="hover:bg-gray-50">
                                         <td className="px-4 py-3">
-                                          <div className="flex items-center space-x-3">
+                                          <div className="flex items-center space-x-2">
                                             {getPartIcon(part.name) && (
-                                              <div className="bg-white rounded-full p-1 shadow-sm border border-gray-200">
-                                                <img src={getPartIcon(part.name)!} alt={part.name} className="h-6 w-6 object-contain" />
-                                              </div>
+                                              <img src={getPartIcon(part.name)!} alt={part.name} className="h-5 w-5 object-contain" />
                                             )}
-                            <div>
-                                              {isPartEditing ? (
-                                                <input
-                                                  type="text"
-                                                  value={partEditData[part.id]?.name || ''}
-                                                  onChange={(e) => handlePartEditChange(part.id, 'name', e.target.value)}
-                                                  className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:ring-1 focus:ring-red-500 focus:border-transparent"
-                                                  autoFocus
-                                                />
-                                              ) : (
-                                                <span className="text-sm font-medium text-gray-900">{part.name}</span>
-                                              )}
-                            </div>
-                          </div>
+                                            <div className="flex-1">
+                                              {/* Part name is always non-editable */}
+                                              <span className="text-sm font-medium text-gray-900">{part.name}</span>
+                                            </div>
+                                          </div>
                                         </td>
                                         <td className="px-4 py-3">
                                           <div className="flex items-center space-x-1">
@@ -1301,7 +1291,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                               </>
                                             )}
                                           </div>
-                      </td>
+                                        </td>
                                         <td className="px-4 py-3">
                                           <div className="flex items-center space-x-1">
                                             {isPartEditing ? (
@@ -1310,12 +1300,13 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                                 value={partEditData[part.id]?.price || ''}
                                                 onChange={(e) => handlePartEditChange(part.id, 'price', e.target.value ? Number(e.target.value) : null)}
                                                 className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:ring-1 focus:ring-red-500 focus:border-transparent"
+                                                autoFocus
                                               />
                                             ) : (
                                               <>
                                                 <span className="text-sm font-medium text-gray-900">
                                                   {part.price ? `$${part.price.toFixed(2)}` : '-'}
-                        </span>
+                                                </span>
                                                 <button
                                                   onClick={() => copyToClipboard(part.price ? part.price.toString() : '')}
                                                   className="p-1 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
@@ -1326,7 +1317,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                               </>
                                             )}
                                           </div>
-                      </td>
+                                        </td>
                                         <td className="px-4 py-3">
                                           <div className="flex items-center space-x-1">
                                             {isPartEditing ? (
@@ -1349,7 +1340,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                               </>
                                             )}
                                           </div>
-                      </td>
+                                        </td>
                                       </tr>
                                     );
                                   })}
@@ -1375,22 +1366,13 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                       <div className="grid grid-cols-2 gap-3">
                                         <div>
                                           <label className="block text-xs font-medium text-gray-500 mb-1">Part Name</label>
-                                          {isPartEditing ? (
-                                            <input
-                                              type="text"
-                                              value={partEditData[part.id]?.name || ''}
-                                              onChange={(e) => handlePartEditChange(part.id, 'name', e.target.value)}
-                                              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-1 focus:ring-red-500 focus:border-transparent"
-                                              autoFocus
-                                            />
-                                          ) : (
-                                            <span className="text-sm font-medium text-gray-900">{part.name}</span>
-                                          )}
+                                          {/* Part name is always non-editable */}
+                                          <span className="text-sm font-medium text-gray-900">{part.name}</span>
                                         </div>
                                         
                                         <div>
                                           <label className="block text-xs font-medium text-gray-500 mb-1">Part Number</label>
-                          <div className="flex items-center space-x-1">
+                                          <div className="flex items-center space-x-1">
                                             {isPartEditing ? (
                                               <input
                                                 type="text"
@@ -1761,17 +1743,8 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                       <div className="grid grid-cols-2 gap-3">
                                             <div>
                                               <label className="block text-xs font-medium text-gray-500 mb-1">Part Name</label>
-                                              {isPartEditing ? (
-                                                <input
-                                                  type="text"
-                                                  value={partEditData[part.id]?.name || ''}
-                                                  onChange={(e) => handlePartEditChange(part.id, 'name', e.target.value)}
-                                              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-1 focus:ring-red-500 focus:border-transparent"
-                                                  autoFocus
-                                                />
-                                              ) : (
-                                                <span className="text-sm font-medium text-gray-900">{part.name}</span>
-                                              )}
+                                              {/* Part name is always non-editable */}
+                                              <span className="text-sm font-medium text-gray-900">{part.name}</span>
                                             </div>
                                             
                                             <div>
@@ -1810,6 +1783,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                                     value={partEditData[part.id]?.price || ''}
                                                     onChange={(e) => handlePartEditChange(part.id, 'price', e.target.value ? Number(e.target.value) : null)}
                                                 className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-1 focus:ring-red-500 focus:border-transparent"
+                                                    autoFocus
                                                   />
                                                 ) : (
                                                   <>

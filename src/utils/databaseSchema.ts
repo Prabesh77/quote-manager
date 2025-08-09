@@ -47,7 +47,7 @@ export const DB_COLUMNS = {
     YEAR: 'year',
     VIN: 'vin',
     COLOR: 'color',
-    TRANSMISSION: 'transmission',
+    AUTO: 'auto',
     BODY: 'body',
     NOTES: 'notes',
     CREATED_AT: 'created_at',

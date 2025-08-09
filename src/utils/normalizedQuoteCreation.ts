@@ -14,7 +14,7 @@ interface VehicleData {
   year?: string; // Changed to string to store "9/2017" format
   vin?: string;
   color?: string;
-  transmission?: string; // auto/manual transmission
+  auto?: boolean; // boolean auto transmission field
   body?: string; // Added body field
   notes?: string;
 }
@@ -32,6 +32,7 @@ interface QuoteData {
   parts: PartData[];
   notes?: string;
   requiredBy?: string;
+  quoteRef: string; // User-provided quote reference
 }
 
 export const createNormalizedQuote = async (quoteData: QuoteData) => {
@@ -78,7 +79,7 @@ export const createNormalizedQuote = async (quoteData: QuoteData) => {
     
     let vehicleQuery = supabase
       .from('vehicles')
-      .select('id, make, model, series, year, color, transmission, body')
+      .select('id, make, model, series, year, color, auto, body')
       .eq('make', quoteData.vehicle.make)
       .eq('model', quoteData.vehicle.model);
     
@@ -103,11 +104,11 @@ export const createNormalizedQuote = async (quoteData: QuoteData) => {
       vehicleQuery = vehicleQuery.is('color', null);
     }
     
-    // Add transmission filter if provided
-    if (quoteData.vehicle.transmission) {
-      vehicleQuery = vehicleQuery.eq('transmission', quoteData.vehicle.transmission);
+    // Add auto filter if provided
+    if (quoteData.vehicle.auto !== undefined) {
+      vehicleQuery = vehicleQuery.eq('auto', quoteData.vehicle.auto);
     } else {
-      vehicleQuery = vehicleQuery.is('transmission', null);
+      vehicleQuery = vehicleQuery.is('auto', null);
     }
     
     // Add body filter if provided
@@ -142,7 +143,7 @@ export const createNormalizedQuote = async (quoteData: QuoteData) => {
             year: quoteData.vehicle.year || null,
             vin: quoteData.vehicle.vin || null,
             color: quoteData.vehicle.color || null,
-            transmission: quoteData.vehicle.transmission || null,
+            auto: quoteData.vehicle.auto || false,
             body: quoteData.vehicle.body || null,
             notes: quoteData.vehicle.notes || null,
           })
@@ -174,6 +175,7 @@ export const createNormalizedQuote = async (quoteData: QuoteData) => {
         status: 'unpriced',
         notes: quoteData.notes || null,
         required_by: quoteData.requiredBy || null,
+        quote_ref: quoteData.quoteRef, // Store user-provided quote reference
         parts_requested: partsRequestedJson, // Re-enabled for fresh JSON setup
       })
       .select()

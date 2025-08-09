@@ -31,7 +31,7 @@ export async function syncNormalizedToLegacy() {
       make: nq.vehicle?.make || '',
       model: nq.vehicle?.model || '',
       series: nq.vehicle?.series || '',
-      auto: nq.vehicle?.transmission === 'auto',
+      auto: nq.vehicle?.auto || false,
       body: nq.vehicle?.body || '',
       mthyr: nq.vehicle?.year || '',
       rego: nq.vehicle?.registration || '',

@@ -127,7 +127,7 @@ export default function NewQuotePage() {
           year: fields.mthyr ? validateDateString(fields.mthyr) : undefined,
           vin: fields.vin || '',
           color: fields.color || '',
-          transmission: fields.auto ? 'auto' : 'manual',
+          auto: fields.auto === 'true',
           body: fields.body || '',
           notes: fields.notes || ''
         },
@@ -138,7 +138,8 @@ export default function NewQuotePage() {
           note: part.note || ''
         })) || [],
         notes: fields.notes || '',
-        requiredBy: fields.requiredBy || ''
+        requiredBy: fields.requiredBy || '',
+        quoteRef: fields.quoteRef // Pass the user-provided quote reference
       });
 
       if (result.error) {

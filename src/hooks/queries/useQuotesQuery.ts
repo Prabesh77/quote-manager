@@ -61,12 +61,12 @@ const fetchQuotes = async (): Promise<Quote[]> => {
         vin: normalizedQuote.vehicle?.vin || '',
         partRequested: partIds, // Legacy field for backward compatibility
         partsRequested: partsRequested, // New JSON field
-        quoteRef: `Q${normalizedQuote.id.slice(0, 8)}`, // Generate quote ref from ID
+        quoteRef: normalizedQuote.quote_ref || `Q${normalizedQuote.id.slice(0, 8)}`, // Use stored quote_ref or fallback to generated
         createdAt: normalizedQuote.created_at,
         make: normalizedQuote.vehicle?.make || '',
         model: normalizedQuote.vehicle?.model || '',
         series: normalizedQuote.vehicle?.series || '',
-        auto: normalizedQuote.vehicle?.transmission === 'auto', // Map transmission to auto boolean
+        auto: normalizedQuote.vehicle?.auto ?? false, // Use boolean auto column directly
         body: normalizedQuote.vehicle?.body || '', // Map body field correctly
         mthyr: normalizedQuote.vehicle?.year?.toString() || '',
         rego: normalizedQuote.vehicle?.rego || '',
@@ -245,13 +245,59 @@ export const useUpdateQuoteMutation = () => {
   
   return useMutation({
     mutationFn: async ({ id, fields }: { id: string; fields: Record<string, any> }) => {
-      const { error } = await supabase
-        .from('quotes')
-        .update(fields)
-        .eq('id', id);
+      // Separate quote fields from vehicle fields
+      const vehicleFields = ['make', 'model', 'series', 'mthyr', 'vin', 'rego', 'color', 'auto', 'body'];
+      const quoteFields: Record<string, any> = {};
+      const vehicleUpdates: Record<string, any> = {};
       
-      if (error) {
-        throw new Error(error.message);
+      // Separate the fields
+      Object.keys(fields).forEach(key => {
+        if (vehicleFields.includes(key)) {
+          // Map frontend field names to database column names
+          if (key === 'mthyr') {
+            vehicleUpdates.year = fields[key];
+          } else {
+            vehicleUpdates[key] = fields[key];
+          }
+        } else {
+          quoteFields[key] = fields[key];
+        }
+      });
+      
+      // Update vehicle fields if any exist
+      if (Object.keys(vehicleUpdates).length > 0) {
+        // First, get the vehicle_id from the quote
+        const { data: quote, error: quoteError } = await supabase
+          .from('quotes')
+          .select('vehicle_id')
+          .eq('id', id)
+          .single();
+        
+        if (quoteError) {
+          throw new Error(`Error fetching quote: ${quoteError.message}`);
+        }
+        
+        // Update the vehicle
+        const { error: vehicleError } = await supabase
+          .from('vehicles')
+          .update(vehicleUpdates)
+          .eq('id', quote.vehicle_id);
+        
+        if (vehicleError) {
+          throw new Error(`Error updating vehicle: ${vehicleError.message}`);
+        }
+      }
+      
+      // Update quote fields if any exist
+      if (Object.keys(quoteFields).length > 0) {
+        const { error: quoteError } = await supabase
+          .from('quotes')
+          .update(quoteFields)
+          .eq('id', id);
+        
+        if (quoteError) {
+          throw new Error(`Error updating quote: ${quoteError.message}`);
+        }
       }
       
       return { id, fields };

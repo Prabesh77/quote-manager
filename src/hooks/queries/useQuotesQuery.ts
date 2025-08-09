@@ -5,6 +5,7 @@ import supabase from '@/utils/supabase';
 import { Quote, Part, QuotePart, QuotePartItem } from '@/components/ui/useQuotes';
 import { useSnackbar } from '@/components/ui/Snackbar';
 import { updatePartInQuote, quoteHasPartWithPrice } from '@/utils/quotePartsHelpers';
+import { createNormalizedQuote } from '@/utils/normalizedQuoteCreation';
 
 // Query Keys - centralized for consistency
 export const queryKeys = {
@@ -217,6 +218,27 @@ export const useQuotePartsAsLegacyParts = (quoteId: string) => {
 };
 
 // Mutation functions
+export const useCreateQuoteMutation = () => {
+  const queryClient = useQueryClient();
+  const { showSnackbar } = useSnackbar();
+  
+  return useMutation({
+    mutationFn: async (quoteData: any) => {
+      return await createNormalizedQuote(quoteData);
+    },
+    onSuccess: () => {
+      // Invalidate and refetch quotes after successful creation
+      queryClient.invalidateQueries({ queryKey: queryKeys.quotes });
+      queryClient.invalidateQueries({ queryKey: queryKeys.parts });
+    },
+    onError: (error) => {
+      console.error('Error creating quote:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      showSnackbar(`Error creating quote: ${errorMessage}`, 'error');
+    },
+  });
+};
+
 export const useUpdateQuoteMutation = () => {
   const queryClient = useQueryClient();
   const { showSnackbar } = useSnackbar();

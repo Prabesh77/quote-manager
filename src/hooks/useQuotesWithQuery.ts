@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { 
   useQuotesQuery, 
   usePartsQuery, 
+  useCreateQuoteMutation,
   useUpdateQuoteMutation, 
   useDeleteQuoteMutation, 
   useUpdatePartMutation,
@@ -26,6 +27,7 @@ export const useQuotes = () => {
   const partsQuery = usePartsQuery();
   
   // Mutations
+  const createQuoteMutation = useCreateQuoteMutation();
   const updateQuoteMutation = useUpdateQuoteMutation();
   const deleteQuoteMutation = useDeleteQuoteMutation();
   const updatePartMutation = useUpdatePartMutation();
@@ -52,6 +54,16 @@ export const useQuotes = () => {
   const parts = partsQuery.data || [];
 
   // Legacy interface functions
+  const createQuote = async (quoteData: any) => {
+    try {
+      const result = await createQuoteMutation.mutateAsync(quoteData);
+      return { data: result, error: null };
+    } catch (error) {
+      console.error('❌ createQuote failed:', error);
+      return { data: null, error: error instanceof Error ? error : new Error(String(error)) };
+    }
+  };
+
   const updateQuote = async (id: string, fields: Record<string, any>) => {
     try {
       await updateQuoteMutation.mutateAsync({ id, fields });
@@ -150,19 +162,16 @@ export const useQuotes = () => {
         
         console.log('📦 Selected parts from JSON:', selectedParts.length, 'Total parts:', currentParts.length);
         
-        // Update the quote with only selected parts and mark as ordered
-        const { error: updateError } = await supabase
-          .from('quotes')
-          .update({
-            parts_requested: selectedParts,
-            status: 'ordered',
-            tax_invoice_number: taxInvoiceNumber
-          })
-          .eq('id', id);
+        // Update the quote with only selected parts and mark as ordered using TanStack Query
+        const result = await updateQuote(id, {
+          parts_requested: selectedParts,
+          status: 'ordered',
+          tax_invoice_number: taxInvoiceNumber
+        });
         
-        if (updateError) {
-          console.error('❌ Error updating quote with selected parts:', updateError);
-          return { error: updateError };
+        if (result.error) {
+          console.error('❌ Error updating quote with selected parts:', result.error);
+          return { error: result.error };
         }
         
         console.log('✅ Quote marked as ordered with', selectedParts.length, 'selected parts (JSON)');
@@ -243,6 +252,7 @@ export const useQuotes = () => {
     parts,
     connectionStatus,
     isLoading,
+    createQuote,
     updateQuote,
     deleteQuote,
     updatePart,

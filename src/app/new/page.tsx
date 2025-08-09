@@ -3,7 +3,6 @@
 import { useQuotes } from '@/hooks/useQuotesWithQuery';
 import QuoteTable from '@/components/ui/QuoteTable';
 import { QuoteForm } from '@/components/ui/QuoteForm';
-import { createNormalizedQuote } from '@/utils/normalizedQuoteCreation';
 import { Part } from '@/components/ui/useQuotes';
 import { useSnackbar } from '@/components/ui/Snackbar';
 
@@ -61,6 +60,7 @@ export default function NewQuotePage() {
   const {
     quotes,
     parts,
+    createQuote,
     updateQuote,
     deleteQuote,
     updatePart,
@@ -113,7 +113,7 @@ export default function NewQuotePage() {
 
   const handleSubmit = async (fields: Record<string, string>, parts: PartDetails[]) => {
     try {
-      const result = await createNormalizedQuote({
+      const result = await createQuote({
         customer: {
           name: fields.customer,
           phone: fields.phone || '',
@@ -141,13 +141,14 @@ export default function NewQuotePage() {
         requiredBy: fields.requiredBy || ''
       });
 
-      console.log('Quote created successfully:', result);
+      if (result.error) {
+        throw result.error;
+      }
+
+      console.log('Quote created successfully:', result.data);
       
-      // Show success message
-      showSnackbar('Quote created successfully!', 'success');
-      
-      // Reset form or redirect
-      // You might want to redirect to the quote details or reset the form here
+      // Success is silent - no snackbar needed
+      // The quote will automatically appear in the table due to cache invalidation
       
     } catch (error) {
       console.error('Quote creation failed with error:', error);

@@ -47,12 +47,12 @@ export class QuoteService {
           id: normalizedQuote.id,
           vin: normalizedQuote.vehicle?.vin || '',
           partRequested: partIds,
-          quoteRef: `Q${normalizedQuote.id.slice(0, 8)}`, // Generate quote ref from ID
+          quoteRef: normalizedQuote.quote_ref || `Q${normalizedQuote.id.slice(0, 8)}`, // Use stored quote_ref or fallback to generated
           createdAt: normalizedQuote.created_at,
           make: normalizedQuote.vehicle?.make || '',
           model: normalizedQuote.vehicle?.model || '',
           series: normalizedQuote.vehicle?.series || '',
-          auto: normalizedQuote.vehicle?.transmission === 'auto', // Map transmission to auto boolean
+          auto: normalizedQuote.vehicle?.auto ?? false, // Use boolean auto column directly
           body: normalizedQuote.vehicle?.body || '', // Map body field correctly
           mthyr: normalizedQuote.vehicle?.year?.toString() || '',
           rego: normalizedQuote.vehicle?.rego || '',
@@ -93,7 +93,6 @@ export class QuoteService {
         } else if (vehicleFieldNames.includes(key)) {
           // Map legacy field names to normalized field names
           const fieldMap: Record<string, string> = {
-            'auto': 'transmission', // Map auto to transmission field
             'body': 'notes', // Map body to notes field
             'mthyr': 'year' // Map mthyr to year field
           };

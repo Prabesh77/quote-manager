@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { ChevronDown, ChevronRight, Edit, Trash2, Save, X, Search, Eye, Copy, Car, CheckCircle, AlertTriangle, ShoppingCart, Package } from 'lucide-react';
+import { ChevronDown, ChevronRight, Edit, Trash2, Save, X, Search, Eye, Copy, Car, CheckCircle, AlertTriangle, ShoppingCart, Package, Edit3 } from 'lucide-react';
 import { Quote, Part } from './useQuotes';
 import { SkeletonLoader } from './SkeletonLoader';
 import {
@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/accordion";
 import supabase from '@/utils/supabase';
 import { getQuotePartsFromJson } from '@/utils/quotePartsHelpers';
+import { QuoteEditModal } from '@/components/quotes/QuoteEditModal';
 
 interface QuoteTableProps {
   quotes: Quote[];
@@ -46,6 +47,10 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
   const [selectedPartIds, setSelectedPartIds] = useState<string[]>([]);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [quotePartsWithNotes, setQuotePartsWithNotes] = useState<Record<string, Part[]>>({});
+
+  // Quote edit modal state
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [selectedQuoteForEdit, setSelectedQuoteForEdit] = useState<Quote | null>(null);
 
   // Function to get parts with their quote-specific notes merged in
   const getQuotePartsWithNotes = async (quoteId: string, partRequested: string): Promise<Part[]> => {
@@ -741,6 +746,22 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
     }
   }, [quotes, parts]);
 
+  // Quote edit modal handlers
+  const handleEditQuote = (quote: Quote) => {
+    setSelectedQuoteForEdit(quote);
+    setEditModalOpen(true);
+  };
+
+  const handleCloseEditModal = () => {
+    setEditModalOpen(false);
+    setSelectedQuoteForEdit(null);
+  };
+
+  const handleSaveQuoteEdit = async (quoteId: string, updates: Record<string, any>) => {
+    await onUpdateQuote(quoteId, updates);
+    // Modal will close automatically after successful save
+  };
+
   return (
     <div className="space-y-4">
       {/* Search and Filters */}
@@ -1085,12 +1106,12 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              startEditingQuote(quote);
+                              handleEditQuote(quote);
                             }}
                             className="p-1 text-blue-600 hover:text-blue-700 hover:bg-blue-100 rounded transition-colors cursor-pointer"
-                            title="Edit quote"
+                            title="Edit quote details"
                           >
-                            <Edit className="h-4 w-4" />
+                            <Edit3 className="h-4 w-4" />
                           </button>
                         )}
                         
@@ -1503,17 +1524,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                           <div className="flex items-center space-x-2">
                             <div className="flex flex-col">
                               <span className="text-xs font-medium text-gray-500">Quote Ref</span>
-                              {editingQuote === quote.id ? (
-                                <input
-                                  type="text"
-                                  value={editData.quoteRef || quote.quoteRef || ''}
-                                  onChange={(e) => handleQuoteEditChange('quoteRef', e.target.value)}
-                                  className="px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                  onClick={(e) => e.stopPropagation()}
-                                />
-                              ) : (
-                                <span className="font-semibold text-gray-900">{quote.quoteRef}</span>
-                              )}
+                              <span className="font-semibold text-gray-900">{quote.quoteRef}</span>
                             </div>
                             <button
                               onClick={(e) => {
@@ -1529,18 +1540,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                           <div className="flex items-center space-x-2">
                             <div className="flex flex-col">
                               <span className="text-xs font-medium text-gray-500">VIN</span>
-                              {editingQuote === quote.id ? (
-                                <input
-                                  type="text"
-                                  value={editData.vin || quote.vin || ''}
-                                  onChange={(e) => handleQuoteEditChange('vin', e.target.value)}
-                                  className="px-2 py-1 text-sm font-mono border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                  onClick={(e) => e.stopPropagation()}
-                                  placeholder="Enter VIN"
-                                />
-                              ) : (
-                                <span className="text-sm font-mono text-gray-900">{quote.vin || '-'}</span>
-                              )}
+                              <span className="text-sm font-mono text-gray-900">{quote.vin || '-'}</span>
                             </div>
                             <button
                               onClick={(e) => {
@@ -1572,88 +1572,11 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                         <div className="flex items-center space-x-2">
                           <span className="text-lg">
                             <img 
-                              src={getVehicleLogo(editingQuote === quote.id ? (editData.make || quote.make) : quote.make)} 
-                              alt={editingQuote === quote.id ? (editData.make || quote.make) : quote.make} 
+                              src={getVehicleLogo(quote.make)} 
+                              alt={quote.make} 
                               className="h-8 w-8 object-contain" 
                             />
                           </span>
-                        {editingQuote === quote.id ? (
-                          <div className="flex flex-col space-y-2">
-                            <div className="grid grid-cols-2 gap-2">
-                              <div className="flex flex-col space-y-1">
-                                <label className="text-xs text-gray-500 font-medium">Make</label>
-                                <input
-                                  type="text"
-                                  value={editData.make || quote.make || ''}
-                                  onChange={(e) => handleQuoteEditChange('make', e.target.value)}
-                                  className="px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                  onClick={(e) => e.stopPropagation()}
-                                  placeholder="Make"
-                                />
-                              </div>
-                              <div className="flex flex-col space-y-1">
-                                <label className="text-xs text-gray-500 font-medium">Model</label>
-                                <input
-                                  type="text"
-                                  value={editData.model || quote.model || ''}
-                                  onChange={(e) => handleQuoteEditChange('model', e.target.value)}
-                                  className="px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                  onClick={(e) => e.stopPropagation()}
-                                  placeholder="Model"
-                                />
-                              </div>
-                            </div>
-                            <div className="grid grid-cols-2 gap-2">
-                              <div className="flex flex-col space-y-1">
-                                <label className="text-xs text-gray-500 font-medium">Year</label>
-                                <input
-                                  type="text"
-                                  value={editData.mthyr || quote.mthyr || ''}
-                                  onChange={(e) => handleQuoteEditChange('mthyr', e.target.value)}
-                                  className="px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                  onClick={(e) => e.stopPropagation()}
-                                  placeholder="e.g. 9/2017"
-                                />
-                              </div>
-                              <div className="flex flex-col space-y-1">
-                                <label className="text-xs text-gray-500 font-medium">Series</label>
-                                <input
-                                  type="text"
-                                  value={editData.series || quote.series || ''}
-                                  onChange={(e) => handleQuoteEditChange('series', e.target.value)}
-                                  className="px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                  onClick={(e) => e.stopPropagation()}
-                                  placeholder="Series"
-                                />
-                              </div>
-                            </div>
-                            <div className="grid grid-cols-2 gap-2">
-                              <div className="flex flex-col space-y-1">
-                                <label className="text-xs text-gray-500 font-medium">Body</label>
-                                <input
-                                  type="text"
-                                  value={editData.body || quote.body || ''}
-                                  onChange={(e) => handleQuoteEditChange('body', e.target.value)}
-                                  className="px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                  onClick={(e) => e.stopPropagation()}
-                                  placeholder="e.g. 5 Door Hatchback"
-                                />
-                              </div>
-                              <div className="flex flex-col space-y-1">
-                                <label className="text-xs text-gray-500 font-medium">Transmission</label>
-                                <select
-                                  value={editData.auto !== undefined ? editData.auto.toString() : quote.auto.toString()}
-                                  onChange={(e) => handleQuoteEditChange('auto', e.target.value === 'true')}
-                                  className="px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                  onClick={(e) => e.stopPropagation()}
-                                >
-                                  <option value="true">Auto</option>
-                                  <option value="false">Manual</option>
-                                </select>
-                              </div>
-                            </div>
-                          </div>
-                        ) : (
                           <div className="flex flex-col space-y-1">
                             <div className="flex items-center space-x-2">
                               <span className="text-sm font-medium text-gray-900">{quote.make} - {quote.model}</span>
@@ -1677,60 +1600,32 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                               )}
                             </div>
                           </div>
-                        )}
                       </div>
                       
                       {/* Action Buttons for Mobile */}
                       {(quote.status !== 'completed' || showCompleted) && (
                         <div className="flex items-center space-x-2">
-                          {editingQuote === quote.id ? (
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleSave();
-                                  }}
-                              className="p-2 text-green-600 hover:text-green-700 hover:bg-green-100 rounded transition-colors cursor-pointer"
-                              title="Save changes"
-                                >
-                                  <Save className="h-4 w-4" />
-                                </button>
-                          ) : (
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                startEditingQuote(quote);
-                              }}
-                              className="p-2 text-blue-600 hover:text-blue-700 hover:bg-blue-100 rounded transition-colors cursor-pointer"
-                              title="Edit quote"
-                            >
-                              <Edit className="h-4 w-4" />
-                            </button>
-                          )}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleEditQuote(quote);
+                            }}
+                            className="p-2 text-blue-600 hover:text-blue-700 hover:bg-blue-100 rounded transition-colors cursor-pointer"
+                            title="Edit quote"
+                          >
+                            <Edit3 className="h-4 w-4" />
+                          </button>
                           
-                          {editingQuote === quote.id ? (
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setEditingQuote(null);
-                                    setEditData({});
-                                  }}
-                              className="p-2 text-gray-600 hover:text-gray-700 hover:bg-gray-100 rounded transition-colors cursor-pointer"
-                              title="Cancel editing"
-                                >
-                                  <X className="h-4 w-4" />
-                                </button>
-                            ) : (
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                handleDeleteWithConfirm(quote.id);
-                                  }}
-                              className="p-1 text-red-600 hover:text-red-700 hover:bg-red-100 rounded transition-colors cursor-pointer"
-                              title="Delete quote"
-                                >
-                              <Trash2 className="h-4 w-4" />
-                                </button>
-                          )}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteWithConfirm(quote.id);
+                            }}
+                            className="p-1 text-red-600 hover:text-red-700 hover:bg-red-100 rounded transition-colors cursor-pointer"
+                            title="Delete quote"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
                           
                           {/* Confirmation button for waiting_verification status */}
                           {status === 'waiting_verification' && (
@@ -2151,6 +2046,14 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
           </div>
         </div>
       )}
+      
+      {/* Quote Edit Modal */}
+      <QuoteEditModal
+        quote={selectedQuoteForEdit}
+        isOpen={editModalOpen}
+        onClose={handleCloseEditModal}
+        onSave={handleSaveQuoteEdit}
+      />
     </div>
   );
 } 

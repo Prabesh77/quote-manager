@@ -186,10 +186,10 @@ export const useNormalizedQuotes = () => {
 
   // Create normalized quote
   const createQuote = useCallback(async (quoteData: any) => {
-    const result = await createNormalizedQuote(quoteData);
-    
-    if (!result.error) {
-      // Refresh all data
+    try {
+      const result = await createNormalizedQuote(quoteData);
+      
+      // Refresh all data after successful creation
       await Promise.all([
         fetchQuotes(),
         fetchCustomers(),
@@ -197,9 +197,12 @@ export const useNormalizedQuotes = () => {
         fetchParts(),
         fetchQuoteParts()
       ]);
+      
+      return result;
+    } catch (error) {
+      console.error('Error creating quote:', error);
+      throw error; // Re-throw for caller to handle
     }
-    
-    return result;
   }, [fetchQuotes, fetchCustomers, fetchVehicles, fetchParts, fetchQuoteParts]);
 
   // Get quote with full details

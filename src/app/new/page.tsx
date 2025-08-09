@@ -57,6 +57,7 @@ const validateDateString = (dateString: string): string | undefined => {
 
 export default function NewQuotePage() {
   const { showSnackbar } = useSnackbar();
+  
   const {
     quotes,
     parts,
@@ -66,35 +67,8 @@ export default function NewQuotePage() {
     updateMultipleParts,
     markQuoteCompleted,
     markQuoteAsOrdered,
-    fetchQuotes,
-    fetchParts,
     isLoading,
   } = useQuotes();
-
-  // Filter to only show quotes waiting for pricing
-  const getQuoteParts = (quote: any): Part[] => {
-    // For now, return empty array since parts are now handled through quote_parts
-    // The status logic will be based on the quote status directly
-    return [];
-  };
-
-  const getQuoteStatus = (quoteParts: Part[], quoteStatus?: string): string => {
-    // Simplified status logic - use the quote status directly from database
-    if (quoteStatus === 'completed' || quoteStatus === 'ordered' || quoteStatus === 'delivered') {
-      return quoteStatus;
-    }
-    
-    if (quoteStatus === 'priced') {
-      return quoteStatus;
-    }
-    
-    if (quoteStatus === 'waiting_verification') {
-      return quoteStatus;
-    }
-    
-    // Default to unpriced for new quotes
-    return 'unpriced';
-  };
 
   // Filter quotes to only show those waiting for initial pricing (unpriced only)
   const unpricedQuotes = quotes.filter(quote => {

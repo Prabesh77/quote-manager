@@ -588,7 +588,7 @@ const updatePartInJsonQuotes = async (partId: string, updates: { price?: number 
       return;
     }
 
-    let updatedQuoteIds: string[] = [];
+    const updatedQuoteIds: string[] = [];
 
     // Update each quote that contains this part
     for (const quote of quotesWithPart) {

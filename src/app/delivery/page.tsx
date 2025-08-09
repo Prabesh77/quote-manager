@@ -2,9 +2,9 @@
 
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { useQuotes } from '@/hooks/quotes/useQuotes';
+import { useQuotes } from '@/hooks/useQuotesWithQuery';
 import { useDelivery } from '@/components/ui/useDelivery';
-import { Part } from '@/types/part';
+import { Part } from '@/components/ui/useQuotes';
 
 export default function DeliveryPage() {
   const { quotes, parts, updateQuote } = useQuotes();

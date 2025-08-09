@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { ChevronDown, ChevronRight, Edit, Trash2, Save, X, Search, Eye, Copy, Car, CheckCircle, AlertTriangle, ShoppingCart, Package } from 'lucide-react';
 import { Quote, Part } from './useQuotes';
+import { SkeletonLoader } from './SkeletonLoader';
 import {
   Accordion,
   AccordionContent,
@@ -22,13 +23,15 @@ interface QuoteTableProps {
   onMarkAsOrderedWithParts?: (id: string, taxInvoiceNumber: string, partIds: string[]) => Promise<{ error: Error | null }>;
   showCompleted?: boolean;
   defaultFilter?: FilterType;
+  isLoading?: boolean;
+  isRefetching?: boolean; // New prop for background loading
 }
 
 type FilterType = 'all' | 'unpriced' | 'priced';
 
 type QuoteStatus = 'unpriced' | 'priced' | 'completed' | 'ordered' | 'delivered';
 
-export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote, onUpdatePart, onUpdateMultipleParts, onMarkCompleted, onMarkAsOrdered, onMarkAsOrderedWithParts, showCompleted = false, defaultFilter = 'all' }: QuoteTableProps) {
+export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote, onUpdatePart, onUpdateMultipleParts, onMarkCompleted, onMarkAsOrdered, onMarkAsOrderedWithParts, showCompleted = false, defaultFilter = 'all', isLoading = false, isRefetching = false }: QuoteTableProps) {
   const [editingQuote, setEditingQuote] = useState<string | null>(null);
   const [editingParts, setEditingParts] = useState<string | null>(null);
   const [editData, setEditData] = useState<Record<string, any>>({});
@@ -254,15 +257,15 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
           if (diffMins < 0) {
             // Overdue
             color = 'bg-red-500';
-            animation = 'animate-glow-pulse-red';
+            animation = '';
           } else if (diffMins < 15) {
             // Less than 15 minutes
             color = 'bg-red-500';
-            animation = 'animate-glow-pulse-red';
+            animation = '';
           } else if (diffMins < 30) {
             // Less than 30 minutes
             color = 'bg-yellow-500';
-            animation = 'animate-glow-pulse';
+            animation = '';
           } else {
             // More than 30 minutes
             color = 'bg-green-500';
@@ -367,15 +370,15 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
         if (diffMins < 0) {
           // Overdue
           color = 'bg-red-500';
-          animation = 'animate-glow-pulse-red';
+          animation = '';
         } else if (diffMins < 15) {
           // Less than 15 minutes
           color = 'bg-red-500';
-          animation = 'animate-glow-pulse-red';
+          animation = '';
         } else if (diffMins < 30) {
           // Less than 30 minutes
           color = 'bg-yellow-500';
-          animation = 'animate-glow-pulse';
+          animation = '';
         } else {
           // More than 30 minutes
           color = 'bg-green-500';
@@ -636,8 +639,28 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
       </div>
 
       {/* Quotes Accordion */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden hidden lg:block">
-        {filteredQuotes.length === 0 ? (
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden hidden lg:block relative">
+        {/* Subtle refetching indicator */}
+        {isRefetching && !isLoading && (
+          <div className="absolute top-0 left-0 right-0 h-1 bg-blue-500 animate-pulse z-20"></div>
+        )}
+        
+        {isLoading && filteredQuotes.length === 0 ? (
+          <>
+            {/* Table Header */}
+            <div className="bg-white border-b border-gray-200 sticky top-0 z-10">
+              <div className="grid grid-cols-6 gap-4 px-6 py-4" style={{ gridTemplateColumns: '1fr 1fr 2fr 1fr 0.5fr 0.5fr' }}>
+                <div className="font-semibold text-gray-900 min-w-[150px]">Quote Ref</div>
+                <div className="font-semibold text-gray-900 min-w-[180px]">VIN</div>
+                <div className="font-semibold text-gray-900">Vehicle</div>
+                <div className="font-semibold text-gray-900">Status</div>
+                <div className="font-semibold text-gray-900">Parts</div>
+                <div className="font-semibold text-gray-900">Actions</div>
+              </div>
+            </div>
+            <SkeletonLoader count={5} />
+          </>
+        ) : filteredQuotes.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 px-4">
             <div className="w-32 h-32 bg-gradient-to-br from-blue-100 to-purple-100 rounded-full flex items-center justify-center mb-8">
               <svg className="w-16 h-16 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -686,10 +709,14 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                   return (
                     <>
                       {/* Desktop: Full left border and indicator */}
-                      <div className={`absolute left-0 top-0 bottom-0 w-1 ${deadlineInfo.color} ${deadlineInfo.animation} hidden sm:block`}></div>
+                      <div className={`absolute left-0 top-0 bottom-0 w-1 ${deadlineInfo.color} hidden sm:block`}></div>
                       <div className="absolute left-0 top-[11px] transform -translate-y-1/2 z-10 flex items-center space-x-2 hidden sm:flex">
-                        <div className={`px-2 py-[2px] text-[12px] font-semibold text-white shadow-sm ${deadlineInfo.color} ${deadlineInfo.animation}`}>
+                        <div className={`px-2 py-[2px] text-[12px] font-semibold text-white shadow-sm ${deadlineInfo.color} relative`}>
                           {deadlineInfo.timeDisplay}
+                          {/* Small ping circle in top-right corner */}
+                          {deadlineInfo.animation === '' && (deadlineInfo.color === 'bg-red-500' || deadlineInfo.color === 'bg-yellow-500') && (
+                            <div className="absolute -top-2 -right-2 w-4 h-4 bg-red-300 rounded-full animate-ping shadow-lg border border-red-600"></div>
+                          )}
                         </div>
                         {quote.customer && (
                           <div className="px-2 py-[2px] text-[10px] text-orange-600 font-medium rounded shadow-sm">
@@ -699,10 +726,14 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                       </div>
                       
                       {/* Mobile: Small rectangle indicator at top-left */}
-                      <div className={`absolute top-0 left-0 w-6 h-6 ${deadlineInfo.color} ${deadlineInfo.animation} block sm:hidden z-50`}></div>
+                      <div className={`absolute top-0 left-0 w-6 h-6 ${deadlineInfo.color} block sm:hidden z-50`}></div>
                       <div className="absolute top-0 left-0 z-50 block sm:hidden">
-                        <div className={`px-1 py-[1px] text-[8px] font-semibold text-white ${deadlineInfo.color} ${deadlineInfo.animation} rounded-sm shadow-sm`}>
+                        <div className={`px-1 py-[1px] text-[8px] font-semibold text-white ${deadlineInfo.color} rounded-sm shadow-sm relative`}>
                           {deadlineInfo.timeDisplay}
+                          {/* Small ping circle in top-right corner for mobile */}
+                          {deadlineInfo.animation === '' && (deadlineInfo.color === 'bg-red-500' || deadlineInfo.color === 'bg-yellow-500') && (
+                            <div className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 bg-lime-400 rounded-full animate-ping shadow-lg border border-lime-300"></div>
+                          )}
                         </div>
                       </div>
                     </>

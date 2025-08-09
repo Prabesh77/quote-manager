@@ -1,9 +1,9 @@
 'use client';
 
 import React from 'react';
-import QuoteTable from '@/components/quotes/QuoteTable';
-import { useQuotes } from '@/hooks/quotes/useQuotes';
-import { Part } from '@/types/part';
+import QuoteTable from '@/components/ui/QuoteTable';
+import { useQuotes } from '@/hooks/useQuotesWithQuery';
+import { Part } from '@/components/ui/useQuotes';
 
 export default function PricingPage() {
   const {
@@ -15,6 +15,8 @@ export default function PricingPage() {
     updateMultipleParts,
     markQuoteCompleted,
     markQuoteAsOrdered,
+    isLoading,
+    isRefetching,
   } = useQuotes();
 
   // Filter to only show unpriced quotes
@@ -47,6 +49,12 @@ export default function PricingPage() {
     return status === 'unpriced';
   });
 
+  // Wrapper function to match QuoteTable's expected interface for updateQuote
+  const handleUpdateQuote = async (id: string, fields: Record<string, any>): Promise<{ error: Error | null }> => {
+    const result = await updateQuote(id, fields);
+    return { error: result.error ? new Error(String(result.error)) : null };
+  };
+
   // Wrapper function to match QuoteTable's expected interface
   const handleUpdatePart = async (id: string, updates: Partial<Part>): Promise<{ data: Part; error: Error | null }> => {
     const result = await updatePart(id, updates);
@@ -76,12 +84,14 @@ export default function PricingPage() {
       <QuoteTable
         quotes={unpricedQuotes}
         parts={parts}
-        onUpdateQuote={updateQuote}
+        onUpdateQuote={handleUpdateQuote}
         onDeleteQuote={deleteQuote}
         onUpdatePart={handleUpdatePart}
         onUpdateMultipleParts={handleUpdateMultipleParts}
         onMarkCompleted={markQuoteCompleted}
         onMarkAsOrdered={markQuoteAsOrdered}
+        isLoading={isLoading}
+        isRefetching={isRefetching}
       />
     </div>
   );

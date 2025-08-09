@@ -38,6 +38,7 @@ export const useQuotes = () => {
   const [quotes, setQuotes] = useState<Quote[]>([]);
   const [parts, setParts] = useState<Part[]>([]);
   const [connectionStatus, setConnectionStatus] = useState<'checking' | 'connected' | 'error'>('checking');
+  const [isLoading, setIsLoading] = useState(true); // Add loading state
 
   // Data validation function
   const validateQuoteData = (data: Record<string, any>) => {
@@ -93,6 +94,7 @@ export const useQuotes = () => {
 
   const fetchQuotes = async () => {
     try {
+      setIsLoading(true);
       // Get normalized quotes with customer and vehicle details
       const { data: normalizedQuotes, error: quotesError } = await supabase
         .from('quotes')
@@ -168,11 +170,14 @@ export const useQuotes = () => {
     } catch (error) {
       console.error('Error fetching normalized quotes:', error);
       setConnectionStatus('error');
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const fetchParts = async () => {
     try {
+      setIsLoading(true);
       const { data: normalizedParts, error } = await supabase
         .from('parts')
         .select('*')
@@ -197,6 +202,8 @@ export const useQuotes = () => {
       console.log('Loaded normalized parts:', legacyParts.length);
     } catch (error) {
       console.error('Error fetching normalized parts:', error);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -710,6 +717,7 @@ export const useQuotes = () => {
     quotes,
     parts,
     connectionStatus,
+    isLoading,
     addQuote,
     updateQuote,
     deleteQuote,

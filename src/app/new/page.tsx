@@ -1,11 +1,10 @@
 'use client';
 
-import { useQuotes } from '@/hooks/quotes/useQuotes';
-import QuoteTable from '@/components/quotes/QuoteTable';
+import { useQuotes } from '@/hooks/useQuotesWithQuery';
+import QuoteTable from '@/components/ui/QuoteTable';
 import { QuoteForm } from '@/components/ui/QuoteForm';
 import { createNormalizedQuote } from '@/utils/normalizedQuoteCreation';
-import { syncNormalizedToLegacy, syncNormalizedPartsToLegacy } from '@/utils/syncNormalizedToLegacy';
-import { Part } from '@/types/part';
+import { Part } from '@/components/ui/useQuotes';
 
 // Function to validate and clean date string
 const validateDateString = (dateString: string): string | undefined => {
@@ -60,7 +59,9 @@ export default function NewQuotePage() {
     markQuoteCompleted,
     markQuoteAsOrdered,
     fetchQuotes,
-    fetchParts
+    fetchParts,
+    isLoading,
+    isRefetching
   } = useQuotes();
 
   // Filter to only show quotes waiting for pricing
@@ -94,8 +95,9 @@ export default function NewQuotePage() {
   });
 
   // Wrapper functions to match QuoteTableProps interface
-  const handleUpdateQuote = async (id: string, fields: Record<string, any>) => {
-    return await updateQuote(id, fields);
+  const handleUpdateQuote = async (id: string, fields: Record<string, any>): Promise<{ error: Error | null }> => {
+    const result = await updateQuote(id, fields);
+    return { error: result.error ? new Error(String(result.error)) : null };
   };
 
   const handleDeleteQuote = async (id: string) => {
@@ -203,6 +205,8 @@ export default function NewQuotePage() {
             onMarkCompleted={handleMarkCompleted}
             onMarkAsOrdered={handleMarkAsOrdered}
             showCompleted={false}
+            isLoading={isLoading}
+            isRefetching={isRefetching}
           />
         </div>
       </div>

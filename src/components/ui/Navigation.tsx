@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Plus, DollarSign, CheckCircle, ShoppingCart, FileText, BarChart3, Menu, X } from 'lucide-react';
 import { ConnectionStatus } from './ConnectionStatus';
-import { useQuotes } from './useQuotes';
+import { useQuotes } from '@/hooks/useQuotesWithQuery';
 
 const Navigation = () => {
   const pathname = usePathname();
@@ -13,6 +13,9 @@ const Navigation = () => {
   const {
     connectionStatus,
   } = useQuotes();
+
+  // Map connectionStatus to match ConnectionStatus component expectations
+  const mappedConnectionStatus = connectionStatus === 'disconnected' ? 'error' : connectionStatus;
 
   const navItems = [
     {
@@ -107,7 +110,7 @@ const Navigation = () => {
           {/* Right side - Connection Status & Mobile Menu Button */}
           <div className="flex items-center">
             <div className="ml-4 flex items-center space-x-4">
-              <ConnectionStatus status={connectionStatus} />
+              <ConnectionStatus status={mappedConnectionStatus} />
               
               {/* Mobile menu button */}
               <button

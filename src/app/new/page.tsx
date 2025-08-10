@@ -21,14 +21,23 @@ const validateDateString = (dateString: string): string | undefined => {
   
   const trimmed = dateString.trim();
   
-  // Handle format like "9/2017" or "09/2017"
+  // Handle Australian format like "11/08/2025" (DD/MM/YYYY)
   if (trimmed.includes('/')) {
     const parts = trimmed.split('/');
-    if (parts.length === 2) {
+    if (parts.length === 3) {
+      const day = parseInt(parts[0]);
+      const month = parseInt(parts[1]);
+      const year = parseInt(parts[2]);
+      if (!isNaN(day) && !isNaN(month) && !isNaN(year) && 
+          day >= 1 && day <= 31 && month >= 1 && month <= 12 && year >= 1900 && year <= 2100) {
+        return trimmed; // Return original string like "11/08/2025"
+      }
+    } else if (parts.length === 2) {
+      // Handle format like "08/2025" (MM/YYYY) - convert to DD/MM/YYYY
       const month = parseInt(parts[0]);
       const year = parseInt(parts[1]);
       if (!isNaN(month) && !isNaN(year) && month >= 1 && month <= 12 && year >= 1900 && year <= 2100) {
-        return trimmed; // Return original string like "9/2017"
+        return `01/${month}/${year}`; // Add day 01 to make it DD/MM/YYYY
       }
     }
   }
@@ -39,14 +48,22 @@ const validateDateString = (dateString: string): string | undefined => {
     return yearOnly.toString();
   }
   
-  // Handle format like "9-2017" or "09-2017"
+  // Handle format like "11-08-2025" or "08-2025" (convert to slash format)
   if (trimmed.includes('-')) {
     const parts = trimmed.split('-');
-    if (parts.length === 2) {
+    if (parts.length === 3) {
+      const day = parseInt(parts[0]);
+      const month = parseInt(parts[1]);
+      const year = parseInt(parts[2]);
+      if (!isNaN(day) && !isNaN(month) && !isNaN(year) && 
+          day >= 1 && day <= 31 && month >= 1 && month <= 12 && year >= 1900 && year <= 2100) {
+        return `${day}/${month}/${year}`; // Convert to slash format
+      }
+    } else if (parts.length === 2) {
       const month = parseInt(parts[0]);
       const year = parseInt(parts[1]);
       if (!isNaN(month) && !isNaN(year) && month >= 1 && month <= 12 && year >= 1900 && year <= 2100) {
-        return `${month}/${year}`; // Convert to slash format
+        return `01/${month}/${year}`; // Convert to slash format with day 01
       }
     }
   }

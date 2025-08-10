@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useRef } from 'react';
-import { Image as ImageIcon, X, Loader2, CheckCircle, AlertCircle, Focus, Clipboard } from 'lucide-react';
+import { Image as ImageIcon, X, Loader2, Focus, Clipboard } from 'lucide-react';
 import { processImageForParts } from '@/utils/googleVisionApi';
 
 interface ExtractedPartInfo {
@@ -22,9 +22,10 @@ interface ProcessedImage {
 
 interface ImagePasteAreaProps {
   onPartsExtracted: (parts: ExtractedPartInfo[]) => void;
+  onPartRemoved?: (removedPart: ExtractedPartInfo) => void;
 }
 
-export const ImagePasteArea = ({ onPartsExtracted }: ImagePasteAreaProps) => {
+export const ImagePasteArea = ({ onPartsExtracted, onPartRemoved }: ImagePasteAreaProps) => {
   const [images, setImages] = useState<ProcessedImage[]>([]);
   const [isDragOver, setIsDragOver] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
@@ -99,26 +100,13 @@ export const ImagePasteArea = ({ onPartsExtracted }: ImagePasteAreaProps) => {
   };
 
   const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (files) {
-      Array.from(files).forEach(file => {
-        if (file.type.startsWith('image/')) {
-          processImage(file);
-        }
-      });
+    const files = Array.from(e.target.files || []);
+    files.forEach(processImage);
+    
+    // Clear the input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
     }
-    // Reset the input value to allow selecting the same file again
-    e.target.value = '';
-  };
-
-  const removeImage = (imageId: string) => {
-    setImages(prev => {
-      const imageToRemove = prev.find(img => img.id === imageId);
-      if (imageToRemove) {
-        URL.revokeObjectURL(imageToRemove.preview);
-      }
-      return prev.filter(img => img.id !== imageId);
-    });
   };
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -176,12 +164,39 @@ export const ImagePasteArea = ({ onPartsExtracted }: ImagePasteAreaProps) => {
 
   const allExtractedParts = images.reduce((acc, img) => [...acc, ...img.extractedParts], [] as ExtractedPartInfo[]);
 
+  const removeExtractedPart = (index: number) => {
+    // Find which image contains this part and remove it
+    let partIndex = 0;
+    for (let i = 0; i < images.length; i++) {
+      const image = images[i];
+      if (partIndex + image.extractedParts.length > index) {
+        // This image contains the part we want to remove
+        const localIndex = index - partIndex;
+        const newImages = [...images];
+        const removedPart = newImages[i].extractedParts[localIndex];
+        newImages[i] = {
+          ...newImages[i],
+          extractedParts: newImages[i].extractedParts.filter((_, j) => j !== localIndex)
+        };
+        setImages(newImages);
+        
+        // Update the parent component
+        const allParts = newImages.reduce((acc, img) => [...acc, ...img.extractedParts], [] as ExtractedPartInfo[]);
+        onPartsExtracted(allParts);
+        onPartRemoved?.(removedPart);
+        break;
+      }
+      partIndex += image.extractedParts.length;
+    }
+  };
+
   return (
     <div className="space-y-4">
       {/* Paste Area */}
       <div
         ref={pasteAreaRef}
         className={`
+          h-32
           relative border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-all duration-200 outline-none
           ${isDragOver 
             ? 'border-red-500 bg-red-50 shadow-lg' 
@@ -232,19 +247,10 @@ export const ImagePasteArea = ({ onPartsExtracted }: ImagePasteAreaProps) => {
             {isFocused || isReady ? (
               <>
                 <span className="font-medium text-blue-600">Ready for pasting!</span>
-                <br />
-                <span className="text-xs text-blue-500">Press Ctrl+V (or Cmd+V) to paste screenshots</span>
               </>
             ) : (
               <>
                 <span className="font-medium">Click to focus, then paste screenshots</span>
-                <br />
-                <button
-                  onClick={handleFileButtonClick}
-                  className="text-xs text-blue-600 hover:text-blue-800 underline"
-                >
-                  or click here to select files
-                </button>
               </>
             )}
           </div>
@@ -269,103 +275,51 @@ export const ImagePasteArea = ({ onPartsExtracted }: ImagePasteAreaProps) => {
         </div>
       )}
 
-      {/* Processing Status */}
-      {images.length > 0 && (
-        <div className="flex items-center justify-between text-sm text-gray-600">
-          <span>
-            Processed: {images.filter(img => img.status === 'completed').length} / {images.length} images
-          </span>
-          {images.some(img => img.status === 'processing') && (
+{images.some(img => img.status === 'processing') && (
             <div className="flex items-center space-x-1 text-blue-600">
               <Loader2 className="h-4 w-4 animate-spin" />
               <span>Processing...</span>
             </div>
           )}
-        </div>
-      )}
 
-      {/* Image Previews and Extracted Parts - Side by Side Layout */}
-      {(images.length > 0 || allExtractedParts.length > 0) && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {/* Image Previews */}
-          {images.length > 0 && (
-            <div>
-              <h4 className="text-sm font-medium text-gray-700 mb-3">
-                Images ({images.length})
-              </h4>
-              <div className="space-y-3 max-h-64 overflow-y-auto">
-                {images.map((image) => (
-                  <div key={image.id} className="relative bg-white border border-gray-200 rounded-lg p-3">
-                    <div className="flex items-start space-x-3">
-                      <img
-                        src={image.preview}
-                        alt="Screenshot"
-                        className="w-12 h-12 object-cover rounded flex-shrink-0"
-                      />
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between mb-1">
-                          <div className="text-xs text-gray-500 truncate">
-                            {image.file.name}
-                          </div>
-                          <button
-                            onClick={() => removeImage(image.id)}
-                            className="text-gray-400 hover:text-red-500 flex-shrink-0"
-                          >
-                            <X className="h-3 w-3" />
-                          </button>
-                        </div>
-                        
-                        <div className="flex items-center space-x-1">
-                          {image.status === 'processing' && (
-                            <>
-                              <Loader2 className="h-3 w-3 animate-spin text-blue-500" />
-                              <span className="text-xs text-blue-600">Processing...</span>
-                            </>
-                          )}
-                          {image.status === 'completed' && (
-                            <>
-                              <CheckCircle className="h-3 w-3 text-green-500" />
-                              <span className="text-xs text-green-600">
-                                {image.extractedParts.length} parts found
-                              </span>
-                            </>
-                          )}
-                          {image.status === 'error' && (
-                            <>
-                              <AlertCircle className="h-3 w-3 text-red-500" />
-                              <span className="text-xs text-red-600">Error</span>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
+      {/* Image Previews and Extracted Parts - Simplified Single Box Layout */}
+      {allExtractedParts.length > 0 && (
+        <div className="mt-6">
+          <div className="flex items-center justify-between mb-4">
+            <h4 className="text-sm font-medium text-green-800">
+              Extracted Parts ({allExtractedParts.length})
+            </h4>
+            <div className="text-xs text-gray-500">
+              Click ✕ to remove
             </div>
-          )}
-
-          {/* Extracted Parts Summary */}
-          {allExtractedParts.length > 0 && (
-            <div>
-              <h4 className="text-sm font-medium text-green-800 mb-3">
-                Extracted Parts ({allExtractedParts.length})
-              </h4>
-              <div className="space-y-2 max-h-64 overflow-y-auto">
-                {allExtractedParts.map((part, index) => (
-                  <div key={index} className="text-xs text-green-700 bg-green-100 rounded-lg px-3 py-2">
-                    <div className="font-medium text-green-800">{part.partName}</div>
-                    {part.partNumber !== 'Not found' && (
-                      <div className="text-green-600 mt-1">#{part.partNumber}</div>
-                    )}
-                    <div className="text-green-500 mt-1">
-                      Confidence: {Math.round(part.confidence * 100)}%
-                    </div>
+          </div>
+          
+          {/* 2-column grid for better space efficiency */}
+          <div className="grid grid-cols-2 gap-3 max-h-64 overflow-y-auto">
+            {allExtractedParts.map((part, index) => (
+              <div key={index} className="relative bg-green-50 border border-green-200 rounded-lg p-3 hover:border-green-300 transition-colors">
+                {/* Close button */}
+                <button
+                  onClick={() => removeExtractedPart(index)}
+                  className="absolute top-2 right-2 w-5 h-5 text-green-400 hover:text-red-500 hover:bg-red-50 rounded-full flex items-center justify-center transition-colors"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+                
+                {/* Part details */}
+                <div className="pr-6"> {/* Add right padding to avoid overlap with close button */}
+                  <div className="font-medium text-green-800 text-sm mb-1 truncate">
+                    {part.partName}
                   </div>
-                ))}
+                  {part.partNumber !== 'Not found' && (
+                    <div className="text-green-600 text-xs bg-white px-2 py-1 rounded border border-green-200 truncate">
+                      #{part.partNumber}
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-          )}
+            ))}
+          </div>
         </div>
       )}
     </div>

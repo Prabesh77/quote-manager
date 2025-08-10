@@ -116,11 +116,72 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
             name: matchedPartName,
             number: part.partNumber !== 'Not found' ? part.partNumber : '',
             price: null,
-            note: `Extracted from image (${Math.round(part.confidence * 100)}% confidence)`
+            note: '' // Empty note field for user input
           }
         }));
       }
     });
+  };
+
+  const handlePartRemoved = (removedPart: ExtractedPartInfo) => {
+    // Remove the part from extracted parts
+    setExtractedParts(prevParts => 
+      prevParts.filter(part => 
+        !(part.partName === removedPart.partName && part.partNumber === removedPart.partNumber)
+      )
+    );
+    
+    // Find the matched part name in our options
+    let matchedPartName = removedPart.partName;
+    const partExists = PART_OPTIONS.some(option => option.name === removedPart.partName);
+    
+    if (!partExists) {
+      const normalizedPartName = removedPart.partName.toLowerCase();
+      for (const option of PART_OPTIONS) {
+        if (option.name.toLowerCase().includes(normalizedPartName) || 
+            normalizedPartName.includes(option.name.toLowerCase())) {
+          matchedPartName = option.name;
+          break;
+        }
+      }
+    }
+    
+    // Check if this part was the only source for this part name
+    const remainingPartsForName = extractedParts.filter(part => {
+      if (part.partName === removedPart.partName && part.partNumber === removedPart.partNumber) {
+        return false; // This is the one being removed
+      }
+      
+      // Check if there are other parts with the same name
+      let otherMatchedPartName = part.partName;
+      const otherPartExists = PART_OPTIONS.some(option => option.name === part.partName);
+      
+      if (!otherPartExists) {
+        const normalizedOtherPartName = part.partName.toLowerCase();
+        for (const option of PART_OPTIONS) {
+          if (option.name.toLowerCase().includes(normalizedOtherPartName) || 
+              normalizedOtherPartName.includes(option.name.toLowerCase())) {
+            otherMatchedPartName = option.name;
+            break;
+          }
+        }
+      }
+      
+      return otherMatchedPartName === matchedPartName;
+    });
+    
+    // If no other parts with this name, remove from selected parts and clear details
+    if (remainingPartsForName.length === 0) {
+      setSelectedParts(prev => prev.filter(part => part !== matchedPartName));
+      setPartDetails(prev => {
+        const newDetails = { ...prev };
+        delete newDetails[matchedPartName];
+        return newDetails;
+      });
+      console.log(`🗑️ Removed part "${matchedPartName}" from form - no more sources`);
+    } else {
+      console.log(`🔄 Part "${matchedPartName}" still has other sources, keeping in form`);
+    }
   };
 
   const handlePaste = () => {
@@ -664,7 +725,7 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
             <label className="block text-sm font-medium text-gray-600 mb-2">
               Part Screenshots
             </label>
-            <ImagePasteArea onPartsExtracted={handlePartsExtracted} />
+            <ImagePasteArea onPartsExtracted={handlePartsExtracted} onPartRemoved={handlePartRemoved} />
           </div>
         </div>
       </div>

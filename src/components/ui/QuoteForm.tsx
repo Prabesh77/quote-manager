@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { ImagePasteArea } from '@/components/ui/ImagePasteArea';
-import { 
+import {
   X,
   Plus,
   AlertCircle
@@ -21,7 +21,7 @@ const getPartIcon = (partName: string): string | null => {
     'Fan Assembly': '/part-icons/fan.png',
     'Intercooler': '/part-icons/intercooler.png',
   };
-  
+
   return iconMap[partName] || null;
 };
 
@@ -79,27 +79,27 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
 
   const handlePartsExtracted = (parts: ExtractedPartInfo[]) => {
     setExtractedParts(prevParts => [...prevParts, ...parts]);
-    
+
     // Auto-add extracted parts to selected parts and populate details
     parts.forEach(part => {
       // The Google Vision API now returns exact part names that match our options
       let matchedPartName = part.partName;
-      
+
       // Double-check that the part name exists in our options
       const partExists = PART_OPTIONS.some(option => option.name === part.partName);
-      
+
       // If the exact match doesn't exist, try fuzzy matching as fallback
       if (!partExists) {
         const normalizedPartName = part.partName.toLowerCase();
         for (const option of PART_OPTIONS) {
-          if (option.name.toLowerCase().includes(normalizedPartName) || 
-              normalizedPartName.includes(option.name.toLowerCase())) {
+          if (option.name.toLowerCase().includes(normalizedPartName) ||
+            normalizedPartName.includes(option.name.toLowerCase())) {
             matchedPartName = option.name;
             break;
           }
         }
       }
-      
+
       // If we found a match, add it to selected parts
       if (partExists || matchedPartName !== part.partName) {
         setSelectedParts(prev => {
@@ -108,7 +108,7 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
           }
           return prev;
         });
-        
+
         // Populate part details
         setPartDetails(prev => ({
           ...prev,
@@ -125,51 +125,51 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
 
   const handlePartRemoved = (removedPart: ExtractedPartInfo) => {
     // Remove the part from extracted parts
-    setExtractedParts(prevParts => 
-      prevParts.filter(part => 
+    setExtractedParts(prevParts =>
+      prevParts.filter(part =>
         !(part.partName === removedPart.partName && part.partNumber === removedPart.partNumber)
       )
     );
-    
+
     // Find the matched part name in our options
     let matchedPartName = removedPart.partName;
     const partExists = PART_OPTIONS.some(option => option.name === removedPart.partName);
-    
+
     if (!partExists) {
       const normalizedPartName = removedPart.partName.toLowerCase();
       for (const option of PART_OPTIONS) {
-        if (option.name.toLowerCase().includes(normalizedPartName) || 
-            normalizedPartName.includes(option.name.toLowerCase())) {
+        if (option.name.toLowerCase().includes(normalizedPartName) ||
+          normalizedPartName.includes(option.name.toLowerCase())) {
           matchedPartName = option.name;
           break;
         }
       }
     }
-    
+
     // Check if this part was the only source for this part name
     const remainingPartsForName = extractedParts.filter(part => {
       if (part.partName === removedPart.partName && part.partNumber === removedPart.partNumber) {
         return false; // This is the one being removed
       }
-      
+
       // Check if there are other parts with the same name
       let otherMatchedPartName = part.partName;
       const otherPartExists = PART_OPTIONS.some(option => option.name === part.partName);
-      
+
       if (!otherPartExists) {
         const normalizedOtherPartName = part.partName.toLowerCase();
         for (const option of PART_OPTIONS) {
-          if (option.name.toLowerCase().includes(normalizedOtherPartName) || 
-              normalizedOtherPartName.includes(option.name.toLowerCase())) {
+          if (option.name.toLowerCase().includes(normalizedOtherPartName) ||
+            normalizedOtherPartName.includes(option.name.toLowerCase())) {
             otherMatchedPartName = option.name;
             break;
           }
         }
       }
-      
+
       return otherMatchedPartName === matchedPartName;
     });
-    
+
     // If no other parts with this name, remove from selected parts and clear details
     if (remainingPartsForName.length === 0) {
       setSelectedParts(prev => prev.filter(part => part !== matchedPartName));
@@ -187,15 +187,15 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
   const handlePaste = () => {
     const lines = rawText.split('\n');
     const parsed: Record<string, string> = {};
-    
+
     for (let i = 0; i < lines.length; i++) {
       const trimmedLine = lines[i].trim();
       if (!trimmedLine) continue;
-      
+
       // Handle different patterns in the data
       let key = '';
       let value = '';
-      
+
       // Pattern 1: "Reference28495#2" (no space)
       if (trimmedLine.match(/^(Reference|Make|Model|Series|Trans|Body|Mth\/Yr|Veh Reg)(.+)$/i)) {
         const match = trimmedLine.match(/^(Reference|Make|Model|Series|Trans|Body|Mth\/Yr|Veh Reg)(.+)$/i);
@@ -230,25 +230,25 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
         // Get the next two lines for date and time
         const dateLine = lines[i + 1]?.trim();
         const timeLine = lines[i + 2]?.trim();
-        
+
         if (dateLine && timeLine) {
           try {
             // Parse the date (format: "08/04/2025" - dd/mm/yyyy for Australian format)
             const [day, month, year] = dateLine.split('/');
-            
+
             // Debug logging
             console.log('Date parsing:', { dateLine, day, month, year });
-            
+
             // Validate date components
             if (!day || !month || !year || isNaN(parseInt(day)) || isNaN(parseInt(month)) || isNaN(parseInt(year))) {
               throw new Error('Invalid date format');
             }
-            
+
             // Parse the time (format: "12:00pm" or "1200pm")
             const timeStr = timeLine.toLowerCase();
             let hours = 0;
             let minutes = 0;
-            
+
             if (timeStr.includes('pm')) {
               const time = timeStr.replace('pm', '');
               if (time.includes(':')) {
@@ -278,23 +278,23 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
                 minutes = timeNum % 100;
               }
             }
-            
+
             // Validate time components
             if (isNaN(hours) || isNaN(minutes) || hours < 0 || hours > 23 || minutes < 0 || minutes > 59) {
               throw new Error('Invalid time format');
             }
-            
+
             // Create ISO timestamp
             const deadline = new Date(parseInt(year), parseInt(month) - 1, parseInt(day), hours, minutes);
-            
+
             // Debug logging
             console.log('Created deadline:', { deadline: deadline.toISOString(), year, month, day, hours, minutes });
-            
+
             // Validate the created date
             if (isNaN(deadline.getTime())) {
               throw new Error('Invalid date/time combination');
             }
-            
+
             value = deadline.toISOString();
           } catch (error) {
             // Fallback to original format if parsing fails
@@ -306,15 +306,15 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
           i += 1; // Skip the next line since we've processed it
         }
       }
-      
+
       console.log('Before continue check - key:', key, 'value:', value);
       if (!key || !value) {
         console.log('Continue triggered - key or value is empty');
         continue;
       }
-      
+
       console.log('Processing key:', key, 'value:', value);
-      
+
       // Map the keys to our form fields
       switch (key) {
         case 'reference':
@@ -362,7 +362,7 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
           break;
       }
     }
-    
+
     setFields({
       quoteRef: parsed['quoteRef'] || '',
       vin: parsed['vin'] || '',
@@ -452,25 +452,25 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
       setShowValidationPopup(true);
       return;
     }
-    
+
     // Validate that all parts have part numbers
     const partsWithoutNumbers = selectedParts.filter(partName => {
       const part = partDetails[partName];
       return !part || !part.number || part.number.trim() === '';
     });
-    
+
     if (partsWithoutNumbers.length > 0) {
       const missingParts = partsWithoutNumbers.join(', ');
       setValidationMessage(`Please add part numbers for the following parts: ${missingParts}`);
       setShowValidationPopup(true);
       return;
     }
-    
+
     setIsLoading(true);
     try {
       // Convert part details to array
       const partsArray = selectedParts.map(partName => partDetails[partName]);
-      
+
       await onSubmit({
         quoteRef,
         vin,
@@ -497,7 +497,7 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
   return (
     <div className="bg-white rounded-lg shadow-sm border p-4">
       <h2 className="text-lg font-semibold text-gray-800 mb-4">Create New Quote</h2>
-      
+
       {/* Raw Data Input */}
       <div className="mb-6">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -517,17 +517,17 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
                   // Process the pasted text directly
                   const lines = pastedText.split('\n');
                   const parsed: Record<string, string> = {};
-                  
+
                   for (let i = 0; i < lines.length; i++) {
                     const trimmedLine = lines[i].trim();
                     if (!trimmedLine) continue;
-                    
 
-                    
+
+
                     // Handle different patterns in the data
                     let key = '';
                     let value = '';
-                    
+
                     // Pattern 1: "Reference28495#2" (no space) - but exclude "Model Nr"
                     if (trimmedLine.match(/^(Reference|Make|Series|Trans|Body|Mth\/Yr|Veh Reg)(.+)$/i)) {
                       const match = trimmedLine.match(/^(Reference|Make|Series|Trans|Body|Mth\/Yr|Veh Reg)(.+)$/i);
@@ -615,7 +615,7 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
                       let dateTimeValue = '';
                       let nextIndex = i + 1;
                       let linesCollected = 0;
-                      
+
                       while (nextIndex < lines.length && linesCollected < 2) {
                         const nextLine = lines[nextIndex]?.trim();
                         if (nextLine && !nextLine.match(/^(Reference|Make|Model|Series|Trans|Body|Mth\/Yr|Veh Reg|Purchaser|Ph:|General Info|Vehicle Info|Quote Status|Estimator)/i)) {
@@ -629,7 +629,7 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
                         nextIndex++;
                         if (linesCollected >= 2) break;
                       }
-                      
+
                       value = dateTimeValue;
                       i = nextIndex - 1; // Skip the processed lines
                     }
@@ -723,11 +723,9 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
               <label className="block text-sm font-medium text-gray-600">
                 Part Screenshots
               </label>
-              <div className="text-center">
-          <div className="px-1 py-1 bg-gray-100 rounded-lg text-[11px] text-gray-600">
-            <span>💡 Click the area below to focus, then use paste screenshots.</span>
-          </div>
-        </div>
+              <div className="px-1 py-0.5 bg-gray-100 rounded-sm text-[11px] text-gray-600">
+                <span>💡 Click the area below to focus, then use paste screenshots.</span>
+              </div>
             </div>
             <ImagePasteArea onPartsExtracted={handlePartsExtracted} onPartRemoved={handlePartRemoved} />
           </div>
@@ -787,17 +785,16 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
           {PART_OPTIONS.map((part) => {
             const iconUrl = part.icon;
             const isSelected = selectedParts.includes(part.name);
-            
+
             return (
               <button
                 key={part.name}
                 type="button"
                 onClick={() => togglePart(part.name)}
-                className={`px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 cursor-pointer flex items-center space-x-2 ${
-                  isSelected
+                className={`px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 cursor-pointer flex items-center space-x-2 ${isSelected
                     ? 'bg-red-600 text-white shadow-md hover:bg-red-700 border-2 border-red-600'
                     : 'bg-gray-100 text-gray-700 hover:bg-gray-200 border-2 border-gray-200'
-                }`}
+                  }`}
               >
                 {iconUrl && (
                   <div className="w-6 h-6 bg-white rounded-full flex items-center justify-center shadow-sm border border-gray-200">
@@ -817,11 +814,11 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
               <Plus className="h-4 w-4" />
               <span>Part Details</span>
             </h3>
-            
+
             {selectedParts.map((partName) => {
               const part = partDetails[partName];
               const iconUrl = getPartIcon(partName);
-              
+
               return (
                 <div key={partName} className="bg-gray-50 rounded-lg p-4 border border-gray-200">
                   <div className="flex items-center justify-between mb-3">
@@ -842,7 +839,7 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
                       <X className="h-4 w-4" />
                     </button>
                   </div>
-                  
+
                   <div className="grid grid-cols-1 gap-3">
                     <div>
                       <label className="block text-xs font-medium text-gray-600 mb-1">
@@ -855,7 +852,7 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
                         className="w-full h-8 text-sm"
                       />
                     </div>
-                    
+
                     {/* Price and Notes fields hidden in quote creation - will be added during pricing workflow */}
                   </div>
                 </div>
@@ -900,7 +897,7 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
                 <p className="text-sm text-gray-600 mt-1">Please fix the following issues:</p>
               </div>
             </div>
-            
+
             <div className="p-6">
               <p className="text-gray-700 leading-relaxed mb-3">{validationMessage.split(':')[0]}:</p>
               {validationMessage.includes('Please add part numbers for the following parts:') && (
@@ -917,7 +914,7 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
                 </div>
               )}
             </div>
-            
+
             <div className="flex justify-end p-6 border-t border-gray-200">
               <Button
                 onClick={() => setShowValidationPopup(false)}

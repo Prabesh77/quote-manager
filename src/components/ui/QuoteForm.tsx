@@ -233,7 +233,7 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
 
         if (dateLine && timeLine) {
           try {
-            // Parse the date (format: "08/04/2025" - dd/mm/yyyy for Australian format)
+            // Parse the date (format: "11/08/2025" - dd/mm/yyyy for Australian format)
             const [day, month, year] = dateLine.split('/');
 
             // Debug logging
@@ -284,11 +284,27 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
               throw new Error('Invalid time format');
             }
 
-            // Create ISO timestamp
-            const deadline = new Date(parseInt(year), parseInt(month) - 1, parseInt(day), hours, minutes);
+            // Create ISO timestamp - explicitly handle Australian DD/MM/YYYY format
+            // For "11/08/2025", we want day=11, month=08 (August), year=2025
+            const parsedDay = parseInt(day);
+            const parsedMonth = parseInt(month);
+            const parsedYear = parseInt(year);
+            
+            // Validate that day and month make sense for Australian format
+            if (parsedDay > 31 || parsedMonth > 12) {
+              throw new Error('Invalid date: day or month out of range');
+            }
+            
+            // Additional validation: ensure day doesn't exceed month limits
+            const daysInMonth = new Date(parsedYear, parsedMonth, 0).getDate();
+            if (parsedDay > daysInMonth) {
+              throw new Error(`Invalid date: ${parsedDay} exceeds days in month ${parsedMonth}`);
+            }
+            
+            // Create Date object with explicit Australian DD/MM/YYYY interpretation
+            const deadline = new Date(parsedYear, parsedMonth - 1, parsedDay, hours, minutes);
+            
 
-            // Debug logging
-            console.log('Created deadline:', { deadline: deadline.toISOString(), year, month, day, hours, minutes });
 
             // Validate the created date
             if (isNaN(deadline.getTime())) {

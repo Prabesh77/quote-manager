@@ -3,6 +3,52 @@
 import { useState, useEffect } from 'react';
 import supabase from '@/utils/supabase';
 
+// Helper function to convert Australian date format (DD/MM/YYYY) to correct format
+const convertAustralianDateToISO = (dateString: string | undefined): string | null => {
+  if (!dateString || dateString.trim() === '') {
+    return null;
+  }
+
+  const trimmed = dateString.trim();
+  
+  // Check if it's already in ISO format (contains 'T' or is in YYYY-MM-DD format)
+  if (trimmed.includes('T') || /^\d{4}-\d{2}-\d{2}/.test(trimmed)) {
+    return trimmed; // Already in correct format
+  }
+
+  // Handle Australian format like "11/08/2025 12:00pm" (DD/MM/YYYY)
+  if (trimmed.includes('/')) {
+    const parts = trimmed.split(' ');
+    const datePart = parts[0]; // "11/08/2025"
+    const timePart = parts[1]; // "12:00pm"
+    
+    const dateComponents = datePart.split('/');
+    if (dateComponents.length === 3) {
+      const day = parseInt(dateComponents[0]);
+      const month = parseInt(dateComponents[1]);
+      const year = parseInt(dateComponents[2]);
+      
+      // Validate the date components
+      if (!isNaN(day) && !isNaN(month) && !isNaN(year) && 
+          day >= 1 && day <= 31 && month >= 1 && month <= 12 && year >= 1900 && year <= 2100) {
+        
+        // Convert to ISO format: YYYY-MM-DD
+        const isoDate = `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
+        
+        // If there's a time part, append it
+        if (timePart) {
+          return `${isoDate} ${timePart}`;
+        }
+        
+        return isoDate;
+      }
+    }
+  }
+  
+  // If we can't parse it, return the original string
+  return dateString;
+};
+
 // New interface for individual parts in the JSON array
 export interface QuotePartItem {
   part_id: string;
@@ -332,7 +378,12 @@ export const useQuotes = () => {
       
       Object.entries(fields).forEach(([key, value]) => {
         if (quoteOnlyFields.includes(key)) {
-          quoteFields[key] = value;
+          // Special handling for required_by field to convert Australian date format
+          if (key === 'required_by') {
+            quoteFields[key] = convertAustralianDateToISO(value as string);
+          } else {
+            quoteFields[key] = value;
+          }
         } else if (vehicleFieldNames.includes(key)) {
           // Map legacy field names to normalized field names
           const fieldMap: Record<string, string> = {

@@ -312,127 +312,14 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
     return iconMap[partName] || null;
   };
 
-  const getDeadlineIndicator = (requiredBy: string | undefined) => {
+    const getDeadlineIndicator = (requiredBy: string | undefined) => {
     if (!requiredBy) return null;
-    
+
     try {
-              // Check if it's an ISO timestamp (contains 'T' and 'Z' or timezone)
-        if (requiredBy.includes('T')) {
-          // ISO timestamp format
-          const deadline = new Date(requiredBy);
-          const now = currentTime; // Use currentTime from state instead of new Date()
-          const diffMs = deadline.getTime() - now.getTime();
-          const diffMins = Math.floor(diffMs / (1000 * 60));
-          
-          let color = 'bg-green-500';
-          let animation = '';
-          
-          if (diffMins < 0) {
-            // Overdue
-            color = 'bg-red-500';
-            animation = '';
-          } else if (diffMins < 15) {
-            // Less than 15 minutes
-            color = 'bg-red-500';
-            animation = '';
-          } else if (diffMins < 30) {
-            // Less than 30 minutes
-            color = 'bg-yellow-500';
-            animation = '';
-          } else {
-            // More than 30 minutes
-            color = 'bg-green-500';
-          }
-        
-        // Format the time display
-        let timeDisplay = '';
-        if (diffMins < 0) {
-          // Overdue - show negative time
-          const absMins = Math.abs(diffMins);
-          if (absMins < 60) {
-            timeDisplay = `-${absMins}m`;
-          } else if (absMins < 1440) { // Less than 24 hours
-            const hours = Math.floor(absMins / 60);
-            const mins = absMins % 60;
-            timeDisplay = `-${hours}h ${mins}m`;
-          } else if (absMins < 10080) { // Less than 7 days
-            const days = Math.floor(absMins / 1440);
-            const remainingMins = absMins % 1440;
-            const hours = Math.floor(remainingMins / 60);
-            const mins = remainingMins % 60;
-            timeDisplay = `-${days}d ${hours}h ${mins}m`;
-          } else {
-            const weeks = Math.floor(absMins / 10080);
-            const remainingMins = absMins % 10080;
-            const days = Math.floor(remainingMins / 1440);
-            const hours = Math.floor((remainingMins % 1440) / 60);
-            const mins = remainingMins % 60;
-            timeDisplay = `-${weeks}wk ${days}d ${hours}h ${mins}m`;
-          }
-        } else if (diffMins < 60) {
-          // Less than 1 hour
-          timeDisplay = `${diffMins}m`;
-        } else if (diffMins < 1440) { // Less than 24 hours
-          const hours = Math.floor(diffMins / 60);
-          const mins = diffMins % 60;
-          timeDisplay = `${hours}h ${mins}m`;
-        } else if (diffMins < 10080) { // Less than 7 days
-          const days = Math.floor(diffMins / 1440);
-          const remainingMins = diffMins % 1440;
-          const hours = Math.floor(remainingMins / 60);
-          const mins = remainingMins % 60;
-          timeDisplay = `${days}d ${hours}h ${mins}m`;
-        } else {
-          // More than 7 days
-          const weeks = Math.floor(diffMins / 10080);
-          const remainingMins = diffMins % 10080;
-          const days = Math.floor(remainingMins / 1440);
-          const hours = Math.floor((remainingMins % 1440) / 60);
-          const mins = remainingMins % 60;
-          timeDisplay = `${weeks}wk ${days}d ${hours}h ${mins}m`;
-        }
-        
-        return { color, animation, timeDisplay };
-      } else {
-        // Legacy format (date and time as string) - Australian dd/mm/yyyy format
-        const [datePart, timePart] = requiredBy.split(' ');
-        const [day, month, year] = datePart.split('/');
-        const timeStr = timePart.toLowerCase();
-        
-        let hours = 0;
-        let minutes = 0;
-        
-        if (timeStr.includes('pm')) {
-          const time = timeStr.replace('pm', '');
-          if (time.includes(':')) {
-            const [h, m] = time.split(':');
-            const hour = parseInt(h);
-            // 12 PM should be 12, not 24
-            hours = hour === 12 ? 12 : hour + 12;
-            minutes = parseInt(m || '0');
-          } else {
-            // Handle format like "1200pm"
-            const timeNum = parseInt(time);
-            const hour = Math.floor(timeNum / 100);
-            // 12 PM should be 12, not 24
-            hours = hour === 12 ? 12 : hour + 12;
-            minutes = timeNum % 100;
-          }
-        } else if (timeStr.includes('am')) {
-          const time = timeStr.replace('am', '');
-          if (time.includes(':')) {
-            const [h, m] = time.split(':');
-            hours = parseInt(h);
-            minutes = parseInt(m || '0');
-          } else {
-            // Handle format like "1200am"
-            const timeNum = parseInt(time);
-            hours = Math.floor(timeNum / 100);
-            minutes = timeNum % 100;
-          }
-        }
-        
-        const deadline = new Date(parseInt(year), parseInt(month) - 1, parseInt(day), hours, minutes);
+      // Check if it's an ISO timestamp (contains 'T')
+      if (requiredBy.includes('T')) {
+        // ISO timestamp format
+        const deadline = new Date(requiredBy);
         const now = currentTime; // Use currentTime from state instead of new Date()
         const diffMs = deadline.getTime() - now.getTime();
         const diffMins = Math.floor(diffMs / (1000 * 60));
@@ -507,6 +394,119 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
         
         return { color, animation, timeDisplay };
       }
+      
+      // Legacy format (date and time as string) - Australian dd/mm/yyyy format
+      const [datePart, timePart] = requiredBy.split(' ');
+      const [day, month, year] = datePart.split('/');
+      const timeStr = timePart.toLowerCase();
+      
+      let hours = 0;
+      let minutes = 0;
+      
+      if (timeStr.includes('pm')) {
+        const time = timeStr.replace('pm', '');
+        if (time.includes(':')) {
+          const [h, m] = time.split(':');
+          const hour = parseInt(h);
+          // 12 PM should be 12, not 24
+          hours = hour === 12 ? 12 : hour + 12;
+          minutes = parseInt(m || '0');
+        } else {
+          // Handle format like "1200pm"
+          const timeNum = parseInt(time);
+          const hour = Math.floor(timeNum / 100);
+          // 12 PM should be 12, not 24
+          hours = hour === 12 ? 12 : hour + 12;
+          minutes = timeNum % 100;
+        }
+      } else if (timeStr.includes('am')) {
+        const time = timeStr.replace('am', '');
+        if (time.includes(':')) {
+          const [h, m] = time.split(':');
+          hours = parseInt(h);
+          minutes = parseInt(m || '0');
+        } else {
+          // Handle format like "1200am"
+          const timeNum = parseInt(time);
+          hours = Math.floor(timeNum / 100);
+          minutes = timeNum % 100;
+        }
+      }
+      
+      const deadline = new Date(parseInt(year), parseInt(month) - 1, parseInt(day), hours, minutes);
+      const now = currentTime; // Use currentTime from state instead of new Date()
+      const diffMs = deadline.getTime() - now.getTime();
+      const diffMins = Math.floor(diffMs / (1000 * 60));
+      
+      let color = 'bg-green-500';
+      let animation = '';
+      
+      if (diffMins < 0) {
+        // Overdue
+        color = 'bg-red-500';
+        animation = '';
+      } else if (diffMins < 15) {
+        // Less than 15 minutes
+        color = 'bg-red-500';
+        animation = '';
+      } else if (diffMins < 30) {
+        // Less than 30 minutes
+        color = 'bg-yellow-500';
+        animation = '';
+      } else {
+        // More than 30 minutes
+        color = 'bg-green-500';
+      }
+      
+      // Format the time display
+      let timeDisplay = '';
+      if (diffMins < 0) {
+        // Overdue - show negative time
+        const absMins = Math.abs(diffMins);
+        if (absMins < 60) {
+          timeDisplay = `-${absMins}m`;
+        } else if (absMins < 1440) { // Less than 24 hours
+          const hours = Math.floor(absMins / 60);
+          const mins = absMins % 60;
+          timeDisplay = `-${hours}h ${mins}m`;
+        } else if (absMins < 10080) { // Less than 7 days
+          const days = Math.floor(absMins / 1440);
+          const remainingMins = absMins % 1440;
+          const hours = Math.floor(remainingMins / 60);
+          const mins = remainingMins % 60;
+          timeDisplay = `-${days}d ${hours}h ${mins}m`;
+        } else {
+          const weeks = Math.floor(absMins / 10080);
+          const remainingMins = absMins % 10080;
+          const days = Math.floor(remainingMins / 1440);
+          const hours = Math.floor((remainingMins % 1440) / 60);
+          const mins = remainingMins % 60;
+          timeDisplay = `-${weeks}wk ${days}d ${hours}h ${mins}m`;
+        }
+      } else if (diffMins < 60) {
+        // Less than 1 hour
+        timeDisplay = `${diffMins}m`;
+      } else if (diffMins < 1440) { // Less than 24 hours
+        const hours = Math.floor(diffMins / 60);
+        const mins = diffMins % 60;
+        timeDisplay = `${hours}h ${mins}m`;
+      } else if (diffMins < 10080) { // Less than 7 days
+        const days = Math.floor(diffMins / 1440);
+        const remainingMins = diffMins % 1440;
+        const hours = Math.floor(remainingMins / 60);
+        const mins = remainingMins % 60;
+        timeDisplay = `${days}d ${hours}h ${mins}m`;
+      } else {
+        // More than 7 days
+        const weeks = Math.floor(diffMins / 10080);
+        const remainingMins = diffMins % 10080;
+        const days = Math.floor(remainingMins / 1440);
+        const hours = Math.floor((remainingMins % 1440) / 60);
+        const mins = remainingMins % 60;
+        timeDisplay = `${weeks}wk ${days}d ${hours}h ${mins}m`;
+      }
+      
+      return { color, animation, timeDisplay };
     } catch (error) {
       return null;
     }

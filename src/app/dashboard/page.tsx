@@ -3,7 +3,7 @@
 import { useQuotes } from '@/hooks/useQuotesWithQuery';
 import { useDelivery } from '@/components/ui/useDelivery';
 import { useEffect, useState, useMemo } from 'react';
-import { Part } from '@/components/ui/useQuotes';
+import { Part, QuotePartItem } from '@/components/ui/useQuotes';
 import { 
   TrendingUp, 
   CheckCircle, 
@@ -98,6 +98,7 @@ export default function Dashboard() {
       }
       
       const foundParts = parts.filter(part => partIds.includes(part.id.toString()));
+      console.log({partRequested, foundParts})
       return foundParts;
     };
   }, [parts]);
@@ -119,17 +120,19 @@ export default function Dashboard() {
     let totalPartsOrdered = 0;
     let totalPartsInQuotes = 0;
     
-
+      console.log({quotes})
     
         quotes.forEach(quote => {
       const quoteParts = getQuoteParts(quote.partRequested);
+      const priceAndNotes = quote.partsRequested
       totalPartsInQuotes += quoteParts.length;
+      console.log({priceAndNotes})
       
       // Calculate revenue for ordered, completed, and delivered quotes with prices
       if (quote.status === 'ordered' || quote.status === 'completed' || quote.status === 'delivered') {
-        quoteParts.forEach((part: Part) => {
-          if (part.price && part.price > 0) {
-            totalRevenue += part.price;
+        priceAndNotes.forEach((part: QuotePartItem) => {
+          if (part.final_price && part.final_price > 0) {
+            totalRevenue += part.final_price;
             if (quote.status === 'ordered' || quote.status === 'delivered') {
               totalPartsOrdered++;
             }
@@ -220,6 +223,8 @@ export default function Dashboard() {
       monthlyStats
     });
   };
+
+  console.log(stats);
 
   const StatCard = ({ title, value, subtitle, icon: Icon, color }: {
     title: string;

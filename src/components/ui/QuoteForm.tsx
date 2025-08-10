@@ -500,9 +500,6 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
       
       {/* Raw Data Input */}
       <div className="mb-6">
-        <label className="block text-sm font-medium text-gray-700 mb-2">
-          Data Input
-        </label>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {/* Text Input Section */}
           <div>
@@ -722,9 +719,16 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
 
           {/* Image Input Section */}
           <div>
-            <label className="block text-sm font-medium text-gray-600 mb-2">
-              Part Screenshots
-            </label>
+            <div className="flex items-center justify-between mb-2">
+              <label className="block text-sm font-medium text-gray-600">
+                Part Screenshots
+              </label>
+              <div className="text-center">
+          <div className="px-1 py-1 bg-gray-100 rounded-lg text-[11px] text-gray-600">
+            <span>💡 Click the area below to focus, then use paste screenshots.</span>
+          </div>
+        </div>
+            </div>
             <ImagePasteArea onPartsExtracted={handlePartsExtracted} onPartRemoved={handlePartRemoved} />
           </div>
         </div>
@@ -734,7 +738,7 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            VIN Number
+            VIN
           </label>
           <Input
             name="vin"

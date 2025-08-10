@@ -574,56 +574,58 @@ export const useUpdateMultiplePartsMutation = () => {
   
   return useMutation({
     mutationFn: async (updates: Array<{ id: string; updates: Partial<Part> }>) => {
-      
-      const results = await Promise.all(
-        updates.map(async ({ id, updates: partUpdates }) => {
+      // Process updates sequentially to avoid race conditions when updating parts in the same quote
+      const results = [];
+      for (let i = 0; i < updates.length; i++) {
+        const { id, updates: partUpdates } = updates[i];
+        
+        // First, update the parts table for basic info (name, number)
+        if (partUpdates.name !== undefined || partUpdates.number !== undefined) {
+          const partUpdateData: any = {};
+          if (partUpdates.name !== undefined) partUpdateData.part_name = partUpdates.name;
+          if (partUpdates.number !== undefined) partUpdateData.part_number = partUpdates.number;
           
-          // First, update the parts table for basic info (name, number)
-          if (partUpdates.name !== undefined || partUpdates.number !== undefined) {
-            const partUpdateData: any = {};
-            if (partUpdates.name !== undefined) partUpdateData.part_name = partUpdates.name;
-            if (partUpdates.number !== undefined) partUpdateData.part_number = partUpdates.number;
-            
-            const { error: partError } = await supabase
-              .from('parts')
-              .update(partUpdateData)
-              .eq('id', id);
-
-            if (partError) {
-              throw new Error(`Error updating part ${id} info: ${partError.message}`);
-            }
-          }
-          
-          // Update JSON structure for price and note (quote-specific data)
-          if (partUpdates.price !== undefined || partUpdates.note !== undefined) {
-            // Update new JSON structure with queryClient for cache invalidation
-            await updatePartInJsonQuotes(id, {
-              price: partUpdates.price,
-              note: partUpdates.note
-            }, queryClient);
-          }
-          
-          // Get the updated part data for return
-          const { data: updatedPart, error: fetchError } = await supabase
+          const { error: partError } = await supabase
             .from('parts')
-            .select('*')
-            .eq('id', id)
-            .single();
+            .update(partUpdateData)
+            .eq('id', id);
 
-          if (fetchError) {
-            console.warn(`Warning: Could not fetch updated part data for ${id}:`, fetchError);
+          if (partError) {
+            throw new Error(`Error updating part ${id} info: ${partError.message}`);
           }
-          
-          return {
-            id: id,
-            name: updatedPart?.part_name || partUpdates.name || '',
-            number: updatedPart?.part_number || partUpdates.number || '',
-            price: partUpdates.price ?? updatedPart?.price ?? null,
-            note: partUpdates.note || '',
-            createdAt: updatedPart?.created_at || new Date().toISOString(),
-          };
-        })
-      );
+        }
+        
+        // Update JSON structure for price and note (quote-specific data)
+        if (partUpdates.price !== undefined || partUpdates.note !== undefined) {
+          // Update new JSON structure with queryClient for cache invalidation
+          await updatePartInJsonQuotes(id, {
+            price: partUpdates.price,
+            note: partUpdates.note
+          }, queryClient);
+        }
+        
+        // Get the updated part data for return
+        const { data: updatedPart, error: fetchError } = await supabase
+          .from('parts')
+          .select('*')
+          .eq('id', id)
+          .single();
+
+        if (fetchError) {
+          console.warn(`Warning: Could not fetch updated part data for ${id}:`, fetchError);
+        }
+        
+        const result = {
+          id: id,
+          name: updatedPart?.part_name || partUpdates.name || '',
+          number: updatedPart?.part_number || partUpdates.number || '',
+          price: partUpdates.price ?? updatedPart?.price ?? null,
+          note: partUpdates.note || '',
+          createdAt: updatedPart?.created_at || new Date().toISOString(),
+        };
+        
+        results.push(result);
+      }
       
       return results;
     },

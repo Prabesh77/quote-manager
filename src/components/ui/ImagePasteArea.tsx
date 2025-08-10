@@ -265,15 +265,6 @@ export const ImagePasteArea = ({ onPartsExtracted, onPartRemoved }: ImagePasteAr
         </div>
       </div>
 
-      {/* Keyboard Shortcut Hint */}
-      {!isFocused && !isReady && images.length === 0 && (
-        <div className="text-center">
-          <div className="inline-flex items-center space-x-2 px-3 py-2 bg-gray-100 rounded-lg text-xs text-gray-600">
-            <span>💡 Tip:</span>
-            <span>Click the area above to focus, then use <kbd className="px-1 py-0.5 bg-white rounded border">Ctrl+V</kbd> to paste</span>
-          </div>
-        </div>
-      )}
 
 {images.some(img => img.status === 'processing') && (
             <div className="flex items-center space-x-1 text-blue-600">

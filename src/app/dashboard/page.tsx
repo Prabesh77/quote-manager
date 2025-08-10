@@ -3,7 +3,7 @@
 import { useQuotes } from '@/hooks/useQuotesWithQuery';
 import { useDelivery } from '@/components/ui/useDelivery';
 import { useEffect, useState, useMemo } from 'react';
-import { Part } from '@/components/ui/useQuotes';
+import { Part, QuotePartItem } from '@/components/ui/useQuotes';
 import { 
   TrendingUp, 
   CheckCircle, 
@@ -118,18 +118,17 @@ export default function Dashboard() {
     let totalRevenue = 0;
     let totalPartsOrdered = 0;
     let totalPartsInQuotes = 0;
-    
-
-    
+        
         quotes.forEach(quote => {
       const quoteParts = getQuoteParts(quote.partRequested);
+      const priceAndNotes = quote.partsRequested
       totalPartsInQuotes += quoteParts.length;
       
       // Calculate revenue for ordered, completed, and delivered quotes with prices
       if (quote.status === 'ordered' || quote.status === 'completed' || quote.status === 'delivered') {
-        quoteParts.forEach((part: Part) => {
-          if (part.price && part.price > 0) {
-            totalRevenue += part.price;
+        priceAndNotes.forEach((part: QuotePartItem) => {
+          if (part.final_price && part.final_price > 0) {
+            totalRevenue += part.final_price;
             if (quote.status === 'ordered' || quote.status === 'delivered') {
               totalPartsOrdered++;
             }

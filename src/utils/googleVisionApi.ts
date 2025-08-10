@@ -84,16 +84,8 @@ export const extractPartsFromText = (text: string): ExtractedPartInfo[] => {
     return /\d/.test(text.trim()) && text.trim().length > 0;
   };
   
-  // Test the classification logic
-  const testCases = ['Radiator', 'Cooler for coolant', '9283742874Rad', 'Con2398493', '123456789', 'ABC123', 'Headlamp'];
-  console.log('🧪 Testing classification logic:');
-  testCases.forEach(testCase => {
-    console.log(`"${testCase}": ${isPartName(testCase) ? 'Part Name' : isPartNumber(testCase) ? 'Part Number' : 'Neither'}`);
-  });
-  
   // Split text into lines and process each line
   const lines = text.split('\n').filter(line => line.trim().length > 0);
-  console.log('📝 Processing lines:', lines);
   
   const extractedParts: ExtractedPartInfo[] = [];
   
@@ -105,15 +97,11 @@ export const extractPartsFromText = (text: string): ExtractedPartInfo[] => {
     const trimmedLine = line.trim();
     if (isPartName(trimmedLine)) {
       allPartNames.push(trimmedLine);
-      console.log(`✅ Found part name: "${trimmedLine}"`);
     } else if (isPartNumber(trimmedLine)) {
       allPartNumbers.push(trimmedLine);
-      console.log(`🔢 Found part number: "${trimmedLine}"`);
     }
   }
   
-  console.log('📋 All part names found:', allPartNames);
-  console.log('🔢 All part numbers found:', allPartNumbers);
   
   // Now associate part names with part numbers based on proximity
   for (const partName of allPartNames) {
@@ -133,7 +121,6 @@ export const extractPartsFromText = (text: string): ExtractedPartInfo[] => {
               bestPartNumber = word;
               bestConfidence = 0.95; // Very high confidence for same line
               bestDistance = distance;
-              console.log(`🎯 Found part number "${word}" in same line as "${partName}" (distance: ${distance})`);
             }
           }
         }
@@ -159,7 +146,6 @@ export const extractPartsFromText = (text: string): ExtractedPartInfo[] => {
                     bestPartNumber = word;
                     bestConfidence = 0.8; // High confidence for adjacent lines
                     bestDistance = distance;
-                    console.log(`🔍 Found part number "${word}" in ${offset > 0 ? 'next' : 'previous'} line for "${partName}"`);
                   }
                 }
               }
@@ -177,7 +163,6 @@ export const extractPartsFromText = (text: string): ExtractedPartInfo[] => {
         if (!extractedParts.some(part => part.partNumber === partNumber)) {
           bestPartNumber = partNumber;
           bestConfidence = 0.5; // Low confidence for fallback
-          console.log(`🔄 Using fallback part number "${partNumber}" for "${partName}"`);
           break;
         }
       }
@@ -190,9 +175,8 @@ export const extractPartsFromText = (text: string): ExtractedPartInfo[] => {
         confidence: bestConfidence,
         rawText: `${partName} - ${bestPartNumber}`
       });
-      console.log(`✅ Created part: "${partName}" -> "${bestPartNumber}" (confidence: ${bestConfidence})`);
     } else {
-      console.log(`⚠️ No part number found for "${partName}"`);
+      // console.log(`⚠️ No part number found for "${partName}"`);
     }
   }
   

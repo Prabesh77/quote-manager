@@ -4,24 +4,18 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 // Initialize Gemini
 const genAI = new GoogleGenerativeAI(process.env.NEXT_PUBLIC_GEMINI_API_KEY || '');
 
+interface GeminiPartResponse {
+  partName: string;
+  partNumber: string;
+  context: string | null;
+}
+
 export interface AIPartExtraction {
   partName: string;
   partNumber: string;
-  confidence: number;
-  context?: string;
-  manufacturer?: string;
-  isSupersession?: boolean;
+  confidence: number; // Keep for compatibility but set to 1.0
   rawText: string;
-}
-
-export interface GeminiPartResponse {
-  partName: string;
-  partNumber: string;
-  confidence: number;
-  context?: string;
-  manufacturer?: string;
-  isSupersession?: boolean;
-  reasoning?: string;
+  context: string | undefined;
 }
 
 /**
@@ -43,18 +37,12 @@ INSTRUCTIONS:
 1. Identify the main automotive part
 2. Extract the part number (alphanumeric codes, usually 5+ characters)
 3. Determine if it's Left/Right specific (look for L, R, LH, RH, Left, Right indicators)
-4. Identify manufacturer if mentioned
-5. Check if this is a supersession (replacement part)
 
 RESPONSE FORMAT (JSON only):
 {
   "partName": "Standardized part name (e.g., 'Right Headlamp', 'Left Headlamp', 'Radiator', 'Condenser')",
   "partNumber": "Clean part number only (no descriptive text)",
-  "confidence": 0.95,
-  "context": "L/R context if applicable (e.g., 'RH', 'LH', 'Left', 'Right')",
-  "manufacturer": "Brand name if mentioned, otherwise null",
-  "isSupersession": false,
-  "reasoning": "Brief explanation of your analysis"
+  "context": "L/R context if applicable (e.g., 'RH', 'LH', 'Left', 'Right')"
 }
 
 IMPORTANT RULES:
@@ -62,7 +50,6 @@ IMPORTANT RULES:
 - For headlamps: If text contains RH/R/Right → 'Right Headlamp', if LH/L/Left → 'Left Headlamp'
 - For daylights: If text contains RH/R/Right → 'Right DayLight', if LH/L/Left → 'Left DayLight'
 - Part numbers should be clean (e.g., "8110560K40" not "8110560K40 UNIT ASSY")
-- Confidence should reflect how certain you are (0.7-1.0)
 - Return valid JSON only
 `;
 
@@ -82,11 +69,9 @@ IMPORTANT RULES:
     const extractedPart: AIPartExtraction = {
       partName: aiResponse.partName,
       partNumber: aiResponse.partNumber,
-      confidence: aiResponse.confidence,
-      context: aiResponse.context,
-      manufacturer: aiResponse.manufacturer,
-      isSupersession: aiResponse.isSupersession || false,
-      rawText: ocrText
+      confidence: 1.0, // Set confidence to 1.0 as it's now part of the response
+      rawText: ocrText,
+      context: aiResponse.context || undefined
     };
     
     return [extractedPart];
@@ -149,8 +134,8 @@ function fallbackExtraction(ocrText: string): AIPartExtraction[] {
     return [{
       partName,
       partNumber,
-      confidence: 0.7,
-      context,
+      confidence: 1.0,
+      context: context || undefined,
       rawText: ocrText
     }];
   }

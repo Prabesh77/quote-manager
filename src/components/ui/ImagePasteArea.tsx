@@ -3,10 +3,7 @@
 import React, { useState, useRef, useCallback, useMemo } from 'react';
 import { Image as ImageIcon, X, Loader2, Focus, Clipboard, AlertCircle, CheckCircle, Clock } from 'lucide-react';
 import { processImageForParts } from '@/utils/googleVisionApi';
-import { 
-  isLikelyPartNumber,
-  extractManufacturerHint 
-} from '@/utils/partMappingDictionary';
+
 
 interface ExtractedPartInfo {
   partName: string;

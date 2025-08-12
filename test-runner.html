@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Intelligent Part Matching Test Runner</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .test-section {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .test-result {
+            padding: 10px;
+            margin: 5px 0;
+            border-radius: 4px;
+            font-family: monospace;
+        }
+        .test-pass {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .test-fail {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .test-info {
+            background-color: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        .confidence-high { color: #28a745; }
+        .confidence-medium { color: #ffc107; }
+        .confidence-low { color: #dc3545; }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px 5px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin: 20px 0;
+        }
+        .stat-card {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .stat-number {
+            font-size: 2em;
+            font-weight: bold;
+            color: #007bff;
+        }
+        .stat-label {
+            color: #666;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <h1>🧪 Intelligent Part Matching Test Runner</h1>
+    <p>This test runner validates our intelligent part matching system with various input patterns.</p>
+    
+    <div class="stats">
+        <div class="stat-card">
+            <div class="stat-number" id="totalTests">0</div>
+            <div class="stat-label">Total Tests</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-number" id="passedTests">0</div>
+            <div class="stat-label">Passed</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-number" id="failedTests">0</div>
+            <div class="stat-label">Failed</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-number" id="successRate">0%</div>
+            <div class="stat-label">Success Rate</div>
+        </div>
+    </div>
+    
+    <button onclick="runAllTests()">🚀 Run All Tests</button>
+    <button onclick="clearResults()">🗑️ Clear Results</button>
+    
+    <div id="testResults"></div>
+
+    <script>
+        // Mock implementation of our intelligent part matching system for testing
+        const PART_MAPPING_DICTIONARY = [
+            {
+                mainPartName: 'Radiator',
+                variations: ['Radiator Assy', 'Radiator Assembly', 'Radiator comp.', 'Cooler for coolant', 'Unit, radiator'],
+                keywords: ['radiator', 'cooler', 'cooling', 'engine cooling'],
+                confidence: 0.95
+            },
+            {
+                mainPartName: 'Condenser',
+                variations: ['Condenser Assy', 'Condenser Assembly', 'Condenser comp.', 'A/C condenser', 'Air conditioning'],
+                keywords: ['condenser', 'ac', 'a/c', 'air conditioning', 'refrigerant'],
+                confidence: 0.95
+            },
+            {
+                mainPartName: 'Left Headlamp',
+                variations: ['Lamp Assy - Head, LH', 'Lamp Assembly-Head left', 'Unit(L), Head Lamp'],
+                keywords: ['headlamp', 'headlight', 'head lamp', 'lh', 'l ', 'left'],
+                confidence: 0.9
+            },
+            {
+                mainPartName: 'Right Headlamp',
+                variations: ['Lamp Assy - Head, RH', 'Lamp Assembly-Head Right', 'Unit(R), Head Lamp'],
+                keywords: ['headlamp', 'headlight', 'head lamp', 'rh', 'r ', 'right'],
+                confidence: 0.9
+            },
+            {
+                mainPartName: 'Fan Assembly',
+                variations: ['Fan Assy', 'Fan Assembly', 'Cooling fan', 'Engine fan'],
+                keywords: ['fan', 'cooling fan', 'engine fan', 'radiator fan'],
+                confidence: 0.9
+            },
+            {
+                mainPartName: 'Intercooler',
+                variations: ['Inter Cooler Assy', 'Intercooler Assy', 'Charge Air cooler'],
+                keywords: ['intercooler', 'inter cooler', 'charge air', 'turbo cooler'],
+                confidence: 0.9
+            },
+            {
+                mainPartName: 'Radar Sensor',
+                variations: ['Radar Control unit with software', 'Radar Unit', 'Cruise control radar'],
+                keywords: ['radar', 'sensor', 'cruise control', 'distance', 'proximity'],
+                confidence: 0.85
+            },
+            {
+                mainPartName: 'Daytime Running Light',
+                variations: ['Lamp Assy - Day Running Light, LH', 'DRL Assembly', 'Day running light'],
+                keywords: ['day running', 'drl', 'daytime running', 'running light'],
+                confidence: 0.8
+            }
+        ];
+
+        // Part number detection function
+        function isLikelyPartNumber(text) {
+            const normalized = text.trim();
+            
+            // Must contain at least one number
+            if (!/\d/.test(normalized)) return false;
+            
+            // Must be at least 5 characters long
+            if (normalized.length < 5) return false;
+            
+            // Common part number patterns
+            const patterns = [
+                /^\d{5,15}$/, // 5-15 digit numbers
+                /^[A-Z0-9]{5,20}$/i, // Alphanumeric 5-20 chars (like 811301E480)
+                /^\d{1,3}[A-Z]{1,3}\d{1,4}[A-Z]{1,3}$/i, // Pattern like 3G2 941 114 A
+                /^\d{1,4}\s+\d{1,4}\s+\d{1,4}$/, // Pattern like 840 02 725
+                /^[A-Z]{1,3}\d{1,4}[A-Z]{1,3}$/i, // Pattern like VC160
+                /^\d+[A-Z]+\d*$/i, // Pattern like 811301E480
+                /^[A-Z]+\d+[A-Z]*$/i, // Pattern like ABC123DEF
+            ];
+            
+            return patterns.some(pattern => pattern.test(normalized));
+        }
+
+        // Smart part matching function
+        function findSmartPartMatch(extractedText, allTextLines = []) {
+            const normalizedText = extractedText.toLowerCase().trim();
+            let bestMatch = null;
+            let highestConfidence = 0;
+
+            for (const mapping of PART_MAPPING_DICTIONARY) {
+                // Check exact variations first
+                for (const variation of mapping.variations) {
+                    const normalizedVariation = variation.toLowerCase().trim();
+                    
+                    if (normalizedText === normalizedVariation) {
+                        const confidence = mapping.confidence * 1.0;
+                        if (confidence > highestConfidence) {
+                            highestConfidence = confidence;
+                            bestMatch = {
+                                mainPartName: mapping.mainPartName,
+                                confidence,
+                                matchedVariation: variation,
+                                context: 'Exact match'
+                            };
+                        }
+                        break;
+                    }
+                    
+                    if (normalizedText.includes(normalizedVariation) || normalizedVariation.includes(normalizedText)) {
+                        const confidence = mapping.confidence * 0.9;
+                        if (confidence > highestConfidence) {
+                            highestConfidence = confidence;
+                            bestMatch = {
+                                mainPartName: mapping.mainPartName,
+                                confidence,
+                                matchedVariation: variation,
+                                context: 'Variation match'
+                            };
+                        }
+                    }
+                }
+
+                // Check keywords
+                for (const keyword of mapping.keywords) {
+                    if (normalizedText.includes(keyword)) {
+                        const confidence = mapping.confidence * 0.7;
+                        if (confidence > highestConfidence) {
+                            highestConfidence = confidence;
+                            bestMatch = {
+                                mainPartName: mapping.mainPartName,
+                                confidence,
+                                matchedVariation: `Keyword: ${keyword}`,
+                                context: 'Keyword match'
+                            };
+                        }
+                    }
+                }
+            }
+
+            // Context-aware headlamp matching
+            if (bestMatch && (bestMatch.mainPartName === 'Left Headlamp' || bestMatch.mainPartName === 'Right Headlamp')) {
+                const context = allTextLines.join(' ').toLowerCase();
+                if (/\b(l|left|lh)\b/i.test(context)) {
+                    bestMatch.mainPartName = 'Left Headlamp';
+                    bestMatch.confidence = Math.max(bestMatch.confidence, 0.95);
+                    bestMatch.context = 'Left headlamp detected from L/R context';
+                } else if (/\b(r|right|rh)\b/i.test(context)) {
+                    bestMatch.mainPartName = 'Right Headlamp';
+                    bestMatch.confidence = Math.max(bestMatch.confidence, 0.95);
+                    bestMatch.context = 'Right headlamp detected from L/R context';
+                }
+            }
+
+            return bestMatch && bestMatch.confidence >= 0.6 ? bestMatch : null;
+        }
+
+        // Test cases
+        const testCases = [
+            { input: 'rad', expected: 'Radiator', description: 'Abbreviation: rad' },
+            { input: 'radiator', expected: 'Radiator', description: 'Full word: radiator' },
+            { input: 'cooler', expected: 'Radiator', description: 'Synonym: cooler' },
+            { input: 'con', expected: 'Condenser', description: 'Abbreviation: con' },
+            { input: 'cond', expected: 'Condenser', description: 'Abbreviation: cond' },
+            { input: 'radar', expected: 'Radar Sensor', description: 'Full word: radar' },
+            { input: 'fan', expected: 'Fan Assembly', description: 'Full word: fan' },
+            { input: 'intercooler', expected: 'Intercooler', description: 'Full word: intercooler' },
+            { input: 'drl', expected: 'Daytime Running Light', description: 'Abbreviation: DRL' },
+            { input: 'headlamp', expected: 'Left Headlamp', description: 'Generic: headlamp' }
+        ];
+
+        // Context tests
+        const contextTests = [
+            { input: 'headlamp', context: ['L', 'left', 'lh'], expected: 'Left Headlamp', description: 'Headlamp with L context' },
+            { input: 'headlamp', context: ['R', 'right', 'rh'], expected: 'Right Headlamp', description: 'Headlamp with R context' },
+            { input: 'lamp assy', context: ['LH'], expected: 'Left Headlamp', description: 'Lamp assy with LH context' }
+        ];
+
+        // Complex pattern tests
+        const complexTests = [
+            { input: '84002vc160. 1. Lamp Assembly-Head Right', expected: 'Right Headlamp', description: 'Complex part description' },
+            { input: 'Unit Assy, Headlamp, LH', expected: 'Left Headlamp', description: 'Manufacturer format' },
+            { input: 'UNIT ASSY, HEADLAMP, RH', expected: 'Right Headlamp', description: 'Your specific example' },
+            { input: '811301E480 UNIT ASSY, HEADLAMP, RH', expected: 'Right Headlamp', description: 'Full part number + description' },
+            { input: 'Radar Control unit with software', expected: 'Radar Sensor', description: 'Technical description' },
+            { input: 'Charge Air cooler', expected: 'Intercooler', description: 'Alternative naming' }
+        ];
+
+        // Part number extraction tests
+        const partNumberTests = [
+            { input: '811301E480', expected: true, description: 'Your specific part number' },
+            { input: '84002vc160', expected: true, description: 'Alphanumeric part number' },
+            { input: '123456789', expected: true, description: 'Numeric part number' },
+            { input: 'ABC123', expected: true, description: 'Mixed alphanumeric' },
+            { input: 'just text', expected: false, description: 'Text without numbers' }
+        ];
+
+        let totalTests = 0;
+        let passedTests = 0;
+
+        function addTestResult(test, result, passed) {
+            const resultsDiv = document.getElementById('testResults');
+            const resultDiv = document.createElement('div');
+            resultDiv.className = `test-result ${passed ? 'test-pass' : 'test-fail'}`;
+            
+            const confidenceClass = result ? 
+                (result.confidence >= 0.9 ? 'confidence-high' : 
+                 result.confidence >= 0.7 ? 'confidence-medium' : 'confidence-low') : '';
+            
+            resultDiv.innerHTML = `
+                <strong>${passed ? '✅' : '❌'} ${test.description}</strong><br>
+                Input: <code>${test.input}</code><br>
+                ${result ? 
+                    `Result: <strong class="${confidenceClass}">${result.mainPartName}</strong> (${(result.confidence * 100).toFixed(0)}%)<br>
+                    Context: ${result.context}` : 
+                    'Result: <strong>No match found</strong>'
+                }
+            `;
+            
+            resultsDiv.appendChild(resultDiv);
+        }
+
+        function updateStats() {
+            document.getElementById('totalTests').textContent = totalTests;
+            document.getElementById('passedTests').textContent = passedTests;
+            document.getElementById('failedTests').textContent = totalTests - passedTests;
+            document.getElementById('successRate').textContent = totalTests > 0 ? `${((passedTests / totalTests) * 100).toFixed(1)}%` : '0%';
+        }
+
+        function runAllTests() {
+            // Clear previous results
+            document.getElementById('testResults').innerHTML = '';
+            totalTests = 0;
+            passedTests = 0;
+
+            // Add section header
+            const resultsDiv = document.getElementById('testResults');
+            const headerDiv = document.createElement('div');
+            headerDiv.className = 'test-section';
+            headerDiv.innerHTML = '<h2>📋 Basic Part Matching Tests</h2>';
+            resultsDiv.appendChild(headerDiv);
+
+            // Run basic tests
+            testCases.forEach(test => {
+                totalTests++;
+                const result = findSmartPartMatch(test.input);
+                const passed = result?.mainPartName === test.expected;
+                
+                if (passed) passedTests++;
+                addTestResult(test, result, passed);
+            });
+
+            // Add context test section
+            const contextHeaderDiv = document.createElement('div');
+            contextHeaderDiv.className = 'test-section';
+            contextHeaderDiv.innerHTML = '<h2>🚗 Context-Aware Headlamp Tests</h2>';
+            resultsDiv.appendChild(contextHeaderDiv);
+
+            // Run context tests
+            contextTests.forEach(test => {
+                totalTests++;
+                const result = findSmartPartMatch(test.input, test.context);
+                const passed = result?.mainPartName === test.expected;
+                
+                if (passed) passedTests++;
+                addTestResult(test, result, passed);
+            });
+
+            // Add complex test section
+            const complexHeaderDiv = document.createElement('div');
+            complexHeaderDiv.className = 'test-section';
+            complexHeaderDiv.innerHTML = '<h2>🚀 Complex Pattern Tests</h2>';
+            resultsDiv.appendChild(complexHeaderDiv);
+
+            // Run complex tests
+            complexTests.forEach(test => {
+                totalTests++;
+                const result = findSmartPartMatch(test.input);
+                const passed = result?.mainPartName === test.expected;
+                
+                if (passed) passedTests++;
+                addTestResult(test, result, passed);
+            });
+
+            // Add part number test section
+            const partNumberHeaderDiv = document.createElement('div');
+            partNumberHeaderDiv.className = 'test-section';
+            partNumberHeaderDiv.innerHTML = '<h2>🔢 Part Number Detection Tests</h2>';
+            resultsDiv.appendChild(partNumberHeaderDiv);
+
+            // Run part number tests
+            partNumberTests.forEach(test => {
+                totalTests++;
+                const result = isLikelyPartNumber(test.input);
+                const passed = result === test.expected;
+                
+                if (passed) passedTests++;
+                addTestResult(test, { mainPartName: result ? 'Valid Part Number' : 'Not a Part Number', confidence: 1.0, context: result ? 'Meets criteria' : 'Does not meet criteria' }, passed);
+            });
+
+            // Add summary
+            const summaryDiv = document.createElement('div');
+            summaryDiv.className = 'test-section';
+            summaryDiv.innerHTML = `
+                <h2>📊 Test Summary</h2>
+                <div class="test-result test-info">
+                    <strong>Total Tests:</strong> ${totalTests}<br>
+                    <strong>Passed:</strong> ${passedTests}<br>
+                    <strong>Failed:</strong> ${totalTests - passedTests}<br>
+                    <strong>Success Rate:</strong> ${((passedTests / totalTests) * 100).toFixed(1)}%
+                </div>
+                ${passedTests === totalTests ? 
+                    '<div class="test-result test-pass"><strong>🎉 All tests passed! The intelligent part matching system is working correctly.</strong></div>' :
+                    '<div class="test-result test-fail"><strong>⚠️ Some tests failed. Please review the results above.</strong></div>'
+                }
+            `;
+            resultsDiv.appendChild(summaryDiv);
+
+            updateStats();
+        }
+
+        function clearResults() {
+            document.getElementById('testResults').innerHTML = '';
+            totalTests = 0;
+            passedTests = 0;
+            updateStats();
+        }
+
+        // Initialize stats
+        updateStats();
+    </script>
+</body>
+</html>

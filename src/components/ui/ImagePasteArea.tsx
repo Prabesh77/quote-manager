@@ -1,14 +1,18 @@
 'use client';
 
-import React, { useState, useRef } from 'react';
-import { Image as ImageIcon, X, Loader2, Focus, Clipboard } from 'lucide-react';
+import React, { useState, useRef, useCallback, useMemo } from 'react';
+import { Image as ImageIcon, X, Loader2, Focus, Clipboard, AlertCircle, CheckCircle, Clock } from 'lucide-react';
 import { processImageForParts } from '@/utils/googleVisionApi';
+
 
 interface ExtractedPartInfo {
   partName: string;
   partNumber: string;
   confidence: number;
   rawText: string;
+  context?: string;
+  isSupersession?: boolean;
+  manufacturer?: string;
 }
 
 interface ProcessedImage {
@@ -18,6 +22,8 @@ interface ProcessedImage {
   status: 'processing' | 'completed' | 'error';
   extractedParts: ExtractedPartInfo[];
   error?: string;
+  processingTime?: number;
+  confidence?: number;
 }
 
 interface ImagePasteAreaProps {
@@ -30,21 +36,31 @@ export const ImagePasteArea = ({ onPartsExtracted, onPartRemoved }: ImagePasteAr
   const [isDragOver, setIsDragOver] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
   const [isReady, setIsReady] = useState(false);
+  const [processingQueue, setProcessingQueue] = useState<string[]>([]);
+  const [isProcessing, setIsProcessing] = useState(false);
   const pasteAreaRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const convertFileToBase64 = (file: File): Promise<string> => {
+  // Memoized processing queue for performance
+  const processingQueueMemo = useMemo(() => processingQueue, [processingQueue]);
+
+  // Optimized file to base64 conversion
+  const convertFileToBase64 = useCallback((file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = () => resolve(reader.result as string);
       reader.onerror = reject;
       reader.readAsDataURL(file);
     });
-  };
+  }, []);
 
-  const processImage = async (file: File) => {
+
+
+  // Optimized image processing with queue management
+  const processImage = useCallback(async (file: File) => {
     const imageId = Date.now().toString() + Math.random().toString(36).substr(2, 9);
     const preview = URL.createObjectURL(file);
+    const startTime = performance.now();
     
     const newImage: ProcessedImage = {
       id: imageId,
@@ -55,19 +71,44 @@ export const ImagePasteArea = ({ onPartsExtracted, onPartRemoved }: ImagePasteAr
     };
 
     setImages(prev => [...prev, newImage]);
+    setProcessingQueue(prev => [...prev, imageId]);
 
     try {
+      // Process image with Google Vision API
       const base64 = await convertFileToBase64(file);
+      
       const extractedParts = await processImageForParts(base64);
+      
+      // Convert the Google Vision API results directly to our format
+      const smartExtractedParts = extractedParts.map(part => ({
+        partName: part.partName,
+        partNumber: part.partNumber,
+        confidence: part.confidence,
+        rawText: part.rawText,
+        context: undefined,
+        isSupersession: false,
+        manufacturer: undefined
+      }));
+      
+      const processingTime = performance.now() - startTime;
       
       setImages(prev => prev.map(img => 
         img.id === imageId 
-          ? { ...img, status: 'completed', extractedParts }
+          ? { 
+              ...img, 
+              status: 'completed', 
+              extractedParts: smartExtractedParts,
+              processingTime,
+              confidence: smartExtractedParts.length > 0 ? smartExtractedParts.reduce((sum, p) => sum + p.confidence, 0) / smartExtractedParts.length : 0
+            }
           : img
       ));
 
       // Notify parent component with all extracted parts
-      onPartsExtracted(extractedParts);
+      onPartsExtracted(smartExtractedParts);
+      
+      // Remove from processing queue
+      setProcessingQueue(prev => prev.filter(id => id !== imageId));
       
     } catch (error) {
       console.error('Error processing image:', error);
@@ -80,11 +121,39 @@ export const ImagePasteArea = ({ onPartsExtracted, onPartRemoved }: ImagePasteAr
             }
           : img
       ));
+      
+      // Remove from processing queue
+      setProcessingQueue(prev => prev.filter(id => id !== imageId));
     }
-  };
+  }, [convertFileToBase64, onPartsExtracted]);
 
-  const handlePaste = (e: React.ClipboardEvent) => {
+  // Batch processing for multiple images
+  const processBatchImages = useCallback(async (files: File[]) => {
+    setIsProcessing(true);
+    
+    // Process images in parallel with concurrency limit
+    const concurrencyLimit = 3; // Process max 3 images simultaneously
+    const chunks = [];
+    
+    for (let i = 0; i < files.length; i += concurrencyLimit) {
+      chunks.push(files.slice(i, i + concurrencyLimit));
+    }
+    
+    for (const chunk of chunks) {
+      await Promise.all(chunk.map(processImage));
+      // Small delay between chunks to prevent overwhelming the API
+      if (chunks.indexOf(chunk) < chunks.length - 1) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+    }
+    
+    setIsProcessing(false);
+  }, [processImage]);
+
+  // Optimized event handlers
+  const handlePaste = useCallback((e: React.ClipboardEvent) => {
     const items = e.clipboardData.items;
+    const imageFiles: File[] = [];
     
     for (let i = 0; i < items.length; i++) {
       const item = items[i];
@@ -93,94 +162,112 @@ export const ImagePasteArea = ({ onPartsExtracted, onPartRemoved }: ImagePasteAr
         e.preventDefault();
         const file = item.getAsFile();
         if (file) {
-          processImage(file);
+          imageFiles.push(file);
         }
       }
     }
-  };
+    
+    if (imageFiles.length > 0) {
+      if (imageFiles.length === 1) {
+        processImage(imageFiles[0]);
+      } else {
+        processBatchImages(imageFiles);
+      }
+    }
+  }, [processImage, processBatchImages]);
 
-  const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileInput = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
-    files.forEach(processImage);
+    if (files.length > 0) {
+      if (files.length === 1) {
+        processImage(files[0]);
+      } else {
+        processBatchImages(files);
+      }
+    }
     
     // Clear the input
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
-  };
+  }, [processImage, processBatchImages]);
 
-  const handleDragOver = (e: React.DragEvent) => {
+  const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     setIsDragOver(true);
-  };
+  }, []);
 
-  const handleDragLeave = (e: React.DragEvent) => {
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     setIsDragOver(false);
-  };
+  }, []);
 
-  const handleDrop = (e: React.DragEvent) => {
+  const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     setIsDragOver(false);
     
-    const files = Array.from(e.dataTransfer.files);
-    files.forEach(file => {
-      if (file.type.startsWith('image/')) {
-        processImage(file);
+    const files = Array.from(e.dataTransfer.files).filter(file => file.type.startsWith('image/'));
+    if (files.length > 0) {
+      if (files.length === 1) {
+        processImage(files[0]);
+      } else {
+        processBatchImages(files);
       }
-    });
-  };
+    }
+  }, [processImage, processBatchImages]);
 
-  const handleFocus = () => {
+  const handleFocus = useCallback(() => {
     setIsFocused(true);
     setIsReady(true);
-  };
+  }, []);
 
-  const handleBlur = () => {
-    // Keep focused state for a short time to allow pasting
+  const handleBlur = useCallback(() => {
     setTimeout(() => {
       setIsFocused(false);
       setIsReady(false);
     }, 100);
-  };
+  }, []);
 
-  const handleAreaClick = (e: React.MouseEvent) => {
-    // Only focus the area, don't trigger file input
+  const handleAreaClick = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
     if (pasteAreaRef.current) {
       pasteAreaRef.current.focus();
       setIsFocused(true);
       setIsReady(true);
     }
-  };
+  }, []);
 
-  const handleFileButtonClick = (e: React.MouseEvent) => {
-    // Stop propagation to prevent area click handler
+  const handleFileButtonClick = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
     if (fileInputRef.current) {
       fileInputRef.current.click();
     }
-  };
+  }, []);
 
-  const allExtractedParts = images.reduce((acc, img) => [...acc, ...img.extractedParts], [] as ExtractedPartInfo[]);
+  // Memoized extracted parts for performance
+  const allExtractedParts = useMemo(() => 
+    images.reduce((acc, img) => [...acc, ...img.extractedParts], [] as ExtractedPartInfo[]), 
+    [images]
+  );
 
-  const removeExtractedPart = (index: number) => {
-    // Find which image contains this part and remove it
+  // Optimized part removal
+  const removeExtractedPart = useCallback((index: number) => {
     let partIndex = 0;
     for (let i = 0; i < images.length; i++) {
       const image = images[i];
       if (partIndex + image.extractedParts.length > index) {
-        // This image contains the part we want to remove
         const localIndex = index - partIndex;
         const newImages = [...images];
         const removedPart = newImages[i].extractedParts[localIndex];
+        
         newImages[i] = {
           ...newImages[i],
           extractedParts: newImages[i].extractedParts.filter((_, j) => j !== localIndex)
         };
+        
         setImages(newImages);
         
-        // Update the parent component
+        // Update parent component
         const allParts = newImages.reduce((acc, img) => [...acc, ...img.extractedParts], [] as ExtractedPartInfo[]);
         onPartsExtracted(allParts);
         onPartRemoved?.(removedPart);
@@ -188,10 +275,39 @@ export const ImagePasteArea = ({ onPartsExtracted, onPartRemoved }: ImagePasteAr
       }
       partIndex += image.extractedParts.length;
     }
-  };
+  }, [images, onPartsExtracted, onPartRemoved]);
+
+  // Performance metrics
+  const performanceMetrics = useMemo(() => {
+    const totalImages = images.length;
+    const completedImages = images.filter(img => img.status === 'completed').length;
+    const errorImages = images.filter(img => img.status === 'error').length;
+    const avgConfidence = allExtractedParts.length > 0 
+      ? allExtractedParts.reduce((sum, p) => sum + p.confidence, 0) / allExtractedParts.length 
+      : 0;
+    const avgProcessingTime = images
+      .filter(img => img.processingTime)
+      .reduce((sum, img) => sum + (img.processingTime || 0), 0) / completedImages;
+
+    return { totalImages, completedImages, errorImages, avgConfidence, avgProcessingTime };
+  }, [images, allExtractedParts]);
 
   return (
     <div className="space-y-4">
+      {/* Performance Metrics */}
+      {/* {performanceMetrics.totalImages > 0 && (
+        <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
+          <div className="flex items-center justify-between text-xs text-gray-600">
+            <span>📊 Processing Stats:</span>
+            <span>{performanceMetrics.completedImages}/{performanceMetrics.totalImages} completed</span>
+          </div>
+          <div className="flex items-center justify-between text-xs text-gray-500 mt-1">
+            <span>Avg Confidence: {(performanceMetrics.avgConfidence * 100).toFixed(0)}%</span>
+            <span>Avg Time: {performanceMetrics.avgProcessingTime.toFixed(0)}ms</span>
+          </div>
+        </div>
+      )} */}
+
       {/* Paste Area */}
       <div
         ref={pasteAreaRef}
@@ -233,6 +349,16 @@ export const ImagePasteArea = ({ onPartsExtracted, onPartRemoved }: ImagePasteAr
             </div>
           </div>
         )}
+
+        {/* Processing Queue Indicator */}
+        {processingQueueMemo.length > 0 && (
+          <div className="absolute top-2 right-2">
+            <div className="flex items-center space-x-1 px-2 py-1 bg-orange-500 text-white rounded text-xs font-medium">
+              <Loader2 className="h-3 w-3 animate-spin" />
+              <span>{processingQueueMemo.length} processing</span>
+            </div>
+          </div>
+        )}
         
         <div className="space-y-2">
           <div className="flex justify-center">
@@ -259,21 +385,21 @@ export const ImagePasteArea = ({ onPartsExtracted, onPartRemoved }: ImagePasteAr
             {isFocused || isReady ? (
               <span>🖼️ Paste multiple images one by one</span>
             ) : (
-              <span>Supports: JPG, PNG, GIF (max 7 images)</span>
+              <span>Supports: JPG, PNG, GIF (max 10 images)</span>
             )}
           </div>
         </div>
       </div>
 
+      {/* Processing Status */}
+      {isProcessing && (
+        <div className="flex items-center space-x-2 text-orange-600">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          <span className="text-sm">Processing batch images...</span>
+        </div>
+      )}
 
-{images.some(img => img.status === 'processing') && (
-            <div className="flex items-center space-x-1 text-blue-600">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              <span>Processing...</span>
-            </div>
-          )}
-
-      {/* Image Previews and Extracted Parts - Simplified Single Box Layout */}
+      {/* Image Previews and Extracted Parts - Enhanced Layout */}
       {allExtractedParts.length > 0 && (
         <div className="mt-6">
           <div className="flex items-center justify-between mb-4">
@@ -285,8 +411,8 @@ export const ImagePasteArea = ({ onPartsExtracted, onPartRemoved }: ImagePasteAr
             </div>
           </div>
           
-          {/* 2-column grid for better space efficiency */}
-          <div className="grid grid-cols-2 gap-3 max-h-64 overflow-y-auto">
+          {/* Enhanced grid layout with confidence indicators */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-80 overflow-y-auto">
             {allExtractedParts.map((part, index) => (
               <div key={index} className="relative bg-green-50 border border-green-200 rounded-lg p-3 hover:border-green-300 transition-colors">
                 {/* Close button */}
@@ -298,15 +424,40 @@ export const ImagePasteArea = ({ onPartsExtracted, onPartRemoved }: ImagePasteAr
                 </button>
                 
                 {/* Part details */}
-                <div className="pr-6"> {/* Add right padding to avoid overlap with close button */}
-                  <div className="font-medium text-green-800 text-sm mb-1 truncate">
-                    {part.partName}
+                <div className="pr-6">
+                  <div className="mb-2">
+                    <div className="font-medium text-green-800 text-sm truncate">
+                      {part.partName}
+                    </div>
                   </div>
+                  
+                  {/* Part number */}
                   {part.partNumber !== 'Not found' && (
-                    <div className="text-green-600 text-xs bg-white px-2 py-1 rounded border border-green-200 truncate">
-                      #{part.partNumber}
+                    <div className="text-green-600 text-xs bg-white px-2 py-1 rounded border border-green-200 truncate mb-2">
+                      {part.partNumber}
                     </div>
                   )}
+                  
+                  {/* Context and metadata */}
+                  <div className="space-y-1">
+                    {part.context && (
+                      <div className="text-xs text-gray-600 bg-white px-2 py-1 rounded border border-gray-200">
+                        {part.context}
+                      </div>
+                    )}
+                    
+                    {part.isSupersession && (
+                      <div className="text-xs text-orange-600 bg-orange-100 px-2 py-1 rounded border border-orange-200">
+                        🔄 Supersession detected
+                      </div>
+                    )}
+                    
+                    {part.manufacturer && (
+                      <div className="text-xs text-blue-600 bg-blue-100 px-2 py-1 rounded border border-blue-200">
+                        🏭 {part.manufacturer}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             ))}

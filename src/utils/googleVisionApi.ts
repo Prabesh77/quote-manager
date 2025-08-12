@@ -1,3 +1,6 @@
+// Google Vision API service for OCR text extraction
+import { extractPartsWithAI, AIPartExtraction } from './geminiApi';
+
 interface VisionApiResponse {
   responses: Array<{
     textAnnotations?: Array<{
@@ -17,6 +20,7 @@ interface ExtractedPartInfo {
   partNumber: string;
   confidence: number;
   rawText: string;
+  context?: string;
 }
 
 export const extractTextFromImage = async (base64Image: string): Promise<string> => {
@@ -70,124 +74,90 @@ export const extractTextFromImage = async (base64Image: string): Promise<string>
   }
 };
 
-export const extractPartsFromText = (text: string): ExtractedPartInfo[] => {
-  console.log('🔍 Starting part extraction from text:', text);
+export const extractPartsFromText = async (text: string): Promise<ExtractedPartInfo[]> => {
+  try {
+    // Use AI for part extraction
+    const aiParts = await extractPartsWithAI(text);
+    
+    // Convert AI response to ExtractedPartInfo format
+    const parts: ExtractedPartInfo[] = aiParts.map(aiPart => ({
+      partName: aiPart.partName,
+      partNumber: aiPart.partNumber,
+      confidence: aiPart.confidence,
+      rawText: aiPart.rawText,
+      context: aiPart.context
+    }));
+    
+    return parts;
+    
+  } catch (error) {
+    // Fallback to basic extraction if AI fails
+    return fallbackExtraction(text);
+  }
+};
+
+/**
+ * Fallback extraction logic for when AI fails
+ */
+function fallbackExtraction(text: string): ExtractedPartInfo[] {
+  const lines = text.split('\n').map(line => line.trim()).filter(line => line);
   
-  // Simple classification functions
-  const isPartName = (text: string): boolean => {
-    // Part name: contains only alphabets, spaces, and special characters (no numbers)
-    return /^[A-Za-z\s\-_\.\(\)\/]+$/.test(text.trim());
-  };
+  if (lines.length === 0) {
+    return [];
+  }
   
-  const isPartNumber = (text: string): boolean => {
-    // Part number: contains at least one number (can be mix of numbers and alphabets)
-    return /\d/.test(text.trim()) && text.trim().length > 0;
-  };
+  const parts: ExtractedPartInfo[] = [];
   
-  // Split text into lines and process each line
-  const lines = text.split('\n').filter(line => line.trim().length > 0);
-  
-  const extractedParts: ExtractedPartInfo[] = [];
-  
-  // First pass: collect all potential part names and part numbers
-  const allPartNames: string[] = [];
-  const allPartNumbers: string[] = [];
+  // Simple fallback logic
+  let partNumber = '';
+  let partName = '';
+  let context = '';
   
   for (const line of lines) {
-    const trimmedLine = line.trim();
-    if (isPartName(trimmedLine)) {
-      allPartNames.push(trimmedLine);
-    } else if (isPartNumber(trimmedLine)) {
-      allPartNumbers.push(trimmedLine);
+    // Look for part numbers (alphanumeric, 5+ chars)
+    const partNumberMatch = line.match(/\b[A-Z0-9]{5,20}\b/i);
+    if (partNumberMatch && !partNumber) {
+      partNumber = partNumberMatch[0];
+    }
+    
+    // Look for part names
+    if (line.toLowerCase().includes('headlamp') || line.toLowerCase().includes('headlight')) {
+      partName = 'Left Headlamp'; // Default
+      
+      // Check for L/R context
+      if (/\b(rh|r\b|right)\b/i.test(line)) {
+        partName = 'Right Headlamp';
+        context = 'RH';
+      } else if (/\b(lh|l\b|left)\b/i.test(line)) {
+        partName = 'Left Headlamp';
+        context = 'LH';
+      }
+    } else if (line.toLowerCase().includes('radiator')) {
+      partName = 'Radiator';
+    } else if (line.toLowerCase().includes('condenser')) {
+      partName = 'Condenser';
     }
   }
   
-  
-  // Now associate part names with part numbers based on proximity
-  for (const partName of allPartNames) {
-    let bestPartNumber = '';
-    let bestConfidence = 0;
-    let bestDistance = Infinity;
+  if (partName && partNumber) {
+    const extractedPart: ExtractedPartInfo = {
+      partName,
+      partNumber,
+      confidence: 0.7,
+      rawText: text,
+      context
+    };
     
-    // Strategy 1: Look for part numbers in the same line as the part name
-    for (const line of lines) {
-      if (line.includes(partName)) {
-        // Find part numbers in this line
-        const words = line.split(/\s+/);
-        for (const word of words) {
-          if (isPartNumber(word) && word !== partName) {
-            const distance = Math.abs(line.indexOf(word) - line.indexOf(partName));
-            if (distance < bestDistance) {
-              bestPartNumber = word;
-              bestConfidence = 0.95; // Very high confidence for same line
-              bestDistance = distance;
-            }
-          }
-        }
-        break; // Found the line, no need to check others
-      }
-    }
-    
-    // Strategy 2: If no same-line match, find the closest part number in adjacent lines
-    if (!bestPartNumber) {
-      for (let i = 0; i < lines.length; i++) {
-        if (lines[i].includes(partName)) {
-          // Check previous and next lines
-          for (let offset = -1; offset <= 1; offset++) {
-            if (offset === 0) continue; // Skip current line
-            const lineIndex = i + offset;
-            if (lineIndex >= 0 && lineIndex < lines.length) {
-              const searchLine = lines[lineIndex];
-              const words = searchLine.split(/\s+/);
-              for (const word of words) {
-                if (isPartNumber(word)) {
-                  const distance = Math.abs(offset); // Distance in lines
-                  if (distance < bestDistance) {
-                    bestPartNumber = word;
-                    bestConfidence = 0.8; // High confidence for adjacent lines
-                    bestDistance = distance;
-                  }
-                }
-              }
-            }
-          }
-          break;
-        }
-      }
-    }
-    
-    // Strategy 3: If still no match, find any unused part number (lowest priority)
-    if (!bestPartNumber && allPartNumbers.length > 0) {
-      // Find the first unused part number
-      for (const partNumber of allPartNumbers) {
-        if (!extractedParts.some(part => part.partNumber === partNumber)) {
-          bestPartNumber = partNumber;
-          bestConfidence = 0.5; // Low confidence for fallback
-          break;
-        }
-      }
-    }
-    
-    if (bestPartNumber) {
-      extractedParts.push({
-        partName,
-        partNumber: bestPartNumber,
-        confidence: bestConfidence,
-        rawText: `${partName} - ${bestPartNumber}`
-      });
-    } else {
-      // console.log(`⚠️ No part number found for "${partName}"`);
-    }
+    parts.push(extractedPart);
   }
   
-  console.log('🎉 Final extracted parts:', extractedParts);
-  return extractedParts;
-};
+  return parts;
+}
 
 export const processImageForParts = async (base64Image: string): Promise<ExtractedPartInfo[]> => {
   try {
     const extractedText = await extractTextFromImage(base64Image);
-    const parts = extractPartsFromText(extractedText);
+    const parts = await extractPartsFromText(extractedText);
     return parts;
   } catch (error) {
     console.error('Error processing image for parts:', error);

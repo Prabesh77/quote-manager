@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { ImagePasteArea } from '@/components/ui/ImagePasteArea';
+
 import {
   X,
   Plus,
@@ -20,6 +21,8 @@ const getPartIcon = (partName: string): string | null => {
     'Radar Sensor': '/part-icons/sensor.png',
     'Fan Assembly': '/part-icons/fan.png',
     'Intercooler': '/part-icons/intercooler.png',
+    'Left DayLight': '/part-icons/headlight-left.png', // Use left headlight icon
+    'Right DayLight': '/part-icons/headlight-right.png', // Use right headlight icon
   };
 
   return iconMap[partName] || null;
@@ -33,6 +36,8 @@ const PART_OPTIONS = [
   { name: 'Radar Sensor', icon: getPartIcon('Radar Sensor') },
   { name: 'Fan Assembly', icon: getPartIcon('Fan Assembly') },
   { name: 'Intercooler', icon: getPartIcon('Intercooler') },
+  { name: 'Left DayLight', icon: getPartIcon('Left Headlamp') }, // Reuse fan icon for now
+  { name: 'Right DayLight', icon: getPartIcon('Right Headlamp') }, // Reuse fan icon for now
 ];
 
 interface PartDetails {
@@ -47,6 +52,7 @@ interface ExtractedPartInfo {
   partNumber: string;
   confidence: number;
   rawText: string;
+  context?: string;
 }
 
 interface QuoteFormProps {
@@ -82,44 +88,49 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
 
     // Auto-add extracted parts to selected parts and populate details
     parts.forEach(part => {
-      // The Google Vision API now returns exact part names that match our options
+      // Use the AI-extracted part name directly instead of re-processing raw text
       let matchedPartName = part.partName;
-
-      // Double-check that the part name exists in our options
-      const partExists = PART_OPTIONS.some(option => option.name === part.partName);
-
-      // If the exact match doesn't exist, try fuzzy matching as fallback
-      if (!partExists) {
-        const normalizedPartName = part.partName.toLowerCase();
-        for (const option of PART_OPTIONS) {
-          if (option.name.toLowerCase().includes(normalizedPartName) ||
-            normalizedPartName.includes(option.name.toLowerCase())) {
-            matchedPartName = option.name;
-            break;
+      
+      // Use context information to determine Left vs Right for Headlamp and DayLight
+      if (part.context && (
+        matchedPartName === 'Left Headlamp' || matchedPartName === 'Right Headlamp' ||
+        matchedPartName === 'Left DayLight' || matchedPartName === 'Right DayLight'
+      )) {
+        if (part.context === 'RH' || part.context === 'R' || part.context === 'Right') {
+          if (matchedPartName.includes('Headlamp')) {
+            matchedPartName = 'Right Headlamp';
+          } else if (matchedPartName.includes('DayLight')) {
+            matchedPartName = 'Right DayLight';
+          }
+        } else if (part.context === 'LH' || part.context === 'L' || part.context === 'Left') {
+          if (matchedPartName.includes('Headlamp')) {
+            matchedPartName = 'Left Headlamp';
+          } else if (matchedPartName.includes('DayLight')) {
+            matchedPartName = 'Left DayLight';
           }
         }
       }
+      
+      // Add to selected parts if not already present
+      setSelectedParts(prev => {
+        if (!prev.includes(matchedPartName)) {
+          return [...prev, matchedPartName];
+        }
+        return prev;
+      });
 
-      // If we found a match, add it to selected parts
-      if (partExists || matchedPartName !== part.partName) {
-        setSelectedParts(prev => {
-          if (!prev.includes(matchedPartName)) {
-            return [...prev, matchedPartName];
-          }
-          return prev;
-        });
+      // Populate part details with confidence information
+      setPartDetails(prev => ({
+        ...prev,
+        [matchedPartName]: {
+          name: matchedPartName,
+          number: part.partNumber !== 'Not found' ? part.partNumber : '',
+          price: null,
+          note: `AI-detected - Context: ${part.context || 'None'}`
+        }
+      }));
+      
 
-        // Populate part details
-        setPartDetails(prev => ({
-          ...prev,
-          [matchedPartName]: {
-            name: matchedPartName,
-            number: part.partNumber !== 'Not found' ? part.partNumber : '',
-            price: null,
-            note: '' // Empty note field for user input
-          }
-        }));
-      }
     });
   };
 
@@ -131,20 +142,8 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
       )
     );
 
-    // Find the matched part name in our options
-    let matchedPartName = removedPart.partName;
-    const partExists = PART_OPTIONS.some(option => option.name === removedPart.partName);
-
-    if (!partExists) {
-      const normalizedPartName = removedPart.partName.toLowerCase();
-      for (const option of PART_OPTIONS) {
-        if (option.name.toLowerCase().includes(normalizedPartName) ||
-          normalizedPartName.includes(option.name.toLowerCase())) {
-          matchedPartName = option.name;
-          break;
-        }
-      }
-    }
+    // Use the AI-extracted part name directly
+    const matchedPartName = removedPart.partName;
 
     // Check if this part was the only source for this part name
     const remainingPartsForName = extractedParts.filter(part => {
@@ -152,20 +151,8 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
         return false; // This is the one being removed
       }
 
-      // Check if there are other parts with the same name
-      let otherMatchedPartName = part.partName;
-      const otherPartExists = PART_OPTIONS.some(option => option.name === part.partName);
-
-      if (!otherPartExists) {
-        const normalizedOtherPartName = part.partName.toLowerCase();
-        for (const option of PART_OPTIONS) {
-          if (option.name.toLowerCase().includes(normalizedOtherPartName) ||
-            normalizedOtherPartName.includes(option.name.toLowerCase())) {
-            otherMatchedPartName = option.name;
-            break;
-          }
-        }
-      }
+      // Use the AI-extracted part name directly
+      const otherMatchedPartName = part.partName;
 
       return otherMatchedPartName === matchedPartName;
     });
@@ -173,16 +160,13 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
     // If no other parts with this name, remove from selected parts and clear details
     if (remainingPartsForName.length === 0) {
       setSelectedParts(prev => prev.filter(part => part !== matchedPartName));
-      setPartDetails(prev => {
-        const newDetails = { ...prev };
-        delete newDetails[matchedPartName];
-        return newDetails;
-      });
-      console.log(`🗑️ Removed part "${matchedPartName}" from form - no more sources`);
-    } else {
-      console.log(`🔄 Part "${matchedPartName}" still has other sources, keeping in form`);
-    }
-  };
+              setPartDetails(prev => {
+          const newDetails = { ...prev };
+          delete newDetails[matchedPartName];
+          return newDetails;
+        });
+      }
+    };
 
   const handlePaste = () => {
     const lines = rawText.split('\n');

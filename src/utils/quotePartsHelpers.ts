@@ -17,25 +17,25 @@ export const getQuotePartsFromJson = (quote: Quote, allParts: Part[]): Part[] =>
     
     if (!basePart) {
       // Create a placeholder if part not found
-      const defaultVariant = quotePart.variants?.[0] || { note: '', final_price: null };
+      const defaultVariant = quotePart.variants?.[0];
       return {
         id: quotePart.part_id,
         name: 'Unknown Part',
         number: '',
-        price: defaultVariant.final_price,
-        note: defaultVariant.note,
+        price: defaultVariant?.final_price ?? null,
+        note: defaultVariant?.note || '',
         createdAt: new Date().toISOString()
       };
     }
 
     // Get the default variant or first variant
-    const defaultVariant = quotePart.variants?.find(v => v.is_default) || quotePart.variants?.[0] || { note: '', final_price: null };
+    const defaultVariant = quotePart.variants?.find(v => v.is_default) || quotePart.variants?.[0];
 
     // Merge base part data with quote-specific data
     return {
       ...basePart,
-      price: defaultVariant.final_price, // Use ONLY the quote-specific price (even if null)
-      note: defaultVariant.note || ''
+      price: defaultVariant?.final_price ?? basePart.price, // Use variant price if available, otherwise fall back to base part price
+      note: defaultVariant?.note || ''
     };
   });
 };
@@ -74,10 +74,7 @@ export const addPartToQuote = (quote: Quote, partId: string, note: string = '', 
     
     updatedParts[existingPartIndex] = {
       ...existingPart,
-      variants: [...(existingPart.variants || []), {
-        ...newVariant,
-        price: newVariant.final_price
-      }]
+      variants: [...(existingPart.variants || []), newVariant]
     };
     
     return updatedParts;
@@ -90,7 +87,7 @@ export const addPartToQuote = (quote: Quote, partId: string, note: string = '', 
         variants: [{
           id: `var_${partId}_${Date.now()}`,
           note,
-          price: finalPrice,
+          final_price: finalPrice,
           created_at: new Date().toISOString(),
           is_default: true
         }]
@@ -151,6 +148,6 @@ export const quoteHasPartWithPrice = (quote: Quote): boolean => {
   }
   
   return quote.partsRequested.some(p => 
-    p.variants?.some(v => v.price !== null && v.price !== undefined && v.price > 0)
+    p.variants?.some(v => v.final_price !== null && v.final_price !== undefined && v.final_price > 0)
   );
 }; 

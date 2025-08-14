@@ -17,21 +17,25 @@ export const getQuotePartsFromJson = (quote: Quote, allParts: Part[]): Part[] =>
     
     if (!basePart) {
       // Create a placeholder if part not found
+      const defaultVariant = quotePart.variants?.[0] || { note: '', final_price: null };
       return {
         id: quotePart.part_id,
         name: 'Unknown Part',
         number: '',
-        price: quotePart.final_price,
-        note: quotePart.note,
+        price: defaultVariant.final_price,
+        note: defaultVariant.note,
         createdAt: new Date().toISOString()
       };
     }
 
+    // Get the default variant or first variant
+    const defaultVariant = quotePart.variants?.find(v => v.is_default) || quotePart.variants?.[0] || { note: '', final_price: null };
+
     // Merge base part data with quote-specific data
     return {
       ...basePart,
-      price: quotePart.final_price, // Use ONLY the quote-specific price (even if null)
-      note: quotePart.note || ''
+      price: defaultVariant.final_price, // Use ONLY the quote-specific price (even if null)
+      note: defaultVariant.note || ''
     };
   });
 };
@@ -56,22 +60,40 @@ export const addPartToQuote = (quote: Quote, partId: string, note: string = '', 
   const existingPartIndex = currentParts.findIndex(p => p.part_id === partId);
   
   if (existingPartIndex >= 0) {
-    // Update existing part
+    // Update existing part - add new variant
     const updatedParts = [...currentParts];
-    updatedParts[existingPartIndex] = {
-      ...updatedParts[existingPartIndex],
+    const existingPart = updatedParts[existingPartIndex];
+    
+    const newVariant = {
+      id: `var_${partId}_${Date.now()}`,
       note,
-      final_price: finalPrice
+      final_price: finalPrice,
+      created_at: new Date().toISOString(),
+      is_default: false
     };
+    
+    updatedParts[existingPartIndex] = {
+      ...existingPart,
+      variants: [...(existingPart.variants || []), {
+        ...newVariant,
+        price: newVariant.final_price
+      }]
+    };
+    
     return updatedParts;
   } else {
-    // Add new part
+    // Add new part with first variant
     return [
       ...currentParts,
       {
         part_id: partId,
-        note,
-        final_price: finalPrice
+        variants: [{
+          id: `var_${partId}_${Date.now()}`,
+          note,
+          price: finalPrice,
+          created_at: new Date().toISOString(),
+          is_default: true
+        }]
       }
     ];
   }
@@ -99,8 +121,15 @@ export const updatePartInQuote = (
     p.part_id === partId 
       ? { 
           ...p, 
-          ...(updates.note !== undefined && { note: updates.note }),
-          ...(updates.final_price !== undefined && { final_price: updates.final_price })
+          variants: p.variants.map(v => 
+            v.is_default 
+              ? { 
+                  ...v, 
+                  ...(updates.note !== undefined && { note: updates.note }),
+                  ...(updates.final_price !== undefined && { final_price: updates.final_price })
+                }
+              : v
+          )
         }
       : p
   );
@@ -121,5 +150,7 @@ export const quoteHasPartWithPrice = (quote: Quote): boolean => {
     return false;
   }
   
-  return quote.partsRequested.some(p => p.final_price !== null && p.final_price !== undefined && p.final_price > 0);
+  return quote.partsRequested.some(p => 
+    p.variants?.some(v => v.price !== null && v.price !== undefined && v.price > 0)
+  );
 }; 

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { ChevronDown, ChevronRight, Edit, Trash2, Save, X, Search, Eye, Copy, Car, CheckCircle, AlertTriangle, ShoppingCart, Package, Edit3 } from 'lucide-react';
+import { ChevronDown, ChevronRight, Edit, Trash2, Save, X, Search, Eye, Copy, Car, CheckCircle, AlertTriangle, ShoppingCart, Package, Edit3, Plus } from 'lucide-react';
 import { Quote, Part } from './useQuotes';
 import { SkeletonLoader } from './SkeletonLoader';
 import {
@@ -52,6 +52,134 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
   // Quote edit modal state
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [selectedQuoteForEdit, setSelectedQuoteForEdit] = useState<Quote | null>(null);
+
+  // Local quotes state for variant management
+  const [localQuotes, setLocalQuotes] = useState<Quote[]>(quotes);
+
+  // Helper functions for variant management
+  const generateVariantId = () => `var_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+  const addVariantToPart = (quoteId: string, partId: string) => {
+    // Only add to local state, don't save to database yet
+    const newVariantId = generateVariantId();
+    
+    console.log('Adding variant to part:', { quoteId, partId, newVariantId });
+    console.log('Current partEditData before adding:', partEditData);
+    console.log('Current localQuotes before adding:', localQuotes);
+    
+    // Add to edit data with consistent structure, preserving existing variant data
+    setPartEditData(prev => {
+      const existingPartData = prev[partId] || {};
+      console.log('Preserving existing partEditData for partId:', partId, existingPartData);
+      
+      const newData = {
+        ...prev,
+        [partId]: {
+          ...existingPartData, // Preserve existing variant data
+          [newVariantId]: { note: '', final_price: null }
+        }
+      };
+      console.log('Updated partEditData:', newData);
+      return newData;
+    });
+    
+    // Add to local quote state for display
+    setLocalQuotes(prev => {
+      console.log('Current localQuotes before adding variant:', prev);
+      
+      const updatedQuotes = prev.map(q => 
+        q.id === quoteId 
+          ? {
+              ...q,
+              partsRequested: q.partsRequested.map(p => 
+                p.part_id === partId 
+                  ? { 
+                      ...p, 
+                      variants: [
+                        ...(p.variants || []),
+                        {
+                          id: newVariantId,
+                          note: '',
+                          final_price: null, // Use consistent final_price key
+                          created_at: new Date().toISOString(),
+                          is_default: false
+                        }
+                      ]
+                    }
+                  : p
+              )
+            }
+          : q
+      );
+      
+      console.log('Updated quotes after adding variant:', updatedQuotes);
+      
+      return updatedQuotes;
+    });
+    
+    // Start editing if not already editing
+    if (editingParts !== quoteId) {
+      setEditingParts(quoteId);
+    }
+  };
+
+  const removeVariantFromPart = (quoteId: string, partId: string, variantId: string) => {
+    // Only update local state, don't save to database yet
+    
+    // Update local quote state
+    setLocalQuotes(prev => prev.map(q => 
+      q.id === quoteId 
+        ? {
+            ...q,
+            partsRequested: q.partsRequested.map(p => 
+              p.part_id === partId 
+                ? { 
+                    ...p, 
+                    variants: p.variants.filter(v => v.id !== variantId)
+                  }
+                : p
+            )
+          }
+        : q
+    ));
+    
+    // Ensure at least one variant remains
+    setLocalQuotes(prev => prev.map(q => 
+      q.id === quoteId 
+        ? {
+            ...q,
+            partsRequested: q.partsRequested.map(p => 
+              p.part_id === partId 
+                ? {
+                    ...p,
+                    variants: p.variants.length === 0 ? [{
+                      id: generateVariantId(),
+                      note: '',
+                      final_price: null,
+                      created_at: new Date().toISOString(),
+                      is_default: true
+                    }] : p.variants
+                  }
+                : p
+            )
+          }
+        : q
+    ));
+    
+    // Clear edit data for removed variant
+    setPartEditData(prev => {
+      const newData = { ...prev };
+      if (newData[partId]) {
+        delete newData[partId][variantId];
+        if (Object.keys(newData[partId]).length === 0) {
+          delete newData[partId];
+        }
+      }
+      return newData;
+    });
+  };
+
+
 
   // Function to get parts with their quote-specific notes merged in
   const getQuotePartsWithNotes = async (quoteId: string, partRequested: string): Promise<Part[]> => {
@@ -179,6 +307,65 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
     });
   }, [quotes]);
 
+  // Synchronize localQuotes with quotes prop
+  useEffect(() => {
+    // Only update if localQuotes is empty (first mount) or if there are new quotes
+    // that don't exist in localQuotes yet
+    if (localQuotes.length === 0) {
+      setLocalQuotes(quotes);
+    } else {
+      // Check if there are new quotes that don't exist in localQuotes
+      const newQuotes = quotes.filter(quote => 
+        !localQuotes.find(localQuote => localQuote.id === quote.id)
+      );
+      
+      if (newQuotes.length > 0) {
+        setLocalQuotes(prev => [...prev, ...newQuotes]);
+      }
+      
+      // Also check if existing quotes have been updated (e.g., status changes)
+      // but preserve local variant changes
+      const updatedQuotes = quotes.map(quote => {
+        const localQuote = localQuotes.find(lq => lq.id === quote.id);
+        if (localQuote) {
+          // Preserve local variant changes but update other fields
+          return {
+            ...quote,
+            partsRequested: localQuote.partsRequested || quote.partsRequested
+          };
+        }
+        return quote;
+      });
+      
+      // Only update if there are actual changes (excluding local variant changes)
+      const hasNonVariantChanges = updatedQuotes.some((quote, index) => {
+        const localQuote = localQuotes[index];
+        if (!localQuote || localQuote.id !== quote.id) return true;
+        
+        // Check if any non-variant fields have changed
+        return (
+          localQuote.status !== quote.status ||
+          localQuote.vin !== quote.vin ||
+          localQuote.make !== quote.make ||
+          localQuote.model !== quote.model ||
+          localQuote.series !== quote.series ||
+          localQuote.auto !== quote.auto ||
+          localQuote.body !== quote.body ||
+          localQuote.year !== quote.year ||
+          localQuote.color !== quote.color ||
+          localQuote.notes !== quote.notes ||
+          localQuote.requiredBy !== quote.requiredBy ||
+          localQuote.quoteRef !== quote.quoteRef ||
+          localQuote.createdAt !== quote.createdAt
+        );
+      });
+      
+      if (hasNonVariantChanges) {
+        setLocalQuotes(updatedQuotes);
+      }
+    }
+  }, [quotes, localQuotes.length]);
+
   const handleSave = async () => {
     if (editingQuote) {
       await onUpdateQuote(editingQuote, editData);
@@ -186,12 +373,143 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
       setEditData({});
     }
     if (editingParts) {
-      const updates = Object.keys(partEditData).map(id => ({
-        id,
-        updates: partEditData[id] || {}
-      }));
+      const quote = localQuotes.find(q => q.id === editingParts);
+      if (quote) {
+        console.log('Saving parts with data:', partEditData);
+        
+        // First, update the local state with all variant changes
+        setLocalQuotes(prev => prev.map(q => 
+          q.id === editingParts 
+            ? {
+                ...q,
+                partsRequested: q.partsRequested.map(p => {
+                  const partEditDataForPart = partEditData[p.part_id];
+                  if (partEditDataForPart) {
+                    // Update all variants for this part
+                    const updatedVariants = p.variants.map(variant => {
+                      const variantEditData = partEditDataForPart[variant.id];
+                      if (variantEditData) {
+                        return {
+                          ...variant,
+                          note: variantEditData.note !== undefined ? variantEditData.note : variant.note,
+                          final_price: variantEditData.final_price !== undefined ? variantEditData.final_price : variant.final_price
+                        };
+                      }
+                      return variant;
+                    });
+                    
+                    return {
+                      ...p,
+                      variants: updatedVariants
+                    };
+                  }
+                  return p;
+                })
+              }
+            : q
+        ));
+        
+        // Then, save the default variant to the backend (for compatibility with current schema)
+        const updates: Array<{ id: string; updates: Partial<Part> }> = [];
+        
+        Object.keys(partEditData).forEach(partId => {
+          const partEditDataForPart = partEditData[partId];
+          if (partEditDataForPart) {
+            // Find the first variant (primary variant)
+            const quotePart = quote.partsRequested?.find(qp => qp.part_id === partId);
+            const defaultVariant = quotePart?.variants?.[0];
+            
+            if (defaultVariant) {
+              const variantEditData = partEditDataForPart[defaultVariant.id];
+              if (variantEditData) {
+                updates.push({
+                  id: partId,
+                  updates: {
+                    note: variantEditData.note !== undefined ? variantEditData.note : defaultVariant.note,
+                    price: variantEditData.final_price !== undefined ? variantEditData.final_price : defaultVariant.final_price
+                  }
+                });
+              }
+            } else {
+              // Handle case where no variants exist yet
+              const variantKeys = Object.keys(partEditDataForPart);
+              if (variantKeys.length > 0) {
+                const firstVariantKey = variantKeys[0];
+                const variantData = partEditDataForPart[firstVariantKey];
+                updates.push({
+                  id: partId,
+                  updates: {
+                    note: variantData.note !== undefined ? variantData.note : '',
+                    price: variantData.final_price !== undefined ? variantData.final_price : null
+                  }
+                });
+              }
+            }
+          }
+        });
+        
+        console.log('Converted updates for backend:', updates);
+        console.log('All variants updated in local state');
+        
+        // Debug: Log the current state of all variants for this quote
+        const currentQuote = localQuotes.find(q => q.id === editingParts);
+        if (currentQuote) {
+          console.log('Current quote variants after update:', currentQuote.partsRequested);
+        }
+        
+        // Update the JSON structure in the database with final_price calculations
+        try {
+          // Use the updated partsRequested that includes user input, not the original from localQuotes
+          const updatedPartsRequested = quote.partsRequested.map(p => {
+            const partEditDataForPart = partEditData[p.part_id];
+            if (partEditDataForPart) {
+              // Update all variants for this part with user input
+              const updatedVariants = p.variants.map(variant => {
+                const variantEditData = partEditDataForPart[variant.id];
+                if (variantEditData) {
+                  return {
+                    ...variant,
+                    note: variantEditData.note !== undefined ? variantEditData.note : variant.note,
+                    final_price: variantEditData.final_price !== undefined ? variantEditData.final_price : variant.final_price
+                  };
+                }
+                return variant;
+              });
+              
+              return {
+                ...p,
+                variants: updatedVariants
+              };
+            }
+            return p;
+          });
+          
+          console.log('Saving updated parts_requested to database:', updatedPartsRequested);
+          
+          const { error: jsonUpdateError } = await supabase
+            .from('quotes')
+            .update({ parts_requested: updatedPartsRequested })
+            .eq('id', editingParts);
+          
+          if (jsonUpdateError) {
+            console.error('Error updating JSON structure:', jsonUpdateError);
+          } else {
+            console.log('Successfully updated JSON structure with final_price calculations');
+          }
+        } catch (error) {
+          console.error('Error updating JSON structure:', error);
+        }
+        
+        if (updates.length > 0) {
+          try {
+            await onUpdateMultipleParts(updates);
+            console.log('Successfully saved default variants to backend');
+          } catch (error) {
+            console.error('Error saving parts to backend:', error);
+          }
+        }
+      }
       
-      await onUpdateMultipleParts(updates);
       setEditingParts(null);
       setPartEditData({});
     }
@@ -214,14 +532,35 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
 
   const startEditingParts = (quoteParts: Part[], quoteId: string) => {
     const newPartEditData: Record<string, Record<string, any>> = {};
-    quoteParts.forEach(part => {
-      newPartEditData[part.id] = {
-        name: part.name,
-        number: part.number,
-        price: part.price,
-        note: part.note
-      };
-    });
+    const localQuote = localQuotes.find(q => q.id === quoteId);
+    
+    if (localQuote) {
+      quoteParts.forEach(part => {
+        const quotePart = localQuote.partsRequested?.find(qp => qp.part_id === part.id);
+        if (quotePart && quotePart.variants) {
+          // Initialize edit data for all variants
+          quotePart.variants.forEach(variant => {
+            if (!newPartEditData[part.id]) {
+              newPartEditData[part.id] = {};
+            }
+            newPartEditData[part.id][variant.id] = {
+              note: variant.note,
+              final_price: variant.final_price
+            };
+          });
+        } else {
+          // Fallback for parts without variants - create default variant
+          newPartEditData[part.id] = {
+            default: {
+              note: part.note || '',
+              final_price: part.price // Map Part.price to final_price for consistency
+            }
+          };
+        }
+      });
+    }
+    
+    console.log('Starting edit mode with data:', newPartEditData);
     setPartEditData(newPartEditData);
     setEditingParts(quoteId);
   };
@@ -240,6 +579,19 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
     }));
   };
 
+  const handleVariantEditChange = (partId: string, variantId: string, field: string, value: string | number | null) => {
+    setPartEditData(prev => ({
+      ...prev,
+      [partId]: {
+        ...prev[partId],
+        [variantId]: {
+          ...prev[partId]?.[variantId],
+          [field]: value
+        }
+      }
+    }));
+  };
+
   const getQuoteStatus = (quoteParts: Part[], quoteStatus?: string): QuoteStatus => {
     // Prioritize database status over calculated status
     if (quoteStatus === 'delivered') return 'delivered';
@@ -251,8 +603,9 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
     if (quoteStatus === 'active') {
       // Fallback to calculation for legacy quotes
       if (quoteParts.length === 0) return 'unpriced';
-      const hasPricedParts = quoteParts.some(part => part.price && part.price > 0);
-      return hasPricedParts ? 'priced' : 'unpriced';
+      // Since we're ignoring base part prices, we need to check variants
+      // For now, assume unpriced if we can't determine from variants
+      return 'unpriced';
     }
     return 'unpriced';
   };
@@ -666,7 +1019,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
     const quote = quotes.find(q => q.id === quoteId);
     if (quote) {
       const quoteParts = getQuotePartsWithNotesSync(quote.id);
-      const orderableParts = quoteParts.filter(part => part.price && part.price > 0);
+      const orderableParts = quoteParts.filter(part => part.final_price && part.final_price > 0);
       const orderablePartIds = orderableParts.map(part => part.id);
       setSelectedPartIds(orderablePartIds);
     } else {
@@ -746,6 +1099,8 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
       loadQuotePartsWithNotes();
     }
   }, [quotes, parts]);
+
+
 
   // Quote edit modal handlers
   const handleEditQuote = (quote: Quote) => {
@@ -1250,98 +1605,152 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Part Number</th>
                                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Price</th>
                                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Notes</th>
+                                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                                   </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-200">
                                   {quoteParts.map((part) => {
                                     const isPartEditing = editingParts === quote.id;
+                                    const localQuote = localQuotes.find(q => q.id === quote.id);
+                                    const quotePart = localQuote?.partsRequested?.find(qp => qp.part_id === part.id);
+                                    const variants = quotePart?.variants || [{ 
+                                      id: 'default', 
+                                      note: part.note, 
+                                      final_price: null, // No base price, only variant prices
+                                      is_default: true 
+                                    }];
                                     
                                     return (
-                                      <tr key={part.id} className="hover:bg-gray-50">
-                                        <td className="px-4 py-3">
-                                          <div className="flex items-center space-x-2">
-                                            {getPartIcon(part.name) && (
-                                              <img src={getPartIcon(part.name)!} alt={part.name} className="h-5 w-5 object-contain" />
-                                            )}
-                                            <div className="flex-1">
-                                              {/* Part name is always non-editable */}
-                                              <span className="text-sm font-medium text-gray-900">{part.name}</span>
-                                            </div>
-                                          </div>
-                                        </td>
-                                        <td className="px-4 py-3">
-                                          <div className="flex items-center space-x-1">
-                                            {isPartEditing ? (
-                                              <input
-                                                type="text"
-                                                value={partEditData[part.id]?.number || ''}
-                                                onChange={(e) => handlePartEditChange(part.id, 'number', e.target.value)}
-                                                className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:ring-1 focus:ring-red-500 focus:border-transparent"
-                                              />
-                                            ) : (
-                                              <>
-                                                <span className="text-sm text-gray-600 font-mono">{part.number || '-'}</span>
-                                                <button
-                                                  onClick={() => copyToClipboard(part.number || '')}
-                                                  className="p-1 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
-                                                  title="Copy to clipboard"
-                                                >
-                                                  <Copy className="h-3 w-3" />
-                                                </button>
-                                              </>
-                                            )}
-                                          </div>
-                                        </td>
-                                        <td className="px-4 py-3">
-                                          <div className="flex items-center space-x-1">
-                                            {isPartEditing ? (
-                                              <input
-                                                type="number"
-                                                value={partEditData[part.id]?.price || ''}
-                                                onChange={(e) => handlePartEditChange(part.id, 'price', e.target.value ? Number(e.target.value) : null)}
-                                                className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:ring-1 focus:ring-red-500 focus:border-transparent"
-                                                autoFocus
-                                              />
-                                            ) : (
-                                              <>
-                                                <span className="text-sm font-medium text-gray-900">
-                                                  {part.price ? `$${part.price.toFixed(2)}` : '-'}
-                                                </span>
-                                                <button
-                                                  onClick={() => copyToClipboard(part.price ? part.price.toString() : '')}
-                                                  className="p-1 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
-                                                  title="Copy to clipboard"
-                                                >
-                                                  <Copy className="h-3 w-3" />
-                                                </button>
-                                              </>
-                                            )}
-                                          </div>
-                                        </td>
-                                        <td className="px-4 py-3">
-                                          <div className="flex items-center space-x-1">
-                                            {isPartEditing ? (
-                                              <input
-                                                type="text"
-                                                value={partEditData[part.id]?.note || ''}
-                                                onChange={(e) => handlePartEditChange(part.id, 'note', e.target.value)}
-                                                className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:ring-1 focus:ring-red-500 focus:border-transparent"
-                                              />
-                                            ) : (
-                                              <>
-                                                <span className="text-sm text-gray-600">{part.note || '-'}</span>
-                                                <button
-                                                  onClick={() => copyToClipboard(part.note || '')}
-                                                  className="p-1 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
-                                                  title="Copy to clipboard"
-                                                >
-                                                  <Copy className="h-3 w-3" />
-                                                </button>
-                                              </>
-                                            )}
-                                          </div>
-                                        </td>
-                                      </tr>
+                                      <>
+                                        {/* Primary Variant Row */}
+                                        {variants.map((variant, index) => (
+                                          <tr key={`${part.id}_${variant.id}`} className={`hover:bg-gray-50 ${index > 0 ? 'bg-gray-50' : ''}`}>
+                                            <td className="px-4 py-3">
+                                              <div className="flex items-center space-x-2">
+                                                {index === 0 && getPartIcon(part.name) && (
+                                                  <img src={getPartIcon(part.name)!} alt={part.name} className="h-5 w-5 object-contain" />
+                                                )}
+                                                <div className="flex-1">
+                                                  {index === 0 ? (
+                                                    <span className="text-sm font-medium text-gray-900">{part.name}</span>
+                                                  ) : (
+                                                    <div className="flex items-center space-x-2">
+                                                      <span className="text-xs text-gray-400">Variant {index + 1}</span>
+                                                    </div>
+                                                  )}
+                                                </div>
+                                              </div>
+                                            </td>
+                                            <td className="px-4 py-3">
+                                              <div className="flex items-center space-x-1">
+                                                {isPartEditing ? (
+                                                  <input
+                                                    type="text"
+                                                    value={partEditData[part.id]?.number || part.number || ''}
+                                                    onChange={(e) => handlePartEditChange(part.id, 'number', e.target.value)}
+                                                    className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:ring-1 focus:ring-red-500 focus:border-transparent"
+                                                  />
+                                                ) : (
+                                                  <>
+                                                    <span className="text-sm text-gray-600 font-mono">{part.number || '-'}</span>
+                                                    <button
+                                                      onClick={() => copyToClipboard(part.number || '')}
+                                                      className="p-1 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
+                                                      title="Copy to clipboard"
+                                                    >
+                                                      <Copy className="h-3 w-3" />
+                                                    </button>
+                                                  </>
+                                                )}
+                                              </div>
+                                            </td>
+                                            <td className="px-4 py-3">
+                                              <div className="flex items-center space-x-1">
+                                                {isPartEditing ? (
+                                                  <input
+                                                    type="number"
+                                                    value={(() => {
+                                                      const editValue = partEditData[part.id]?.[variant.id]?.final_price;
+                                                      const displayValue = editValue !== undefined ? editValue : variant.final_price || '';
+                                                      // Ensure we never return null - use empty string instead
+                                                      return displayValue === null ? '' : displayValue;
+                                                    })()}
+                                                    onChange={(e) => handleVariantEditChange(part.id, variant.id, 'final_price', e.target.value ? Number(e.target.value) : null)}
+                                                    className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-1 focus:ring-red-500 focus:border-transparent"
+                                                  />
+                                                ) : (
+                                                  <>
+                                                    <span className="text-sm font-medium text-gray-900">
+                                                      {variant.final_price ? `$${variant.final_price.toFixed(2)}` : '-'}
+                                                    </span>
+                                                    <button
+                                                      onClick={() => copyToClipboard(variant.final_price ? variant.final_price.toString() : '')}
+                                                      className="p-1 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
+                                                      title="Copy to clipboard"
+                                                    >
+                                                      <Copy className="h-3 w-3" />
+                                                    </button>
+                                                  </>
+                                                )}
+                                              </div>
+                                            </td>
+                                            <td className="px-4 py-3">
+                                              <div className="flex items-center space-x-1">
+                                                {isPartEditing ? (
+                                                  <input
+                                                    type="text"
+                                                    value={partEditData[part.id]?.[variant.id]?.note !== undefined ? partEditData[part.id][variant.id].note : variant.note || ''}
+                                                    onChange={(e) => handleVariantEditChange(part.id, variant.id, 'note', e.target.value)}
+                                                    className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:ring-1 focus:ring-red-500 focus:border-transparent"
+                                                  />
+                                                ) : (
+                                                  <>
+                                                    <span className="text-sm text-gray-600">{variant.note || '-'}</span>
+                                                    <button
+                                                      onClick={() => copyToClipboard(variant.note || '')}
+                                                      className="p-1 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
+                                                      title="Copy to clipboard"
+                                                    >
+                                                      <Copy className="h-3 w-3" />
+                                                    </button>
+                                                  </>
+                                                )}
+                                              </div>
+                                            </td>
+                                            <td className="px-4 py-3">
+                                              <div className="flex items-center space-x-1">
+                                                {isPartEditing ? (
+                                                  <>
+                                                    {index === 0 ? (
+                                                      <button
+                                                        onClick={() => addVariantToPart(quote.id, part.id)}
+                                                        className="px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors cursor-pointer flex items-center space-x-1"
+                                                        title="Add variant"
+                                                      >
+                                                        <Plus className="h-3 w-3" />
+                                                        <span>Add Variant</span>
+                                                      </button>
+                                                    ) : (
+                                                      <button
+                                                        onClick={() => removeVariantFromPart(quote.id, part.id, variant.id)}
+                                                        className="px-2 py-1 text-xs bg-red-100 text-red-700 rounded hover:bg-red-200 transition-colors cursor-pointer"
+                                                        title="Remove variant"
+                                                      >
+                                                        Remove
+                                                      </button>
+                                                    )}
+                                                  </>
+                                                ) : (
+                                                  // Show variant number for non-editing mode
+                                                  <span className="text-xs text-gray-400">
+                                                    {index === 0 ? 'Primary' : `Variant ${index + 1}`}
+                                                  </span>
+                                                )}
+                                              </div>
+                                            </td>
+                                          </tr>
+                                        ))}
+                                      </>
                                     );
                                   })}
                                 </tbody>
@@ -1353,105 +1762,155 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                           <div className="lg:hidden space-y-3">
                             {quoteParts.map((part) => {
                               const isPartEditing = editingParts === quote.id;
+                              const localQuote = localQuotes.find(q => q.id === quote.id);
+                              const quotePart = localQuote?.partsRequested?.find(qp => qp.part_id === part.id);
+                              const variants = quotePart?.variants || [{ 
+                                id: 'default', 
+                                note: part.note, 
+                                final_price: null, // No base price, only variant prices
+                                is_default: true 
+                              }];
                               
                               return (
-                                <div key={part.id} className="bg-white rounded-lg border border-gray-200 p-3 shadow-sm">
-                                  <div className="relative">
-                                    {getPartIcon(part.name) && (
-                                      <div className="absolute top-2 right-2 bg-white rounded-full p-1.5 shadow-sm border border-gray-200">
-                                        <img src={getPartIcon(part.name)!} alt={part.name} className="h-7 w-7 object-contain" />
-                                      </div>
-                                    )}
-                                    <div className="space-y-3 pr-12">
-                                      <div className="grid grid-cols-2 gap-3">
-                                        <div>
-                                          <label className="block text-xs font-medium text-gray-500 mb-1">Part Name</label>
-                                          {/* Part name is always non-editable */}
-                                          <span className="text-sm font-medium text-gray-900">{part.name}</span>
-                                        </div>
-                                        
-                                        <div>
-                                          <label className="block text-xs font-medium text-gray-500 mb-1">Part Number</label>
-                                          <div className="flex items-center space-x-1">
-                                            {isPartEditing ? (
-                                              <input
-                                                type="text"
-                                                value={partEditData[part.id]?.number || ''}
-                                                onChange={(e) => handlePartEditChange(part.id, 'number', e.target.value)}
-                                                className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-1 focus:ring-red-500 focus:border-transparent"
-                                              />
-                                            ) : (
-                                              <>
-                                                <span className="text-sm text-gray-600 font-mono">{part.number || '-'}</span>
-                                                <button
-                                                  onClick={() => copyToClipboard(part.number || '')}
-                                                  className="p-1 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
-                                                  title="Copy to clipboard"
-                                                >
-                                                  <Copy className="h-3 w-3" />
-                                                </button>
-                                              </>
-                                            )}
+                                <>
+                                  {variants.map((variant, index) => (
+                                    <div key={`${part.id}_${variant.id}`} className={`bg-white rounded-lg border border-gray-200 p-3 shadow-sm ${index > 0 ? 'ml-4 border-l-4 border-l-blue-200' : ''}`}>
+                                      <div className="relative">
+                                        {index === 0 && getPartIcon(part.name) && (
+                                          <div className="absolute top-2 right-2 bg-white rounded-full p-1.5 shadow-sm border border-gray-200">
+                                            <img src={getPartIcon(part.name)!} alt={part.name} className="h-7 w-7 object-contain" />
                                           </div>
-                                        </div>
-                                      </div>
-                                      
-                                      <div className="grid grid-cols-2 gap-3">
-                                        <div>
-                                          <label className="block text-xs font-medium text-gray-500 mb-1">Price</label>
-                                          <div className="flex items-center space-x-1">
-                                            {isPartEditing ? (
-                                              <input
-                                                type="number"
-                                                value={partEditData[part.id]?.price || ''}
-                                                onChange={(e) => handlePartEditChange(part.id, 'price', e.target.value ? Number(e.target.value) : null)}
-                                                className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-1 focus:ring-red-500 focus:border-transparent"
-                                              />
-                                            ) : (
-                                              <>
-                                                <span className="text-sm font-medium text-gray-900">
-                                                  {part.price ? `$${part.price.toFixed(2)}` : '-'}
-                                                </span>
-                                                <button
-                                                  onClick={() => copyToClipboard(part.price ? part.price.toString() : '')}
-                                                  className="p-1 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
-                                                  title="Copy to clipboard"
-                                                >
-                                                  <Copy className="h-3 w-3" />
-                                                </button>
-                                              </>
-                                            )}
+                                        )}
+                                        <div className="space-y-3 pr-12">
+                                          <div className="grid grid-cols-2 gap-3">
+                                            <div>
+                                              <label className="block text-xs font-medium text-gray-500 mb-1">
+                                                {index === 0 ? 'Part Name' : `Variant ${index + 1}`}
+                                              </label>
+                                              {index === 0 ? (
+                                                <span className="text-sm font-medium text-gray-900">{part.name}</span>
+                                              ) : (
+                                                <div className="flex items-center space-x-2">
+                                                  <span className="text-sm font-medium text-gray-900">Variant {index + 1}</span>
+                                                </div>
+                                              )}
+                                            </div>
+                                            
+                                            <div>
+                                              <label className="block text-xs font-medium text-gray-500 mb-1">Part Number</label>
+                                              <div className="flex items-center space-x-1">
+                                                {isPartEditing ? (
+                                                  <input
+                                                    type="text"
+                                                    value={partEditData[part.id]?.number || part.number || ''}
+                                                    onChange={(e) => handlePartEditChange(part.id, 'number', e.target.value)}
+                                                    className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-1 focus:ring-red-500 focus:border-transparent"
+                                                  />
+                                                ) : (
+                                                  <>
+                                                    <span className="text-sm text-gray-600 font-mono">{part.number || '-'}</span>
+                                                    <button
+                                                      onClick={() => copyToClipboard(part.number || '')}
+                                                      className="p-1 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
+                                                      title="Copy to clipboard"
+                                                    >
+                                                      <Copy className="h-3 w-3" />
+                                                    </button>
+                                                  </>
+                                                )}
+                                              </div>
+                                            </div>
                                           </div>
-                                        </div>
-                                        
-                                        <div>
-                                          <label className="block text-xs font-medium text-gray-500 mb-1">Notes</label>
-                                          <div className="flex items-center space-x-1">
+                                          
+                                          <div className="grid grid-cols-2 gap-3">
+                                            <div>
+                                              <label className="block text-xs font-medium text-gray-500 mb-1">Price</label>
+                                              <div className="flex items-center space-x-1">
+                                                {isPartEditing ? (
+                                                  <input
+                                                    type="number"
+                                                    value={partEditData[part.id]?.[variant.id]?.final_price !== undefined ? partEditData[part.id][variant.id].final_price : variant.final_price || ''}
+                                                    onChange={(e) => handleVariantEditChange(part.id, variant.id, 'final_price', e.target.value ? Number(e.target.value) : null)}
+                                                    className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-1 focus:ring-red-500 focus:border-transparent"
+                                                  />
+                                                ) : (
+                                                  <>
+                                                    <span className="text-sm font-medium text-gray-900">
+                                                      {variant.final_price ? `$${variant.final_price.toFixed(2)}` : '-'}
+                                                    </span>
+                                                    <button
+                                                      onClick={() => copyToClipboard(variant.final_price ? variant.final_price.toString() : '')}
+                                                      className="p-1 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
+                                                      title="Copy to clipboard"
+                                                    >
+                                                      <Copy className="h-3 w-3" />
+                                                    </button>
+                                                  </>
+                                                )}
+                                              </div>
+                                            </div>
+                                            
+                                            <div>
+                                              <label className="block text-xs font-medium text-gray-500 mb-1">Notes</label>
+                                              <div className="flex items-center space-x-1">
+                                                {isPartEditing ? (
+                                                  <input
+                                                    type="text"
+                                                    value={partEditData[part.id]?.[variant.id]?.note !== undefined ? partEditData[part.id][variant.id].note : variant.note || ''}
+                                                    onChange={(e) => handleVariantEditChange(part.id, variant.id, 'note', e.target.value)}
+                                                    className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-1 focus:ring-red-500 focus:border-transparent"
+                                                  />
+                                                ) : (
+                                                  <>
+                                                    <span className="text-sm text-gray-600">{variant.note || '-'}</span>
+                                                    <button
+                                                      onClick={() => copyToClipboard(variant.note || '')}
+                                                      className="p-1 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
+                                                      title="Copy to clipboard"
+                                                    >
+                                                      <Copy className="h-3 w-3" />
+                                                    </button>
+                                                  </>
+                                                )}
+                                              </div>
+                                            </div>
+                                          </div>
+                                          
+                                          {/* Variant Actions */}
+                                          <div className="flex items-center justify-between pt-2 border-t border-gray-100">
                                             {isPartEditing ? (
-                                              <input
-                                                type="text"
-                                                value={partEditData[part.id]?.note || ''}
-                                                onChange={(e) => handlePartEditChange(part.id, 'note', e.target.value)}
-                                                className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-1 focus:ring-red-500 focus:border-transparent"
-                                              />
-                                            ) : (
                                               <>
-                                                <span className="text-sm text-gray-600">{part.note || '-'}</span>
-                                                <button
-                                                  onClick={() => copyToClipboard(part.note || '')}
-                                                  className="p-1 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
-                                                  title="Copy to clipboard"
-                                                >
-                                                  <Copy className="h-3 w-3" />
-                                                </button>
+                                                {index === 0 ? (
+                                                  <button
+                                                    onClick={() => addVariantToPart(quote.id, part.id)}
+                                                    className="px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors cursor-pointer flex items-center space-x-1"
+                                                    title="Add variant"
+                                                  >
+                                                    <Plus className="h-3 w-3" />
+                                                    <span>Add Variant</span>
+                                                  </button>
+                                                ) : (
+                                                  <button
+                                                    onClick={() => removeVariantFromPart(quote.id, part.id, variant.id)}
+                                                    className="px-2 py-1 text-xs bg-red-100 text-red-700 rounded hover:bg-red-200 transition-colors cursor-pointer"
+                                                    title="Remove variant"
+                                                  >
+                                                    Remove
+                                                  </button>
+                                                )}
                                               </>
+                                            ) : (
+                                              // Show variant number for non-editing mode
+                                              <span className="text-xs text-gray-400">
+                                                {index === 0 ? 'Primary' : `Variant ${index + 1}`}
+                                              </span>
                                             )}
                                           </div>
                                         </div>
                                       </div>
                                     </div>
-                                  </div>
-                                </div>
+                                  ))}
+                                </>
                               );
                             })}
                           </div>
@@ -1780,18 +2239,18 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                                 {isPartEditing ? (
                                                   <input
                                                     type="number"
-                                                    value={partEditData[part.id]?.price || ''}
-                                                    onChange={(e) => handlePartEditChange(part.id, 'price', e.target.value ? Number(e.target.value) : null)}
+                                                    value={partEditData[part.id]?.final_price || ''}
+                                                    onChange={(e) => handlePartEditChange(part.id, 'final_price', e.target.value ? Number(e.target.value) : null)}
                                                 className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-1 focus:ring-red-500 focus:border-transparent"
                                                     autoFocus
                                                   />
                                                 ) : (
                                                   <>
                                                     <span className="text-sm font-medium text-gray-900">
-                                                      {part.price ? `$${part.price.toFixed(2)}` : '-'}
+                                                      {part.final_price ? `$${part.final_price.toFixed(2)}` : '-'}
                                                     </span>
                                                     <button
-                                                      onClick={() => copyToClipboard(part.price ? part.price.toString() : '')}
+                                                      onClick={() => copyToClipboard(part.final_price ? part.final_price.toString() : '')}
                                                   className="p-1 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
                                                       title="Copy to clipboard"
                                                     >
@@ -1934,8 +2393,18 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
               const quoteParts = getQuotePartsWithNotesSync(quote.id);
               
               // Filter out parts with no price or zero price
-              const orderableParts = quoteParts.filter(part => part.price && part.price > 0);
-              const nonOrderableParts = quoteParts.filter(part => !part.price || part.price === 0);
+              const orderableParts = quoteParts.filter(part => {
+                // Check if any variant has a price
+                const localQuote = localQuotes.find(q => q.id === quote.id);
+                const quotePart = localQuote?.partsRequested?.find(qp => qp.part_id === part.id);
+                return quotePart?.variants?.some(variant => variant.final_price && variant.final_price > 0);
+              });
+              const nonOrderableParts = quoteParts.filter(part => {
+                // Check if no variants have a price
+                const localQuote = localQuotes.find(q => q.id === quote.id);
+                const quotePart = localQuote?.partsRequested?.find(qp => qp.part_id === part.id);
+                return !quotePart?.variants?.some(variant => variant.final_price && variant.final_price > 0);
+              });
               
               return (
                 <div className="mb-6">
@@ -1964,7 +2433,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                         <div className="flex-1">
                           <div className="font-medium text-gray-900">{part.name}</div>
                           <div className="text-sm text-gray-500">
-                            {part.number} • ${part.price?.toFixed(2) || 0}
+                            {part.number} • ${part.final_price?.toFixed(2) || 0}
                           </div>
                         </div>
                       </label>
@@ -1988,7 +2457,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                             <span>•</span>
                             <span>{part.name} ({part.number})</span>
                             <span className="text-yellow-600">
-                              {!part.price ? 'No price set' : 'Price is $0'}
+                              {!part.final_price ? 'No price set' : 'Price is $0'}
                             </span>
                           </div>
                         ))}

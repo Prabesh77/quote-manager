@@ -675,11 +675,32 @@ const updatePartInJsonQuotes = async (partId: string, updates: { price?: number 
         // Create a single update object with all changes
         const partUpdates: any = { ...currentPart };
         
-        if (updates.price !== undefined) {
-          partUpdates.final_price = updates.price;
-        }
-        if (updates.note !== undefined) {
-          partUpdates.note = updates.note;
+        if (updates.price !== undefined || updates.note !== undefined) {
+          // Update the default variant
+          partUpdates.variants = partUpdates.variants?.map((variant: any) => 
+            variant.is_default 
+              ? { 
+                  ...variant, 
+                  ...(updates.price !== undefined && { final_price: updates.price }),
+                  ...(updates.note !== undefined && { note: updates.note })
+                }
+              : variant
+          ) || [{
+            id: `var_${currentPart.part_id}_${Date.now()}`,
+            note: updates.note || '',
+            final_price: updates.price || null,
+            created_at: new Date().toISOString(),
+            is_default: true
+          }];
+          
+          // Recalculate final_price at the part level from all variants
+          if (partUpdates.variants && partUpdates.variants.length > 0) {
+            partUpdates.final_price = partUpdates.variants.reduce((sum: number, variant: any) => {
+              return sum + (variant.final_price || 0);
+            }, 0);
+          } else {
+            partUpdates.final_price = null;
+          }
         }
         
         // Apply the single update
@@ -736,11 +757,13 @@ const checkAndUpdateQuoteStatusJson = async (quoteId: string, partsArray?: Quote
     const parts = partsArray || (quote.parts_requested as QuotePartItem[]) || [];
     
     // Check if any part has a price
-    const hasAnyPrice = parts.some((part: QuotePartItem) => 
-      part.final_price !== null && part.final_price !== undefined && part.final_price > 0
+    const hasPrice = parts.some(part => 
+      part.variants?.some(variant => 
+        variant.final_price !== null && variant.final_price !== undefined && variant.final_price > 0
+      )
     );
 
-    if (hasAnyPrice) {
+    if (hasPrice) {
       console.log('💰 Quote has parts with prices, updating status to waiting_verification');
       
       const { error: statusUpdateError } = await supabase

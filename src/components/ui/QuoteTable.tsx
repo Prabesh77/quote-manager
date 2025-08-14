@@ -1599,13 +1599,13 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                           <div className="hidden lg:block">
                             <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
                               <table className="w-full">
-                                <thead className="bg-gray-50">
+                                <thead className="bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200">
                                   <tr>
-                                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Part</th>
-                                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Part Number</th>
-                                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Price</th>
-                                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Notes</th>
-                                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                                    <th className="px-4 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Part & Variants</th>
+                                    <th className="px-4 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Part Number</th>
+                                    <th className="px-4 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Price</th>
+                                    <th className="px-4 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Notes</th>
+                                    <th className="px-4 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Actions</th>
                                   </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-200">
@@ -1624,47 +1624,76 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                       <>
                                         {/* Primary Variant Row */}
                                         {variants.map((variant, index) => (
-                                          <tr key={`${part.id}_${variant.id}`} className={`hover:bg-gray-50 ${index > 0 ? 'bg-gray-50' : ''}`}>
-                                            <td className="px-4 py-3">
-                                              <div className="flex items-center space-x-2">
-                                                {index === 0 && getPartIcon(part.name) && (
-                                                  <img src={getPartIcon(part.name)!} alt={part.name} className="h-5 w-5 object-contain" />
-                                                )}
-                                                <div className="flex-1">
-                                                  {index === 0 ? (
-                                                    <span className="text-sm font-medium text-gray-900">{part.name}</span>
-                                                  ) : (
-                                                    <div className="flex items-center space-x-2">
-                                                      <span className="text-xs text-gray-400">Variant {index + 1}</span>
+                                          <tr key={`${part.id}_${variant.id}`} className={`${index === 0 ? 'bg-white border-b border-gray-100' : 'bg-gray-50/50 border-b border-gray-100/50'}`}>
+                                            <td className="px-4 py-4">
+                                              <div className="flex items-center space-x-3">
+                                                {index === 0 ? (
+                                                  <>
+                                                    {getPartIcon(part.name) && (
+                                                      <div className="flex-shrink-0 w-8 h-8 bg-gradient-to-br from-blue-50 to-indigo-100 rounded-lg p-1.5 shadow-sm border border-blue-200">
+                                                        <img src={getPartIcon(part.name)!} alt={part.name} className="w-full h-full object-contain" />
+                                                      </div>
+                                                    )}
+                                                    <div className="flex-1">
+                                                      <span className="text-sm font-semibold text-gray-900">{part.name}</span>
+                                                      <div className="text-xs text-gray-500 mt-0.5">Primary Variant</div>
                                                     </div>
+                                                  </>
+                                                ) : (
+                                                  <div className="flex items-center space-x-3 ml-11">
+                                                    <div className="flex-shrink-0 w-6 h-6 bg-gradient-to-br from-purple-50 to-pink-100 rounded-full p-1.5 shadow-sm border border-purple-200">
+                                                      <div className="w-full h-full bg-gradient-to-br from-purple-400 to-pink-500 rounded-full flex items-center justify-center">
+                                                        <span className="text-xs font-semibold text-white">{index}</span>
+                                                      </div>
+                                                    </div>
+                                                    <div className="flex-1">
+                                                      <div className="text-sm font-medium text-gray-700">Variant {index + 1}</div>
+                                                      <div className="flex items-center justify-center mt-2">
+                                               <div className="w-5 h-5 bg-gray-100 rounded-full flex items-center justify-center">
+                                                 <svg className="w-2.5 h-2.5 text-gray-400" fill="currentColor" viewBox="0 0 24 24">
+                                                   <path d="M14.017 21v-7.391c0-5.704 3.731-9.57 8.983-10.609l.995 2.151c-2.432.917-3.995 3.638-3.995 5.849h4v10h-9.983zm-14.017 0v-7.391c0-5.704 3.748-9.57 9-10.609l.996 2.151c-2.433.917-3.996 3.638-3.996 5.849h3.983v10h-9.983z"/>
+                                                 </svg>
+                                               </div>
+                                             </div>
+                                                    </div>
+                                                  </div>
+                                                )}
+                                              </div>
+                                            </td>
+                                            <td className="px-4 py-4">
+                                              {index === 0 ? (
+                                                <div className="flex items-center space-x-1">
+                                                  {isPartEditing ? (
+                                                    <input
+                                                      type="text"
+                                                      value={partEditData[part.id]?.number || part.number || ''}
+                                                      onChange={(e) => handlePartEditChange(part.id, 'number', e.target.value)}
+                                                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                                                    />
+                                                  ) : (
+                                                    <>
+                                                      <span className="text-sm font-medium text-gray-900 font-mono">{part.number || '-'}</span>
+                                                      <button
+                                                        onClick={() => copyToClipboard(part.number || '')}
+                                                        className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-md transition-all duration-200 cursor-pointer"
+                                                        title="Copy to clipboard"
+                                                      >
+                                                        <Copy className="h-3.5 w-3.5" />
+                                                      </button>
+                                                    </>
                                                   )}
                                                 </div>
-                                              </div>
+                                              ) : (
+                                                <div className="flex items-center justify-center">
+                                                  <div className="w-6 h-6 bg-gray-100 rounded-full flex items-center justify-center">
+                                                    <svg className="w-3 h-3 text-gray-400" fill="currentColor" viewBox="0 0 24 24">
+                                                      <path d="M14.017 21v-7.391c0-5.704 3.731-9.57 8.983-10.609l.995 2.151c-2.432.917-3.995 3.638-3.995 5.849h4v10h-9.983zm-14.017 0v-7.391c0-5.704 3.748-9.57 9-10.609l.996 2.151c-2.433.917-3.996 3.638-3.996 5.849h3.983v10h-9.983z"/>
+                                                    </svg>
+                                                  </div>
+                                                </div>
+                                              )}
                                             </td>
-                                            <td className="px-4 py-3">
-                                              <div className="flex items-center space-x-1">
-                                                {isPartEditing ? (
-                                                  <input
-                                                    type="text"
-                                                    value={partEditData[part.id]?.number || part.number || ''}
-                                                    onChange={(e) => handlePartEditChange(part.id, 'number', e.target.value)}
-                                                    className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:ring-1 focus:ring-red-500 focus:border-transparent"
-                                                  />
-                                                ) : (
-                                                  <>
-                                                    <span className="text-sm text-gray-600 font-mono">{part.number || '-'}</span>
-                                                    <button
-                                                      onClick={() => copyToClipboard(part.number || '')}
-                                                      className="p-1 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
-                                                      title="Copy to clipboard"
-                                                    >
-                                                      <Copy className="h-3 w-3" />
-                                                    </button>
-                                                  </>
-                                                )}
-                                              </div>
-                                            </td>
-                                            <td className="px-4 py-3">
+                                            <td className="px-4 py-4">
                                               <div className="flex items-center space-x-1">
                                                 {isPartEditing ? (
                                                   <input
@@ -1676,67 +1705,77 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                                       return displayValue === null ? '' : displayValue;
                                                     })()}
                                                     onChange={(e) => handleVariantEditChange(part.id, variant.id, 'final_price', e.target.value ? Number(e.target.value) : null)}
-                                                    className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-1 focus:ring-red-500 focus:border-transparent"
+                                                    className={`w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 ${index === 0 ? 'bg-white' : 'bg-gray-50'}`}
+                                                    placeholder="Enter price"
+                                                    autoFocus={index === 0}
                                                   />
                                                 ) : (
                                                   <>
-                                                    <span className="text-sm font-medium text-gray-900">
-                                                      {variant.final_price ? `$${variant.final_price.toFixed(2)}` : '-'}
+                                                    <span className={`text-sm font-medium ${variant.final_price ? 'text-gray-900' : 'text-gray-400'}`}>
+                                                      {variant.final_price ? `$${variant.final_price.toFixed(2)}` : 'Not set'}
                                                     </span>
-                                                    <button
-                                                      onClick={() => copyToClipboard(variant.final_price ? variant.final_price.toString() : '')}
-                                                      className="p-1 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
-                                                      title="Copy to clipboard"
-                                                    >
-                                                      <Copy className="h-3 w-3" />
-                                                    </button>
+                                                    {variant.final_price && (
+                                                      <button
+                                                        onClick={() => copyToClipboard(variant.final_price ? variant.final_price.toString() : '')}
+                                                        className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-md transition-all duration-200 cursor-pointer"
+                                                        title="Copy to clipboard"
+                                                      >
+                                                        <Copy className="h-3.5 w-3.5" />
+                                                      </button>
+                                                    )}
                                                   </>
                                                 )}
                                               </div>
                                             </td>
-                                            <td className="px-4 py-3">
+                                            <td className="px-4 py-4">
                                               <div className="flex items-center space-x-1">
                                                 {isPartEditing ? (
                                                   <input
                                                     type="text"
                                                     value={partEditData[part.id]?.[variant.id]?.note !== undefined ? partEditData[part.id][variant.id].note : variant.note || ''}
                                                     onChange={(e) => handleVariantEditChange(part.id, variant.id, 'note', e.target.value)}
-                                                    className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:ring-1 focus:ring-red-500 focus:border-transparent"
+                                                    className={`w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 ${index === 0 ? 'bg-white' : 'bg-gray-50'}`}
+                                                    placeholder="Add notes..."
                                                   />
                                                 ) : (
                                                   <>
-                                                    <span className="text-sm text-gray-600">{variant.note || '-'}</span>
-                                                    <button
-                                                      onClick={() => copyToClipboard(variant.note || '')}
-                                                      className="p-1 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
-                                                      title="Copy to clipboard"
-                                                    >
-                                                      <Copy className="h-3 w-3" />
-                                                    </button>
+                                                    <span className={`text-sm ${variant.note ? 'text-gray-700' : 'text-gray-400'}`}>
+                                                      {variant.note || 'No notes'}
+                                                    </span>
+                                                    {variant.note && (
+                                                      <button
+                                                        onClick={() => copyToClipboard(variant.note || '')}
+                                                        className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-md transition-all duration-200 cursor-pointer"
+                                                        title="Copy to clipboard"
+                                                      >
+                                                        <Copy className="h-3.5 w-3.5" />
+                                                      </button>
+                                                    )}
                                                   </>
                                                 )}
                                               </div>
                                             </td>
-                                            <td className="px-4 py-3">
+                                            <td className="px-4 py-4">
                                               <div className="flex items-center space-x-1">
                                                 {isPartEditing ? (
                                                   <>
                                                     {index === 0 ? (
                                                       <button
                                                         onClick={() => addVariantToPart(quote.id, part.id)}
-                                                        className="px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors cursor-pointer flex items-center space-x-1"
+                                                        className="px-3 py-2 text-sm bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg hover:from-blue-600 hover:to-blue-700 transition-all duration-200 cursor-pointer flex items-center space-x-2 shadow-sm hover:shadow-md"
                                                         title="Add variant"
                                                       >
-                                                        <Plus className="h-3 w-3" />
+                                                        <Plus className="h-4 w-4" />
                                                         <span>Add Variant</span>
                                                       </button>
                                                     ) : (
                                                       <button
                                                         onClick={() => removeVariantFromPart(quote.id, part.id, variant.id)}
-                                                        className="px-2 py-1 text-xs bg-red-100 text-red-700 rounded hover:bg-red-200 transition-colors cursor-pointer"
+                                                        className="px-3 py-2 text-sm bg-gradient-to-r from-red-500 to-red-600 text-white rounded-lg hover:from-red-600 hover:to-red-700 transition-all duration-200 cursor-pointer flex items-center space-x-2 shadow-sm hover:shadow-md"
                                                         title="Remove variant"
                                                       >
-                                                        Remove
+                                                        <X className="h-4 w-4" />
+                                                        <span>Remove</span>
                                                       </button>
                                                     )}
                                                   </>
@@ -1774,138 +1813,165 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                               return (
                                 <>
                                   {variants.map((variant, index) => (
-                                    <div key={`${part.id}_${variant.id}`} className={`bg-white rounded-lg border border-gray-200 p-3 shadow-sm ${index > 0 ? 'ml-4 border-l-4 border-l-blue-200' : ''}`}>
+                                    <div key={`${part.id}_${variant.id}`} className={`bg-white rounded-lg border border-gray-200 p-4 shadow-sm ${index === 0 ? '' : 'ml-6 border-l-4 border-l-purple-200 bg-gradient-to-r from-purple-50/30 to-white'}`}>
                                       <div className="relative">
-                                        {index === 0 && getPartIcon(part.name) && (
-                                          <div className="absolute top-2 right-2 bg-white rounded-full p-1.5 shadow-sm border border-gray-200">
-                                            <img src={getPartIcon(part.name)!} alt={part.name} className="h-7 w-7 object-contain" />
+                                        {index === 0 ? (
+                                          <>
+                                            {getPartIcon(part.name) && (
+                                              <div className="absolute top-2 right-2 bg-gradient-to-br from-blue-50 to-indigo-100 rounded-full p-2 shadow-sm border border-blue-200">
+                                                <img src={getPartIcon(part.name)!} alt={part.name} className="h-6 w-6 object-contain" />
+                                              </div>
+                                            )}
+                                            <div className="space-y-4 pr-16">
+                                              <div className="space-y-3">
+                                                <div>
+                                                  <label className="block text-xs font-medium text-gray-500 mb-1">Part Name</label>
+                                                  <span className="text-sm font-semibold text-gray-900">{part.name}</span>
+                                                  <div className="text-xs text-blue-600 font-medium mt-0.5">Primary Variant</div>
+                                                </div>
+                                                
+                                                <div>
+                                                  <label className="block text-xs font-medium text-gray-500 mb-1">Part Number</label>
+                                                  <div className="flex items-center space-x-2">
+                                                    {isPartEditing ? (
+                                                      <input
+                                                        type="text"
+                                                        value={partEditData[part.id]?.number || part.number || ''}
+                                                        onChange={(e) => handlePartEditChange(part.id, 'number', e.target.value)}
+                                                        className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                                                      />
+                                                    ) : (
+                                                      <>
+                                                        <span className="text-sm font-medium text-gray-900 font-mono">{part.number || '-'}</span>
+                                                        <button
+                                                          onClick={() => copyToClipboard(part.number || '')}
+                                                          className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-md transition-all duration-200 cursor-pointer"
+                                                          title="Copy to clipboard"
+                                                        >
+                                                          <Copy className="h-3.5 w-3.5" />
+                                                        </button>
+                                                      </>
+                                                    )}
+                                                  </div>
+                                                </div>
+                                              </div>
+                                            </div>
+                                          </>
+                                        ) : (
+                                          <div className="space-y-4">
+                                            <div className="flex items-center space-x-3 mb-3">
+                                              <div className="flex-shrink-0 w-8 h-8 bg-gradient-to-br from-purple-50 to-pink-100 rounded-full p-1.5 shadow-sm border border-purple-200">
+                                                <div className="w-full h-full bg-gradient-to-br from-purple-400 to-pink-500 rounded-full flex items-center justify-center">
+                                                  <span className="text-sm font-semibold text-white">{index}</span>
+                                                </div>
+                                              </div>
+                                              <div>
+                                                <div className="text-sm font-semibold text-gray-700">Variant {index + 1}</div>
+                                                <div className="text-xs text-purple-600 font-medium">Alternative option</div>
+                                              </div>
+                                            </div>
+                                            
+                                            <div className="text-xs text-gray-400 italic">Part number: Same as primary</div>
                                           </div>
                                         )}
-                                        <div className="space-y-3 pr-12">
-                                          <div className="grid grid-cols-2 gap-3">
-                                            <div>
-                                              <label className="block text-xs font-medium text-gray-500 mb-1">
-                                                {index === 0 ? 'Part Name' : `Variant ${index + 1}`}
-                                              </label>
-                                              {index === 0 ? (
-                                                <span className="text-sm font-medium text-gray-900">{part.name}</span>
+                                        
+                                        <div className="grid grid-cols-2 gap-3">
+                                          <div>
+                                            <label className="block text-xs font-medium text-gray-500 mb-1">Price</label>
+                                            <div className="flex items-center space-x-1">
+                                              {isPartEditing ? (
+                                                <input
+                                                  type="number"
+                                                  value={(() => {
+                                                    const editValue = partEditData[part.id]?.[variant.id]?.final_price;
+                                                    const displayValue = editValue !== undefined ? editValue : variant.final_price || '';
+                                                    // Ensure we never return null - use empty string instead
+                                                    return displayValue === null ? '' : displayValue;
+                                                  })()}
+                                                  onChange={(e) => handleVariantEditChange(part.id, variant.id, 'final_price', e.target.value ? Number(e.target.value) : null)}
+                                                  className={`w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 ${index === 0 ? 'bg-white' : 'bg-gray-50'}`}
+                                                  placeholder="Enter price"
+                                                />
                                               ) : (
-                                                <div className="flex items-center space-x-2">
-                                                  <span className="text-sm font-medium text-gray-900">Variant {index + 1}</span>
-                                                </div>
-                                              )}
-                                            </div>
-                                            
-                                            <div>
-                                              <label className="block text-xs font-medium text-gray-500 mb-1">Part Number</label>
-                                              <div className="flex items-center space-x-1">
-                                                {isPartEditing ? (
-                                                  <input
-                                                    type="text"
-                                                    value={partEditData[part.id]?.number || part.number || ''}
-                                                    onChange={(e) => handlePartEditChange(part.id, 'number', e.target.value)}
-                                                    className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-1 focus:ring-red-500 focus:border-transparent"
-                                                  />
-                                                ) : (
-                                                  <>
-                                                    <span className="text-sm text-gray-600 font-mono">{part.number || '-'}</span>
-                                                    <button
-                                                      onClick={() => copyToClipboard(part.number || '')}
-                                                      className="p-1 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
-                                                      title="Copy to clipboard"
-                                                    >
-                                                      <Copy className="h-3 w-3" />
-                                                    </button>
-                                                  </>
-                                                )}
-                                              </div>
-                                            </div>
-                                          </div>
-                                          
-                                          <div className="grid grid-cols-2 gap-3">
-                                            <div>
-                                              <label className="block text-xs font-medium text-gray-500 mb-1">Price</label>
-                                              <div className="flex items-center space-x-1">
-                                                {isPartEditing ? (
-                                                  <input
-                                                    type="number"
-                                                    value={partEditData[part.id]?.[variant.id]?.final_price !== undefined ? partEditData[part.id][variant.id].final_price : variant.final_price || ''}
-                                                    onChange={(e) => handleVariantEditChange(part.id, variant.id, 'final_price', e.target.value ? Number(e.target.value) : null)}
-                                                    className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-1 focus:ring-red-500 focus:border-transparent"
-                                                  />
-                                                ) : (
-                                                  <>
-                                                    <span className="text-sm font-medium text-gray-900">
-                                                      {variant.final_price ? `$${variant.final_price.toFixed(2)}` : '-'}
-                                                    </span>
+                                                <>
+                                                  <span className={`text-sm font-medium ${variant.final_price ? 'text-gray-900' : 'text-gray-400'}`}>
+                                                    {variant.final_price ? `$${variant.final_price.toFixed(2)}` : 'Not set'}
+                                                  </span>
+                                                  {variant.final_price && (
                                                     <button
                                                       onClick={() => copyToClipboard(variant.final_price ? variant.final_price.toString() : '')}
-                                                      className="p-1 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
+                                                      className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-md transition-all duration-200 cursor-pointer"
                                                       title="Copy to clipboard"
                                                     >
-                                                      <Copy className="h-3 w-3" />
+                                                      <Copy className="h-3.5 w-3.5" />
                                                     </button>
-                                                  </>
-                                                )}
-                                              </div>
-                                            </div>
-                                            
-                                            <div>
-                                              <label className="block text-xs font-medium text-gray-500 mb-1">Notes</label>
-                                              <div className="flex items-center space-x-1">
-                                                {isPartEditing ? (
-                                                  <input
-                                                    type="text"
-                                                    value={partEditData[part.id]?.[variant.id]?.note !== undefined ? partEditData[part.id][variant.id].note : variant.note || ''}
-                                                    onChange={(e) => handleVariantEditChange(part.id, variant.id, 'note', e.target.value)}
-                                                    className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-1 focus:ring-red-500 focus:border-transparent"
-                                                  />
-                                                ) : (
-                                                  <>
-                                                    <span className="text-sm text-gray-600">{variant.note || '-'}</span>
-                                                    <button
-                                                      onClick={() => copyToClipboard(variant.note || '')}
-                                                      className="p-1 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
-                                                      title="Copy to clipboard"
-                                                    >
-                                                      <Copy className="h-3 w-3" />
-                                                    </button>
-                                                  </>
-                                                )}
-                                              </div>
+                                                  )}
+                                                </>
+                                              )}
                                             </div>
                                           </div>
                                           
-                                          {/* Variant Actions */}
-                                          <div className="flex items-center justify-between pt-2 border-t border-gray-100">
-                                            {isPartEditing ? (
-                                              <>
-                                                {index === 0 ? (
-                                                  <button
-                                                    onClick={() => addVariantToPart(quote.id, part.id)}
-                                                    className="px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors cursor-pointer flex items-center space-x-1"
-                                                    title="Add variant"
-                                                  >
-                                                    <Plus className="h-3 w-3" />
-                                                    <span>Add Variant</span>
-                                                  </button>
-                                                ) : (
-                                                  <button
-                                                    onClick={() => removeVariantFromPart(quote.id, part.id, variant.id)}
-                                                    className="px-2 py-1 text-xs bg-red-100 text-red-700 rounded hover:bg-red-200 transition-colors cursor-pointer"
-                                                    title="Remove variant"
-                                                  >
-                                                    Remove
-                                                  </button>
-                                                )}
-                                              </>
-                                            ) : (
-                                              // Show variant number for non-editing mode
-                                              <span className="text-xs text-gray-400">
-                                                {index === 0 ? 'Primary' : `Variant ${index + 1}`}
-                                              </span>
-                                            )}
+                                          <div>
+                                            <label className="block text-xs font-medium text-gray-500 mb-1">Notes</label>
+                                            <div className="flex items-center space-x-1">
+                                              {isPartEditing ? (
+                                                <input
+                                                  type="text"
+                                                  value={partEditData[part.id]?.[variant.id]?.note !== undefined ? partEditData[part.id][variant.id].note : variant.note || ''}
+                                                  onChange={(e) => handleVariantEditChange(part.id, variant.id, 'note', e.target.value)}
+                                                  className={`w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 ${index === 0 ? 'bg-white' : 'bg-gray-50'}`}
+                                                  placeholder="Add notes..."
+                                                />
+                                              ) : (
+                                                <>
+                                                  <span className={`text-sm ${variant.note ? 'text-gray-700' : 'text-gray-400'}`}>
+                                                    {variant.note || 'No notes'}
+                                                  </span>
+                                                  {variant.note && (
+                                                    <button
+                                                      onClick={() => copyToClipboard(variant.note || '')}
+                                                      className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-md transition-all duration-200 cursor-pointer"
+                                                      title="Copy to clipboard"
+                                                    >
+                                                      <Copy className="h-3.5 w-3.5" />
+                                                    </button>
+                                                  )}
+                                                </>
+                                              )}
+                                            </div>
                                           </div>
+                                        </div>
+                                        
+                                        {/* Variant Actions */}
+                                        <div className="flex items-center justify-between pt-3 border-t border-gray-100 mt-4">
+                                          {isPartEditing ? (
+                                            <>
+                                              {index === 0 ? (
+                                                <button
+                                                  onClick={() => addVariantToPart(quote.id, part.id)}
+                                                  className="px-4 py-2 text-sm bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg hover:from-blue-600 hover:to-blue-700 transition-all duration-200 cursor-pointer flex items-center space-x-2 shadow-sm hover:shadow-md"
+                                                  title="Add variant"
+                                                >
+                                                  <Plus className="h-4 w-4" />
+                                                  <span>Add Variant</span>
+                                                </button>
+                                              ) : (
+                                                <button
+                                                  onClick={() => removeVariantFromPart(quote.id, part.id, variant.id)}
+                                                  className="px-4 py-2 text-sm bg-gradient-to-r from-red-500 to-red-600 text-white rounded-lg hover:from-red-600 hover:to-red-700 transition-all duration-200 cursor-pointer flex items-center space-x-2 shadow-sm hover:shadow-md"
+                                                  title="Remove variant"
+                                                >
+                                                  <X className="h-4 w-4" />
+                                                  <span>Remove</span>
+                                                </button>
+                                              )}
+                                            </>
+                                          ) : (
+                                            // Show variant number for non-editing mode
+                                            <span className="text-xs text-gray-400">
+                                              {index === 0 ? 'Primary' : `Variant ${index + 1}`}
+                                            </span>
+                                          )}
                                         </div>
                                       </div>
                                     </div>

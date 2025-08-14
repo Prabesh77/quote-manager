@@ -19,11 +19,11 @@ export interface AIPartExtraction {
 }
 
 /**
- * Extract part information using Gemini AI
+ * Extract part information using Gemini AI gemini-2.5-flash-lite
  */
 export async function extractPartsWithAI(ocrText: string): Promise<AIPartExtraction[]> {
   try {
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash-lite' });
 
     const prompt = `
 You are an expert automotive parts analyst. Extract part information from the following text.

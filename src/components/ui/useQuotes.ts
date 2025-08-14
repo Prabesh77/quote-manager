@@ -52,8 +52,15 @@ const convertAustralianDateToISO = (dateString: string | undefined): string | nu
 // New interface for individual parts in the JSON array
 export interface QuotePartItem {
   part_id: string;
-  note: string;
+  variants: PartVariant[];
+}
+
+export interface PartVariant {
+  id: string;
   final_price: number | null;
+  note: string;
+  created_at: string;
+  is_default?: boolean;
 }
 
 export interface Part {
@@ -212,8 +219,13 @@ export const useQuotes = () => {
           partRequested: partIds,
           partsRequested: (quotePartsForThisQuote || []).map(qp => ({
             part_id: qp.part_id,
-            note: qp.note || '',
-            final_price: qp.final_price || null,
+            variants: [{
+              id: `var_${qp.part_id}_${qp.quote_id}`,
+              final_price: qp.final_price || null,
+              note: qp.note || '',
+              created_at: qp.created_at || new Date().toISOString(),
+              is_default: true
+            }]
           })),
           quoteRef: normalizedQuote.quote_ref || `Q${normalizedQuote.id.slice(0, 8)}`, // Use stored quote_ref or fallback to generated
           createdAt: normalizedQuote.created_at,

@@ -127,8 +127,13 @@ export default function Dashboard() {
       // Calculate revenue for ordered, completed, and delivered quotes with prices
       if (quote.status === 'ordered' || quote.status === 'completed' || quote.status === 'delivered') {
         priceAndNotes.forEach((part: QuotePartItem) => {
-          if (part.final_price && part.final_price > 0) {
-            totalRevenue += part.final_price;
+          // Check all variants for the highest price
+          const highestPrice = part.variants?.reduce((max, variant) => 
+            variant.final_price && variant.final_price > max ? variant.final_price : max, 0
+          ) || 0;
+          
+          if (highestPrice > 0) {
+            totalRevenue += highestPrice;
             if (quote.status === 'ordered' || quote.status === 'delivered') {
               totalPartsOrdered++;
             }

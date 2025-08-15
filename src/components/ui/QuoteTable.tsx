@@ -59,33 +59,30 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
   // Helper functions for variant management
   const generateVariantId = () => `var_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
-  const addVariantToPart = (quoteId: string, partId: string) => {
+    const addVariantToPart = (quoteId: string, partId: string) => {
     // Only add to local state, don't save to database yet
     const newVariantId = generateVariantId();
     
-    console.log('Adding variant to part:', { quoteId, partId, newVariantId });
-    console.log('Current partEditData before adding:', partEditData);
-    console.log('Current localQuotes before adding:', localQuotes);
+    // Debug logging removed - issue resolved
     
-    // Add to edit data with consistent structure, preserving existing variant data
+    // Use functional updates to ensure state consistency and prevent race conditions
     setPartEditData(prev => {
       const existingPartData = prev[partId] || {};
-      console.log('Preserving existing partEditData for partId:', partId, existingPartData);
       
+      // Create new data that preserves ALL existing variant data
       const newData = {
         ...prev,
         [partId]: {
-          ...existingPartData, // Preserve existing variant data
+          ...existingPartData, // Preserve existing variant data including primary variant
           [newVariantId]: { note: '', final_price: null }
         }
       };
-      console.log('Updated partEditData:', newData);
+      
       return newData;
     });
     
-    // Add to local quote state for display
+    // Add to local quote state for display - use functional update for consistency
     setLocalQuotes(prev => {
-      console.log('Current localQuotes before adding variant:', prev);
       
       const updatedQuotes = prev.map(q => 
         q.id === quoteId 
@@ -93,26 +90,45 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
               ...q,
               partsRequested: q.partsRequested.map(p => 
                 p.part_id === partId 
-                  ? { 
-                      ...p, 
-                      variants: [
-                        ...(p.variants || []),
-                        {
-                          id: newVariantId,
-                          note: '',
-                          final_price: null, // Use consistent final_price key
+                  ? (() => {
+                      
+                      // Get the existing partEditData to ensure we have the default variant
+                      const existingEditData = partEditData[partId] || {};
+                      const hasDefaultVariant = existingEditData['default'];
+                      
+                      // Start with existing variants from localQuotes (if any)
+                      let variants = p.variants || [];
+                      
+                      // Only add default variant if it doesn't already exist in variants
+                      if (hasDefaultVariant && !variants.some(v => v.id === 'default')) {
+                        variants = [{
+                          id: 'default',
+                          note: existingEditData['default'].note || '',
+                          final_price: existingEditData['default'].final_price,
                           created_at: new Date().toISOString(),
-                          is_default: false
-                        }
-                      ]
-                    }
+                          is_default: true
+                        }, ...variants];
+                      }
+                      
+                      // Add the new variant
+                      const newVariant = {
+                        id: newVariantId,
+                        note: '',
+                        final_price: null,
+                        created_at: new Date().toISOString(),
+                        is_default: false
+                      };
+                      
+                      return {
+                        ...p, 
+                        variants: [...variants, newVariant]
+                      };
+                    })()
                   : p
               )
             }
           : q
       );
-      
-      console.log('Updated quotes after adding variant:', updatedQuotes);
       
       return updatedQuotes;
     });
@@ -364,7 +380,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
         setLocalQuotes(updatedQuotes);
       }
     }
-  }, [quotes, localQuotes.length]);
+  }, [quotes]); // Remove localQuotes.length dependency to prevent interference with variant operations
 
   const handleSave = async () => {
     if (editingQuote) {
@@ -1613,12 +1629,18 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                     const isPartEditing = editingParts === quote.id;
                                     const localQuote = localQuotes.find(q => q.id === quote.id);
                                     const quotePart = localQuote?.partsRequested?.find(qp => qp.part_id === part.id);
-                                    const variants = quotePart?.variants || [{ 
-                                      id: 'default', 
-                                      note: part.note, 
-                                      final_price: null, // No base price, only variant prices
-                                      is_default: true 
-                                    }];
+                                    // Only create fallback variant if no variants exist AND we're not editing
+                                    // This prevents interference with user-added variants
+                                    const variants = quotePart?.variants && quotePart.variants.length > 0 
+                                      ? quotePart.variants 
+                                      : [{ 
+                                          id: 'default', 
+                                          note: part.note, 
+                                          final_price: null, // No base price, only variant prices
+                                          is_default: true 
+                                        }];
+                                    
+                                    // Debug logging removed - issue resolved
                                     
                                     return (
                                       <>
@@ -1661,7 +1683,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                                       type="text"
                                                       value={partEditData[part.id]?.number || part.number || ''}
                                                       onChange={(e) => handlePartEditChange(part.id, 'number', e.target.value)}
-                                                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                                                      className="w-full px-2 py-1 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
                                                     />
                                                   ) : (
                                                     <>
@@ -1694,8 +1716,8 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                                       return displayValue === null ? '' : displayValue;
                                                     })()}
                                                     onChange={(e) => handleVariantEditChange(part.id, variant.id, 'final_price', e.target.value ? Number(e.target.value) : null)}
-                                                    className={`w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 ${index === 0 ? 'bg-white' : 'bg-gray-50'}`}
-                                                    placeholder="Enter price"
+                                                                                                      className={`w-full px-2 py-1 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 ${index === 0 ? 'bg-white' : 'bg-gray-50'}`}
+                                                  placeholder="Enter price"
                                                     autoFocus={index === 0}
                                                   />
                                                 ) : (
@@ -1724,8 +1746,8 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                                       type="text"
                                                       value={partEditData[part.id]?.[variant.id]?.note !== undefined ? partEditData[part.id][variant.id].note : variant.note || ''}
                                                       onChange={(e) => handleVariantEditChange(part.id, variant.id, 'note', e.target.value)}
-                                                      className={`w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 ${index === 0 ? 'bg-white' : 'bg-gray-50'}`}
-                                                      placeholder="Add notes..."
+                                                                                                        className={`w-full px-2 py-1 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 ${index === 0 ? 'bg-white' : 'bg-gray-50'}`}
+                                                  placeholder="Add notes..."
                                                     />
                                                   ) : (
                                                     <>
@@ -2079,9 +2101,9 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                                 {isPartEditing ? (
                                                   <input
                                                     type="text"
-                                                    value={partEditData[part.id]?.number || ''}
-                                                    onChange={(e) => handlePartEditChange(part.id, 'number', e.target.value)}
-                                                className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-1 focus:ring-red-500 focus:border-transparent"
+                                                                                                          value={partEditData[part.id]?.number || ''}
+                                                      onChange={(e) => handlePartEditChange(part.id, 'number', e.target.value)}
+                                                className="flex-1 px-2 py-1 border border-gray-300 rounded-md text-sm focus:ring-1 focus:ring-red-500 focus:border-transparent"
                                                   />
                                                 ) : (
                                                   <>
@@ -2108,7 +2130,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                                     type="number"
                                                     value={partEditData[part.id]?.price || ''}
                                                     onChange={(e) => handlePartEditChange(part.id, 'price', e.target.value ? Number(e.target.value) : null)}
-                                                className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-1 focus:ring-red-500 focus:border-transparent"
+                                                className="flex-1 px-2 py-1 border border-gray-300 rounded-md text-sm focus:ring-1 focus:ring-red-500 focus:border-transparent"
                                                     autoFocus
                                                   />
                                                 ) : (
@@ -2134,9 +2156,9 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                                 {isPartEditing ? (
                                                   <input
                                                     type="text"
-                                                    value={partEditData[part.id]?.note || ''}
-                                                    onChange={(e) => handlePartEditChange(part.id, 'note', e.target.value)}
-                                                className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-1 focus:ring-red-500 focus:border-transparent"
+                                                                                                    value={partEditData[part.id]?.note || ''}
+                                                onChange={(e) => handlePartEditChange(part.id, 'note', e.target.value)}
+                                                className="flex-1 px-2 py-1 border border-gray-300 rounded-md text-sm focus:ring-1 focus:ring-red-500 focus:border-transparent"
                                                   />
                                                 ) : (
                                                   <>
@@ -2248,7 +2270,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                 value={taxInvoiceNumber}
                 onChange={(e) => setTaxInvoiceNumber(e.target.value)}
                 placeholder="Enter tax invoice number"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                                                                className="w-full px-2 py-1 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                 autoFocus
               />
             </div>

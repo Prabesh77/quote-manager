@@ -29,9 +29,10 @@ interface ProcessedImage {
 interface ImagePasteAreaProps {
   onPartsExtracted: (parts: ExtractedPartInfo[]) => void;
   onPartRemoved?: (removedPart: ExtractedPartInfo) => void;
+  onClearAll?: () => void;
 }
 
-export const ImagePasteArea = ({ onPartsExtracted, onPartRemoved }: ImagePasteAreaProps) => {
+export const ImagePasteArea = ({ onPartsExtracted, onPartRemoved, onClearAll }: ImagePasteAreaProps) => {
   const [images, setImages] = useState<ProcessedImage[]>([]);
   const [isDragOver, setIsDragOver] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
@@ -383,9 +384,9 @@ export const ImagePasteArea = ({ onPartsExtracted, onPartRemoved }: ImagePasteAr
           
           <div className="text-xs text-gray-500">
             {isFocused || isReady ? (
-              <span>🖼️ Paste multiple images one by one</span>
+              <span>🖼️ Paste screenshots with multiple parts (up to 10 parts per image)</span>
             ) : (
-              <span>Supports: JPG, PNG, GIF (max 10 images)</span>
+              <span>Supports: JPG, PNG, GIF (extracts up to 10 parts per image)</span>
             )}
           </div>
         </div>
@@ -406,19 +407,31 @@ export const ImagePasteArea = ({ onPartsExtracted, onPartRemoved }: ImagePasteAr
             <h4 className="text-sm font-medium text-green-800">
               Extracted Parts ({allExtractedParts.length})
             </h4>
-            <div className="text-xs text-gray-500">
-              Click ✕ to remove
+            <div className="flex items-center space-x-2">
+                          <button
+              onClick={() => {
+                setImages([]);
+                onPartsExtracted([]);
+                // Also clear selected parts in the parent component
+                onClearAll?.();
+              }}
+              className="text-xs text-red-600 hover:text-red-800 hover:bg-red-50 px-2 py-1 rounded border border-red-200 transition-colors"
+              title="Clear all parts and selections"
+            >
+              Clear All
+            </button>
             </div>
           </div>
           
-          {/* Enhanced grid layout with confidence indicators */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-80 overflow-y-auto">
+          {/* Enhanced grid layout for multiple parts */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 max-h-96 overflow-y-auto">
             {allExtractedParts.map((part, index) => (
               <div key={index} className="relative bg-green-50 border border-green-200 rounded-lg p-3 hover:border-green-300 transition-colors">
                 {/* Close button */}
                 <button
                   onClick={() => removeExtractedPart(index)}
                   className="absolute top-2 right-2 w-5 h-5 text-green-400 hover:text-red-500 hover:bg-red-50 rounded-full flex items-center justify-center transition-colors"
+                  title="Remove this part"
                 >
                   <X className="h-3 w-3" />
                 </button>
@@ -432,8 +445,8 @@ export const ImagePasteArea = ({ onPartsExtracted, onPartRemoved }: ImagePasteAr
                   </div>
                   
                   {/* Part number */}
-                  {part.partNumber !== 'Not found' && (
-                    <div className="text-green-600 text-xs bg-white px-2 py-1 rounded border border-green-200 truncate mb-2">
+                  {part.partNumber && part.partNumber !== 'Not found' && (
+                    <div className="text-green-600 text-xs bg-white px-2 py-1 rounded border border-green-200 truncate mb-2 font-mono">
                       {part.partNumber}
                     </div>
                   )}
@@ -445,6 +458,8 @@ export const ImagePasteArea = ({ onPartsExtracted, onPartRemoved }: ImagePasteAr
                         {part.context}
                       </div>
                     )}
+                    
+
                     
                     {part.isSupersession && (
                       <div className="text-xs text-orange-600 bg-orange-100 px-2 py-1 rounded border border-orange-200">
@@ -461,6 +476,14 @@ export const ImagePasteArea = ({ onPartsExtracted, onPartRemoved }: ImagePasteAr
                 </div>
               </div>
             ))}
+          </div>
+          
+          {/* Summary information */}
+          <div className="mt-3 text-xs text-gray-600 bg-gray-50 rounded-lg p-2 border border-gray-200">
+            <div className="flex items-center justify-between">
+              <span>📊 Total parts extracted: {allExtractedParts.length}</span>
+              <span>🖼️ From {images.filter(img => img.status === 'completed').length} image(s)</span>
+            </div>
           </div>
         </div>
       )}

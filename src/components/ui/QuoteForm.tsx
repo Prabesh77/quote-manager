@@ -38,6 +38,8 @@ const PART_OPTIONS = [
   { name: 'Intercooler', icon: getPartIcon('Intercooler') },
   { name: 'Left DayLight', icon: getPartIcon('Left Headlamp') }, // Reuse fan icon for now
   { name: 'Right DayLight', icon: getPartIcon('Right Headlamp') }, // Reuse fan icon for now
+  { name: 'Oil Cooler', icon: getPartIcon('Radiator') }, // Reuse radiator icon for now
+  { name: 'Auxiliary Radiator', icon: getPartIcon('Radiator') }, // Reuse radiator icon for now
 ];
 
 interface PartDetails {
@@ -727,7 +729,15 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
                 <span>💡 Click the area below to focus, then use paste screenshots.</span>
               </div>
             </div>
-            <ImagePasteArea onPartsExtracted={handlePartsExtracted} onPartRemoved={handlePartRemoved} />
+            <ImagePasteArea 
+          onPartsExtracted={handlePartsExtracted} 
+          onPartRemoved={handlePartRemoved}
+          onClearAll={() => {
+            setSelectedParts([]);
+            setPartDetails({});
+            setExtractedParts([]);
+          }}
+        />
           </div>
         </div>
       </div>

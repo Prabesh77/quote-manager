@@ -83,6 +83,7 @@ INSTRUCTIONS:
 7. Ignore irrelevant short codes like "10", "50", "110", "001" (these are quantities or prices, not part numbers).
 8. Keep part numbers clean — e.g., "8110560K40" not "8110560K40 UNIT ASSY".
 9. SINGLE LINE RULE: If multiple keywords appear in one line (e.g., "O FAN & MOTOR ASSY-CONDENSER"), select the LAST keyword as the part name with this priority: Condenser > Oil Cooler > Radiator > Fan > Motor > Assembly.
+10. DAYTIME HEADLAMP RULE: If a line contains 'headlamp' or 'headlight' WITH 'daytime' or 'combination' → classify as 'DayLight' (NOT 'Headlamp'). This takes priority over regular headlamp detection.
 
 IMPORTANT RULES:
 - Use these exact standardized part names:
@@ -95,9 +96,11 @@ IMPORTANT RULES:
   * If both "Headlamp" and "DayLight" appear in the same name → prioritize "Headlamp"
 - For headlamps: If text contains RH/R/Right → 'Right Headlamp', if LH/L/Left → 'Left Headlamp'
 - For daylights: If text contains RH/R/Right → 'Right DayLight', if LH/L/Left → 'Left DayLight'
+- DAYTIME HEADLAMP DETECTION: If text contains 'headlamp' or 'headlight' WITH 'daytime' or 'combination' → classify as 'DayLight' (NOT 'Headlamp')
 - PART NUMBER LENGTH: Only extract part numbers with ≥ 8 REAL alphanumeric characters (ignore special chars like hyphens)
 - MAXIMUM 5 MAIN PARTS per response
 - IGNORE: brackets, mounting hardware, bolts, nuts, clips, supporting components
+- DUPLICATE HANDLING: If multiple instances of the same part type exist (e.g., multiple "Radiator" entries), extract each one separately - the system will automatically group them
 
 RESPONSE FORMAT (JSON only):
 {
@@ -139,7 +142,51 @@ RESPONSE FORMAT (JSON only):
       context: part.context || undefined
     }));
     
-    return extractedParts;
+    // Post-process AI results to handle duplicates like Nissan variants
+    // Group parts by name and combine part numbers for duplicates
+    const partGroups = new Map<string, { part: AIPartExtraction; partNumbers: string[]; count: number }>();
+    
+    for (const part of extractedParts) {
+      const normalizedName = part.partName.toLowerCase().trim();
+      
+      if (partGroups.has(normalizedName)) {
+        // Part already exists, add part number to existing group
+        const existing = partGroups.get(normalizedName)!;
+        existing.partNumbers.push(part.partNumber);
+        existing.count++;
+        
+        // Merge contexts if different
+        if (part.context && existing.part.context && part.context !== existing.part.context) {
+          existing.part.context = `${existing.part.context}, ${part.context}`;
+        }
+      } else {
+        // Create new part group
+        partGroups.set(normalizedName, {
+          part: { ...part },
+          partNumbers: [part.partNumber],
+          count: 1
+        });
+      }
+    }
+    
+    // Create final result with grouped duplicates
+    const finalParts: AIPartExtraction[] = [];
+    for (const [_, groupData] of partGroups) {
+      if (groupData.count === 1) {
+        // Single part, no duplicates
+        finalParts.push(groupData.part);
+      } else {
+        // Multiple duplicates, combine part numbers
+        console.log(`AI: Grouped ${groupData.count} instances of "${groupData.part.partName}" with part numbers: ${groupData.partNumbers.join(', ')}`);
+        finalParts.push({
+          ...groupData.part,
+          partNumber: groupData.partNumbers.join(', '),
+          context: groupData.part.context
+        });
+      }
+    }
+    
+    return finalParts;
     
   } catch (error) {
     console.error('AI extraction failed, falling back to basic extraction:', error);
@@ -208,7 +255,16 @@ function fallbackExtraction(ocrText: string): AIPartExtraction[] {
     let partName = '';
     let context = '';
     
-    if (line.toLowerCase().includes('headlamp') || line.toLowerCase().includes('headlight')) {
+    // Check for daytime headlamps first (highest priority - overrides regular headlamp detection)
+    if ((line.toLowerCase().includes('headlamp') || line.toLowerCase().includes('headlight')) && 
+        (line.toLowerCase().includes('daytime') || line.toLowerCase().includes('combination'))) {
+      if (/\b(rh|r\b|right)\b/i.test(line)) {
+        context = 'RH';
+      } else if (/\b(lh|l\b|left)\b/i.test(line)) {
+        context = 'LH';
+      }
+      partName = 'DayLight';
+    } else if (line.toLowerCase().includes('headlamp') || line.toLowerCase().includes('headlight')) {
       if (/\b(rh|r\b|right)\b/i.test(line)) {
         context = 'RH';
       } else if (/\b(lh|l\b|left)\b/i.test(line)) {
@@ -346,6 +402,10 @@ function fallbackExtraction(ocrText: string): AIPartExtraction[] {
       // Create single entry with all part numbers (comma-separated)
       if (collectedPartNumbers.length > 0) {
         const finalPartNumber = collectedPartNumbers.join(', ');
+        
+        if (groupData.count > 1) {
+          console.log(`Nissan: Grouped ${groupData.count} instances of "${groupData.name}" with part numbers: ${finalPartNumber}`);
+        }
         
         parts.push({
           partName: groupData.name,

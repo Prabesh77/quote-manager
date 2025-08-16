@@ -30,10 +30,39 @@ export interface MultiPartExtraction {
  */
 export async function extractPartsWithAI(ocrText: string): Promise<AIPartExtraction[]> {
   try {
+    // Check if this looks like a Nissan layout (complex, scattered format)
+    const lines = ocrText.split('\n').map(line => line.trim()).filter(line => line);
+    
+    // Nissan indicators: scattered format with mixed parts and numbers
+    const hasNissanParts = lines.some(line => 
+      line.toLowerCase().includes('headlamp') || 
+      line.toLowerCase().includes('radiator') || 
+      line.toLowerCase().includes('condenser') || 
+      line.toLowerCase().includes('oil cooler')
+    );
+    
+    // Check for Nissan-style scattered format (not clean table)
+    const hasScatteredFormat = lines.some(line => 
+      line.includes('O ') || line.includes('⚫ ') || line.includes('• ') || // Nissan-style prefixes
+      line.includes('ASSY-') || line.includes('& MOTOR') // Nissan-style text
+    );
+    
+    // Check for clean table format (not Nissan)
+    const hasCleanTableFormat = lines.some(line => 
+      line.includes('Part Number') || line.includes('Part Name') || 
+      line.includes('Short Code') || line.includes('Date Range') ||
+      /\d{2}\.\d{2}\.\d{4}/.test(line) // Date format like 04.04.2022
+    );
+    
+    // Only skip AI for truly complex Nissan layouts
+    if (hasNissanParts && hasScatteredFormat && !hasCleanTableFormat) {
+      return fallbackExtraction(ocrText);
+    }
+    
     const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash-lite' });
 
     const prompt = `
-You are an expert automotive parts analyst. Extract ONLY the MAIN automotive parts from the following text.
+You are an expert automotive parts analyst. Analyze the provided OCR text and extract ONLY the MAIN automotive parts according to the rules below.
 
 TEXT TO ANALYZE:
 """
@@ -41,14 +70,34 @@ ${ocrText}
 """
 
 INSTRUCTIONS:
-1. Identify ONLY the MAIN automotive parts (not brackets, mounting hardware, or supporting components)
-2. Extract part numbers for each MAIN part (alphanumeric codes, MUST be 8+ REAL alphanumeric characters - ignore shorter numbers and count only letters/numbers, not special characters)
-3. Determine Left/Right specificity for each part (look for L, R, LH, RH, Left, Right indicators)
-4. IGNORE: brackets, mounting hardware, bolts, nuts, clips, or supporting components
-5. Focus on finding 2-5 MAIN parts maximum
-6. IMPORTANT: Match part names with their CLOSEST part numbers in the text layout
-7. PART NUMBER PATTERN: In most cases, part numbers appear ABOVE the part name (within 1-3 lines)
-8. NISSAN STYLE: Some brands may have part numbers BELOW the part name
+1. Identify ONLY MAIN automotive parts. Exclude brackets, mounting hardware, bolts, nuts, clips, and other supporting components.
+2. Extract part numbers for each MAIN part. A valid part number must contain ≥ 8 letters/digits combined (ignore hyphens, spaces, and special characters when counting). Ignore any shorter numbers.
+3. Determine Left/Right context:
+   - If text contains "LH", "L", or "Left" → Left
+   - If text contains "RH", "R", or "Right" → Right
+4. Focus on returning 2–9 MAIN parts maximum, but output no more than the first 5 valid parts found in text order.
+5. Extract part numbers that are clearly associated with each part.
+6. PART NUMBER PATTERNS: Look for these formats as they are most likely part numbers:
+   - Hyphenated format: "21606-EB405", "26060-5X00B", "92120-EB400" (these are almost always part numbers)
+   - Alphanumeric codes: "21460EB31B", "8110560K40" (8+ characters)
+7. Ignore irrelevant short codes like "10", "50", "110", "001" (these are quantities or prices, not part numbers).
+8. Keep part numbers clean — e.g., "8110560K40" not "8110560K40 UNIT ASSY".
+9. SINGLE LINE RULE: If multiple keywords appear in one line (e.g., "O FAN & MOTOR ASSY-CONDENSER"), select the LAST keyword as the part name with this priority: Condenser > Oil Cooler > Radiator > Fan > Motor > Assembly.
+
+IMPORTANT RULES:
+- Use these exact standardized part names:
+  'Left Headlamp', 'Right Headlamp', 'Left DayLight', 'Right DayLight', 'Radiator', 'Condenser', 'Fan Assembly', 'Intercooler', 'Radar Sensor', 'Headlight Left', 'Headlight Right', 'Oil Cooler', 'Auxiliary Radiator'
+- Part naming priority:
+  * RADIATOR: If "RADIATOR" is found, use "Radiator" instead of generic radiator terms
+  * CONDENSER: If "CONDENSER" is found, use "Condenser" instead of "Refrigerant Condenser" or generic condenser terms
+  * Only use "Refrigerant Condenser" if no specific "Condenser" is found
+  * Only use generic radiator terms if no specific "RADIATOR" is found
+  * If both "Headlamp" and "DayLight" appear in the same name → prioritize "Headlamp"
+- For headlamps: If text contains RH/R/Right → 'Right Headlamp', if LH/L/Left → 'Left Headlamp'
+- For daylights: If text contains RH/R/Right → 'Right DayLight', if LH/L/Left → 'Left DayLight'
+- PART NUMBER LENGTH: Only extract part numbers with ≥ 8 REAL alphanumeric characters (ignore special chars like hyphens)
+- MAXIMUM 5 MAIN PARTS per response
+- IGNORE: brackets, mounting hardware, bolts, nuts, clips, supporting components
 
 RESPONSE FORMAT (JSON only):
 {
@@ -62,28 +111,8 @@ RESPONSE FORMAT (JSON only):
   "totalPartsFound": "Number of parts found",
   "ignoredContent": ["List of irrelevant content that was ignored"]
 }
-
-IMPORTANT RULES:
-- Use these exact part names: 'Left Headlamp', 'Right Headlamp', 'Left DayLight', 'Right DayLight', 'Radiator', 'Condenser', 'Fan Assembly', 'Intercooler', 'Radar Sensor', 'Headlight Left', 'Headlight Right', 'Oil Cooler', 'Auxiliary Radiator'
-- PRIORITY RULES for part naming:
-  * RADIATOR: If "RADIATOR" (specific) is found, use that instead of "REFRIGERANT CONDENSER" or generic radiator terms
-  * CONDENSER: If "CONDENSER" (specific) is found, use that instead of "REFRIGERANT CONDENSER" or generic condenser terms
-  * Only use "REFRIGERANT CONDENSER" if no specific "CONDENSER" is found
-  * Only use generic radiator terms if no specific "RADIATOR" is found
-- SPATIAL MATCHING: Match part names with their CLOSEST part numbers in the text layout
-- IGNORE THESE: brackets, mounting hardware, bolts, nuts, clips, supporting components
-- For headlamps: If text contains RH/R/Right → 'Right Headlamp', if LH/L/Left → 'Left Headlamp'
-- For daylights: If text contains RH/R/Right → 'Right DayLight', if LH/L/Left → 'Left DayLight'
-- PART NUMBER LENGTH: Only extract part numbers that are 8+ REAL alphanumeric characters long (ignore special chars like hyphens)
-- IGNORE SHORT NUMBERS: Numbers like "10", "50", "110", "001" are NOT part numbers (they are quantities, prices, or codes)
-- SINGLE LINE RULE: If multiple part keywords appear in one line (e.g., "O FAN & MOTOR ASSY-CONDENSER"), use the LAST keyword as the main part
-- PRIORITY ORDER: When multiple keywords in one line, prioritize: Condenser > Oil Cooler > Radiator > Fan > Motor > Assembly
-- SPATIAL MATCHING: Part numbers may be in a separate section below all part names - look for the closest match in the entire text
-- Part numbers should be clean (e.g., "8110560K40" not "8110560K40 UNIT ASSY")
-- Look for multiple instances of the same part type (e.g., both left and right headlamps)
-- Return valid JSON only
-- Maximum 5 MAIN parts per response
 `;
+
 
     const result = await model.generateContent(prompt);
     const response = await result.response;
@@ -137,11 +166,20 @@ function fallbackExtraction(ocrText: string): AIPartExtraction[] {
     
     // Look for part numbers (alphanumeric, MUST be 8+ REAL alphanumeric chars, ignoring special chars)
     // Also look for part numbers with hyphens (e.g., 26060-5X00B, 26010-5X00B)
+    // IMPORTANT: Exclude common part names that might match the regex
     const partNumberMatches = line.match(/\b[A-Z0-9]{8,20}\b/gi);
     const hyphenatedMatches = line.match(/\b[A-Z0-9]{3,10}-[A-Z0-9]{3,10}\b/gi);
     
     if (partNumberMatches) {
       partNumberMatches.forEach(number => {
+        // Exclude common part names that might match the regex
+        const lowerNumber = number.toLowerCase();
+        if (lowerNumber.includes('headlamp') || lowerNumber.includes('headlight') || 
+            lowerNumber.includes('condenser') || lowerNumber.includes('radiator') || 
+            lowerNumber.includes('assembly') || lowerNumber.includes('assy')) {
+          return;
+        }
+        
         // Double-check it's actually 8+ chars
         if (number.length >= 8) {
           partNumberPositions.push({ number, lineIndex, line });
@@ -151,6 +189,12 @@ function fallbackExtraction(ocrText: string): AIPartExtraction[] {
     
     if (hyphenatedMatches) {
       hyphenatedMatches.forEach(number => {
+        // Exclude part names that might have hyphens
+        const lowerNumber = number.toLowerCase();
+        if (lowerNumber.includes('assy-') || lowerNumber.includes('assembly-')) {
+          return;
+        }
+        
         // For hyphenated numbers, count only alphanumeric chars (ignore hyphens)
         const alphanumericOnly = number.replace(/[^A-Z0-9]/gi, '');
         if (alphanumericOnly.length >= 8) {
@@ -212,69 +256,111 @@ function fallbackExtraction(ocrText: string): AIPartExtraction[] {
       }
       
       partNamePositions.push({ name: partName, lineIndex, line: cleanLine, context });
-      console.log(`Detected part: ${partName} from line: "${line}" (cleaned: "${cleanLine}")`);
     }
   }
   
-  // Check if this is a Nissan-style layout (part names grouped, then part numbers grouped separately)
+  // Check if this is a Nissan-style layout
+  // Nissan can have either:
+  // 1. Grouped format: part names together, then part numbers together
+  // 2. Mixed format: part names and part numbers scattered throughout
   const isNissanStyle = partNamePositions.length > 0 && partNumberPositions.length > 0 && 
-    Math.min(...partNamePositions.map(p => p.lineIndex)) < Math.min(...partNumberPositions.map(p => p.lineIndex));
+    (Math.min(...partNamePositions.map(p => p.lineIndex)) < Math.min(...partNumberPositions.map(p => p.lineIndex)) || // Grouped format
+    partNamePositions.length >= 5); // Mixed format (Nissan typically has 5+ parts)
 
   if (isNissanStyle) {
-    // Nissan-style: simple sequential matching (first part name → first part number)
-    console.log('Detected Nissan-style layout, using simple sequential matching');
+    // Nissan-style: intelligent grouping and merging with 8+ character filtering
     
-    // Filter to only valid part numbers (8+ real characters)
+    // Filter to only valid part numbers (8+ real characters, excluding special chars)
     const validPartNumbers = partNumberPositions.filter(pn => {
       const realLength = pn.number.replace(/[^A-Z0-9]/gi, '').length;
-      return realLength >= 8;
+      return realLength >= 8; // Must be 8+ real characters
     });
     
-    console.log(`Found ${validPartNumbers.length} valid part numbers:`, validPartNumbers.map(pn => pn.number));
-    console.log('Part names in order:', partNamePositions.map(p => p.name));
+    // Group and merge parts by name, handling duplicates and variations
+    const partGroups = new Map<string, { name: string; partNumbers: string[]; context: string; count: number }>();
     
-    // Simple sequential matching
-    for (let i = 0; i < partNamePositions.length && i < validPartNumbers.length; i++) {
-      const partName = partNamePositions[i];
-      const partNumber = validPartNumbers[i];
+    for (const partName of partNamePositions) {
+      let normalizedName = partName.name;
+      let context = partName.context || '';
       
-      let finalPartName = partName.name;
-      
-      // Add L/R context to headlamps and daylights
+      // Normalize part names to group similar entries
       if (partName.name === 'Headlamp') {
-        if (partName.context === 'RH') {
-          finalPartName = 'Right Headlamp';
-        } else if (partName.context === 'LH') {
-          finalPartName = 'Left Headlamp';
+        if (partName.context === 'RH' || partName.line.toLowerCase().includes('rh') || partName.line.toLowerCase().includes('right')) {
+          normalizedName = 'Right Headlamp';
+          context = 'RH';
+        } else if (partName.context === 'LH' || partName.line.toLowerCase().includes('lh') || partName.line.toLowerCase().includes('left')) {
+          normalizedName = 'Left Headlamp';
+          context = 'LH';
         } else {
-          finalPartName = 'Left Headlamp'; // Default
+          normalizedName = 'Left Headlamp'; // Default
+          context = 'LH';
         }
       } else if (partName.name === 'DayLight') {
-        if (partName.context === 'RH') {
-          finalPartName = 'Right DayLight';
-        } else if (partName.context === 'LH') {
-          finalPartName = 'Left DayLight';
+        if (partName.context === 'RH' || partName.line.toLowerCase().includes('rh') || partName.line.toLowerCase().includes('right')) {
+          normalizedName = 'Right DayLight';
+          context = 'RH';
+        } else if (partName.context === 'LH' || partName.line.toLowerCase().includes('lh') || partName.line.toLowerCase().includes('left')) {
+          normalizedName = 'Left DayLight';
+          context = 'LH';
         } else {
-          finalPartName = 'Left DayLight'; // Default
+          normalizedName = 'Left DayLight'; // Default
+          context = 'LH';
         }
       }
       
-      parts.push({
-        partName: finalPartName,
-        partNumber: partNumber.number,
-        confidence: 0.9,
-        context: partName.context || undefined,
-        rawText: ocrText
-      });
+      // Add to existing group or create new one
+      if (partGroups.has(normalizedName)) {
+        // Part already exists, increment count
+        const existing = partGroups.get(normalizedName)!;
+        existing.count++;
+        if (context && !existing.context.includes(context)) {
+          existing.context = existing.context ? `${existing.context}, ${context}` : context;
+        }
+      } else {
+        // Create new part group
+        partGroups.set(normalizedName, {
+          name: normalizedName,
+          partNumbers: [],
+          context,
+          count: 1
+        });
+      }
+    }
+    
+    // Assign part numbers to each part group, handling duplicates
+    let partNumberIndex = 0;
+    for (const [groupName, groupData] of partGroups) {
       
-      console.log(`Matched: ${finalPartName} → ${partNumber.number}`);
+      // For duplicate parts, collect all part numbers but create single entry
+      const partNumbersToAssign = Math.min(groupData.count, validPartNumbers.length - partNumberIndex);
+      const collectedPartNumbers: string[] = [];
       
-      // Limit to maximum 5 parts
-      if (parts.length >= 5) break;
+      for (let i = 0; i < partNumbersToAssign; i++) {
+        if (partNumberIndex < validPartNumbers.length) {
+          const partNumber = validPartNumbers[partNumberIndex];
+          collectedPartNumbers.push(partNumber.number);
+          partNumberIndex++;
+        }
+      }
+      
+      // Create single entry with all part numbers (comma-separated)
+      if (collectedPartNumbers.length > 0) {
+        const finalPartNumber = collectedPartNumbers.join(', ');
+        
+        parts.push({
+          partName: groupData.name,
+          partNumber: finalPartNumber,
+          confidence: 0.9,
+          context: groupData.context || undefined,
+          rawText: ocrText
+        });
+      }
+      
+      // Limit to maximum 9 parts (as per your updated prompt)
+      if (parts.length >= 9) break;
     }
   } else {
     // Standard layout: spatial matching (closest part number to each part name)
-    console.log('Using standard spatial matching for non-Nissan layout');
     
     for (const partName of partNamePositions) {
       // Find the closest part number to this part name

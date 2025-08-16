@@ -4,12 +4,28 @@ import React, { useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { ImagePasteArea } from '@/components/ui/ImagePasteArea';
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 
 import {
   X,
   Plus,
-  AlertCircle
+  AlertCircle,
+  Car,
+  User
 } from 'lucide-react';
+
+// Function to clean part numbers by removing special characters and replacing O with 0
+const cleanPartNumber = (partNumber: string): string => {
+  if (!partNumber) return '';
+  return partNumber
+    .replace(/O/g, '0') // Replace O with 0 to avoid confusion
+    .replace(/[^a-zA-Z0-9]/g, ''); // Remove all special characters
+};
 
 // Function to get part icon from /public/part-icons
 const getPartIcon = (partName: string): string | null => {
@@ -19,10 +35,11 @@ const getPartIcon = (partName: string): string | null => {
     'Right Headlamp': '/part-icons/headlight-right.png',
     'Condenser': '/part-icons/condenser.png',
     'Radar Sensor': '/part-icons/sensor.png',
-    'Fan Assembly': '/part-icons/fan.png',
+    'Fan Assembly': '/part-icons/fa.png',
     'Intercooler': '/part-icons/intercooler.png',
-    'Left DayLight': '/part-icons/headlight-left.png', // Use left headlight icon
-    'Right DayLight': '/part-icons/headlight-right.png', // Use right headlight icon
+    'Left DayLight': '/part-icons/lh.png', // Use left headlight icon
+    'Right DayLight': '/part-icons/rh.png', // Use right headlight icon
+    'Auxiliary Radiator': '/part-icons/aux.png'
   };
 
   return iconMap[partName] || null;
@@ -36,10 +53,10 @@ const PART_OPTIONS = [
   { name: 'Radar Sensor', icon: getPartIcon('Radar Sensor') },
   { name: 'Fan Assembly', icon: getPartIcon('Fan Assembly') },
   { name: 'Intercooler', icon: getPartIcon('Intercooler') },
-  { name: 'Left DayLight', icon: getPartIcon('Left Headlamp') }, // Reuse fan icon for now
-  { name: 'Right DayLight', icon: getPartIcon('Right Headlamp') }, // Reuse fan icon for now
+  { name: 'Left DayLight', icon: getPartIcon('Left DayLight') }, // Reuse fan icon for now
+  { name: 'Right DayLight', icon: getPartIcon('Right DayLight') }, // Reuse fan icon for now
   { name: 'Oil Cooler', icon: getPartIcon('Radiator') }, // Reuse radiator icon for now
-  { name: 'Auxiliary Radiator', icon: getPartIcon('Radiator') }, // Reuse radiator icon for now
+  { name: 'Auxiliary Radiator', icon: getPartIcon('Auxiliary Radiator') }, // Reuse radiator icon for now
 ];
 
 interface PartDetails {
@@ -84,6 +101,7 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
   const [isLoading, setIsLoading] = useState(false);
   const [showValidationPopup, setShowValidationPopup] = useState(false);
   const [validationMessage, setValidationMessage] = useState('');
+  const [isFormAccordionOpen, setIsFormAccordionOpen] = useState(false);
 
   const handlePartsExtracted = (parts: ExtractedPartInfo[]) => {
     setExtractedParts(prevParts => [...prevParts, ...parts]);
@@ -92,7 +110,7 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
     parts.forEach(part => {
       // Use the AI-extracted part name directly instead of re-processing raw text
       let matchedPartName = part.partName;
-      
+
       // Use context information to determine Left vs Right for Headlamp and DayLight
       if (part.context && (
         matchedPartName === 'Left Headlamp' || matchedPartName === 'Right Headlamp' ||
@@ -112,7 +130,7 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
           }
         }
       }
-      
+
       // Add to selected parts if not already present
       setSelectedParts(prev => {
         if (!prev.includes(matchedPartName)) {
@@ -126,14 +144,14 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
         ...prev,
         [matchedPartName]: {
           name: matchedPartName,
-          number: part.partNumber !== 'Not found' ? part.partNumber : '',
+          number: part.partNumber !== 'Not found' ? cleanPartNumber(part.partNumber) : '',
           price: null,
           note: `AI-detected - Context: ${part.context || 'None'}`
         }
       }));
-      
-
     });
+
+
   };
 
   const handlePartRemoved = (removedPart: ExtractedPartInfo) => {
@@ -162,13 +180,13 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
     // If no other parts with this name, remove from selected parts and clear details
     if (remainingPartsForName.length === 0) {
       setSelectedParts(prev => prev.filter(part => part !== matchedPartName));
-              setPartDetails(prev => {
-          const newDetails = { ...prev };
-          delete newDetails[matchedPartName];
-          return newDetails;
-        });
-      }
-    };
+      setPartDetails(prev => {
+        const newDetails = { ...prev };
+        delete newDetails[matchedPartName];
+        return newDetails;
+      });
+    }
+  };
 
   const handlePaste = () => {
     const lines = rawText.split('\n');
@@ -275,21 +293,21 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
             const parsedDay = parseInt(day);
             const parsedMonth = parseInt(month);
             const parsedYear = parseInt(year);
-            
+
             // Validate that day and month make sense for Australian format
             if (parsedDay > 31 || parsedMonth > 12) {
               throw new Error('Invalid date: day or month out of range');
             }
-            
+
             // Additional validation: ensure day doesn't exceed month limits
             const daysInMonth = new Date(parsedYear, parsedMonth, 0).getDate();
             if (parsedDay > daysInMonth) {
               throw new Error(`Invalid date: ${parsedDay} exceeds days in month ${parsedMonth}`);
             }
-            
+
             // Create Date object with explicit Australian DD/MM/YYYY interpretation
             const deadline = new Date(parsedYear, parsedMonth - 1, parsedDay, hours, minutes);
-            
+
 
 
             // Validate the created date
@@ -380,6 +398,11 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
       address: parsed['address'] || '',
       phone: parsed['phone'] || '',
     });
+
+    // Auto-open the form accordion when data is populated
+    if (Object.values(parsed).some(value => value)) {
+      setIsFormAccordionOpen(true);
+    }
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -699,7 +722,7 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
                     phone: parsed['phone'] || '',
                   });
                 }}
-                placeholder="Paste your quote data here and it will auto-populate the form below..."
+                placeholder="Paste Quote..."
                 className="w-full h-32 p-4 text-sm border-2 border-gray-300 rounded-lg shadow-sm focus:border-red-500 focus:ring-2 focus:ring-red-200 focus:outline-none transition-all duration-200 bg-gray-50 font-mono resize-none"
                 style={{
                   backgroundImage: 'linear-gradient(45deg, #f9fafb 25%, transparent 25%), linear-gradient(-45deg, #f9fafb 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #f9fafb 75%), linear-gradient(-45deg, transparent 75%, #f9fafb 75%)',
@@ -729,62 +752,324 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
                 <span>💡 Click the area below to focus, then use paste screenshots.</span>
               </div>
             </div>
-            <ImagePasteArea 
-          onPartsExtracted={handlePartsExtracted} 
-          onPartRemoved={handlePartRemoved}
-          onClearAll={() => {
-            setSelectedParts([]);
-            setPartDetails({});
-            setExtractedParts([]);
-          }}
-        />
+            <ImagePasteArea
+              onPartsExtracted={handlePartsExtracted}
+              onPartRemoved={handlePartRemoved}
+              onClearAll={() => {
+                setSelectedParts([]);
+                setPartDetails({});
+                setExtractedParts([]);
+              }}
+            />
           </div>
         </div>
       </div>
 
-      {/* Simplified Form Fields - Only show VIN and Rego for user correction */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            VIN
-          </label>
-          <Input
-            name="vin"
-            value={fields.vin}
-            onChange={handleChange}
-            className="w-full h-8 text-sm"
-            placeholder="Enter VIN if correction needed"
-          />
-        </div>
+      {/* Form Fields Accordion */}
+              <Accordion
+          type="single"
+          collapsible
+          value={isFormAccordionOpen ? "form-fields" : ""}
+          onValueChange={(value) => setIsFormAccordionOpen(value === "form-fields")}
+          className="mt-6"
+        >
+        <AccordionItem value="form-fields" className="border border-gray-200 rounded-lg">
+          <AccordionTrigger className="px-4 py-3 hover:bg-gray-50 transition-colors cursor-pointer">
+            <div className="flex flex-col space-y-2 w-full">
+              {/* First Row - Basic Info */}
+              <div className="flex items-center space-x-3">
+                <div className="flex items-center space-x-2">
+                  <Car className="h-4 w-4 text-gray-600" />
+                  <span className="font-medium text-gray-900">Quote Details</span>
+                </div>
+                {fields.customer && fields.quoteRef && (
+                  <div className="flex items-center space-x-2 text-sm text-gray-600">
+                    <span>•</span>
+                    <span className="font-medium text-blue-600">{fields.customer}</span>
+                    <span>•</span>
+                    <span className="font-mono text-green-600">{fields.quoteRef}</span>
+                    {(fields.make || fields.model) && (
+                      <>
+                        <span>•</span>
+                        <span className="text-purple-600">
+                          {fields.make && fields.model ? `${fields.make} ${fields.model}` : fields.make || fields.model}
+                        </span>
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
+              
+              {/* Second Row - VIN & Registration with Copy Buttons */}
+              {(fields.vin || fields.rego) && (
+                <div className="flex items-center space-x-4 text-xs text-gray-600">
+                  {fields.vin && (
+                    <div className="flex items-center space-x-2">
+                      <span className="font-medium">VIN:</span>
+                      <span className="font-mono text-gray-700">{fields.vin}</span>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigator.clipboard.writeText(fields.vin);
+                          // Visual confirmation
+                          const button = e.currentTarget;
+                          const originalIcon = button.innerHTML;
+                          button.innerHTML = `
+                            <svg class="h-4 w-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                            </svg>
+                          `;
+                          setTimeout(() => {
+                            button.innerHTML = originalIcon;
+                          }, 1500);
+                        }}
+                        className="p-1.5 text-gray-400 hover:text-blue-600 transition-colors cursor-pointer"
+                        title="Copy VIN"
+                      >
+                        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                        </svg>
+                      </button>
+                    </div>
+                  )}
+                  {fields.rego && (
+                    <div className="flex items-center space-x-2">
+                      <span className="font-medium">Rego:</span>
+                      <span className="font-mono text-gray-700">{fields.rego}</span>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigator.clipboard.writeText(fields.rego);
+                          // Visual confirmation
+                          const button = e.currentTarget;
+                          const originalIcon = button.innerHTML;
+                          button.innerHTML = `
+                            <svg class="h-4 w-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                            </svg>
+                          `;
+                          setTimeout(() => {
+                            button.innerHTML = originalIcon;
+                          }, 1500);
+                        }}
+                        className="p-1.5 text-gray-400 hover:text-blue-600 transition-colors cursor-pointer"
+                        title="Copy Registration"
+                      >
+                        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                        </svg>
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </AccordionTrigger>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Registration (Rego)
-          </label>
-          <Input
-            name="rego"
-            value={fields.rego}
-            onChange={handleChange}
-            className="w-full h-8 text-sm"
-            placeholder="Enter registration if correction needed"
-          />
-        </div>
-      </div>
+          <AccordionContent className="px-4 pb-4">
+            <div className="space-y-6">
+              {/* Quote Reference */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Quote Reference
+                </label>
+                <Input
+                  name="quoteRef"
+                  value={fields.quoteRef}
+                  onChange={handleChange}
+                  className="w-full h-8 text-sm"
+                  placeholder="Enter quote reference number"
+                />
+              </div>
 
-      {/* Hidden fields - still store data but not visible to user */}
-      <div className="hidden">
-        <Input name="quoteRef" value={fields.quoteRef} onChange={handleChange} />
-        <Input name="make" value={fields.make} onChange={handleChange} />
-        <Input name="model" value={fields.model} onChange={handleChange} />
-        <Input name="series" value={fields.series} onChange={handleChange} />
-        <Input name="auto" value={fields.auto} onChange={handleChange} />
-        <Input name="body" value={fields.body} onChange={handleChange} />
-        <Input name="mthyr" value={fields.mthyr} onChange={handleChange} />
-        <Input name="requiredBy" value={fields.requiredBy} onChange={handleChange} />
-        <Input name="customer" value={fields.customer} onChange={handleChange} />
-        <Input name="address" value={fields.address} onChange={handleChange} />
-        <Input name="phone" value={fields.phone} onChange={handleChange} />
-      </div>
+              {/* Vehicle Details */}
+              <div className="mt-6">
+                <h3 className="text-md font-semibold text-gray-800 mb-3 flex items-center space-x-2">
+                  <Car className="h-4 w-4" />
+                  <span>Vehicle Details</span>
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      VIN
+                    </label>
+                    <Input
+                      name="vin"
+                      value={fields.vin}
+                      onChange={handleChange}
+                      className="w-full h-8 text-sm"
+                      placeholder="Enter VIN"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Registration (Rego)
+                    </label>
+                    <Input
+                      name="rego"
+                      value={fields.rego}
+                      onChange={handleChange}
+                      className="w-full h-8 text-sm"
+                      placeholder="Enter registration"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Make
+                    </label>
+                    <Input
+                      name="make"
+                      value={fields.make}
+                      onChange={handleChange}
+                      className="w-full h-8 text-sm"
+                      placeholder="e.g., Toyota, Honda"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Model
+                    </label>
+                    <Input
+                      name="model"
+                      value={fields.model}
+                      onChange={handleChange}
+                      className="w-full h-8 text-sm"
+                      placeholder="e.g., Camry, Civic"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Series
+                    </label>
+                    <Input
+                      name="series"
+                      value={fields.series}
+                      onChange={handleChange}
+                      className="w-full h-8 text-sm"
+                      placeholder="e.g., LE, EX"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Body Type
+                    </label>
+                    <Input
+                      name="body"
+                      value={fields.body}
+                      onChange={handleChange}
+                      className="w-full h-8 text-sm"
+                      placeholder="e.g., Sedan, SUV"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Month/Year
+                    </label>
+                    <Input
+                      name="mthyr"
+                      value={fields.mthyr}
+                      onChange={handleChange}
+                      className="w-full h-8 text-sm"
+                      placeholder="e.g., 2020, 2021"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Transmission
+                    </label>
+                    <select
+                      name="auto"
+                      value={fields.auto}
+                      onChange={(e) => setFields(prev => ({ ...prev, auto: e.target.value }))}
+                      className="w-full h-8 text-sm border border-gray-300 rounded-md px-2 focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                    >
+                      <option value="true">Automatic</option>
+                      <option value="false">Manual</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              {/* Customer Details */}
+              <div className="mt-6">
+                <h3 className="text-md font-semibold text-gray-800 mb-3 flex items-center space-x-2">
+                  <User className="h-4 w-4" />
+                  <span>Customer Details</span>
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Customer Name
+                    </label>
+                    <Input
+                      name="customer"
+                      value={fields.customer}
+                      onChange={handleChange}
+                      className="w-full h-8 text-sm"
+                      placeholder="Enter customer name"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Phone Number
+                    </label>
+                    <Input
+                      name="phone"
+                      value={fields.phone}
+                      onChange={handleChange}
+                      className="w-full h-8 text-sm"
+                      placeholder="Enter phone number"
+                    />
+                  </div>
+
+                  <div className="md:col-span-2 lg:col-span-3">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Address
+                    </label>
+                    <Input
+                      name="address"
+                      value={fields.address}
+                      onChange={handleChange}
+                      className="w-full h-8 text-sm"
+                      placeholder="Enter customer address"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Additional Details */}
+              <div className="mt-6">
+                <h3 className="text-md font-semibold text-gray-800 mb-3 flex items-center space-x-2">
+                  <AlertCircle className="h-4 w-4" />
+                  <span>Additional Details</span>
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Required By
+                    </label>
+                    <Input
+                      name="requiredBy"
+                      value={fields.requiredBy}
+                      onChange={handleChange}
+                      className="w-full h-8 text-sm"
+                      placeholder="Enter deadline (optional)"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </AccordionContent>
+        </AccordionItem>
+      </Accordion>
 
       {/* Parts Selection */}
       <div className="mt-6">
@@ -802,8 +1087,8 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
                 type="button"
                 onClick={() => togglePart(part.name)}
                 className={`px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 cursor-pointer flex items-center space-x-2 ${isSelected
-                    ? 'bg-red-600 text-white shadow-md hover:bg-red-700 border-2 border-red-600'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200 border-2 border-gray-200'
+                  ? 'bg-red-600 text-white shadow-md hover:bg-red-700 border-2 border-red-600'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200 border-2 border-gray-200'
                   }`}
               >
                 {iconUrl && (
@@ -819,55 +1104,78 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
 
         {/* Dynamic Part Details */}
         {selectedParts.length > 0 && (
-          <div className="space-y-4">
-            <h3 className="text-md font-semibold text-gray-800 flex items-center space-x-2">
+          <div>
+            <h3 className="text-md font-semibold text-gray-800 flex items-center space-x-2 mb-4">
               <Plus className="h-4 w-4" />
               <span>Part Details</span>
             </h3>
 
-            {selectedParts.map((partName) => {
-              const part = partDetails[partName];
-              const iconUrl = getPartIcon(partName);
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {selectedParts.map((partName) => {
+                const part = partDetails[partName];
+                const iconUrl = getPartIcon(partName);
 
-              return (
-                <div key={partName} className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center space-x-2">
-                      {iconUrl && (
-                        <div className="w-6 h-6 bg-white rounded-full flex items-center justify-center shadow-sm border border-gray-200">
-                          <img src={iconUrl} alt={partName} className="h-4 w-4 object-contain" />
-                        </div>
-                      )}
-                      <span className="font-medium text-gray-900">{partName}</span>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => togglePart(partName)}
-                      className="p-1 text-gray-400 hover:text-red-600 transition-colors"
-                      title="Remove part"
-                    >
-                      <X className="h-4 w-4" />
-                    </button>
-                  </div>
-
-                  <div className="grid grid-cols-1 gap-3">
-                    <div>
-                      <label className="block text-xs font-medium text-gray-600 mb-1">
-                        Part Number *
-                      </label>
-                      <Input
-                        value={part.number}
-                        onChange={(e) => updatePartDetail(partName, 'number', e.target.value)}
-                        placeholder="Enter part number"
-                        className="w-full h-8 text-sm"
-                      />
+                return (
+                  <div key={partName} className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center space-x-2">
+                        {iconUrl && (
+                          <div className="w-6 h-6 bg-white rounded-full flex items-center justify-center shadow-sm border border-gray-200">
+                            <img src={iconUrl} alt={partName} className="h-4 w-4 object-contain" />
+                          </div>
+                        )}
+                        <span className="font-medium text-gray-900">{partName}</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => togglePart(partName)}
+                        className="p-1 text-gray-400 hover:text-red-600 transition-colors cursor-pointer"
+                        title="Remove part"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
                     </div>
 
-                    {/* Price and Notes fields hidden in quote creation - will be added during pricing workflow */}
+                    <div className="space-y-3">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-2">
+                          Part Number *
+                        </label>
+                        {part.number ? (
+                          <div className="space-y-2">
+                            {part.number.split(',').map((singleNumber, index) => (
+                              <div key={index} className="flex items-center space-x-2">
+                                <div className="flex-1 bg-gray-50 px-3 py-2 rounded-md border border-gray-200 text-sm font-mono text-gray-700">
+                                  {cleanPartNumber(singleNumber.trim())}
+                                </div>
+                                <button
+                                  onClick={() => navigator.clipboard.writeText(cleanPartNumber(singleNumber.trim()))}
+                                  className="p-1.5 text-gray-400 hover:text-blue-600 transition-colors cursor-pointer"
+                                  title="Copy part number"
+                                >
+                                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                  </svg>
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <Input
+                            value=""
+                            onChange={(e) => updatePartDetail(partName, 'number', cleanPartNumber(e.target.value))}
+                            placeholder="Enter part number"
+                            className="w-full h-8 text-sm"
+                          />
+                        )}
+                      </div>
+
+                      {/* Price and Notes fields hidden in quote creation - will be added during pricing workflow */}
+                    </div>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
           </div>
         )}
       </div>

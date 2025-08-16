@@ -1,9 +1,8 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import "./globals.css";
+import "../globals.css";
 import { QueryProvider } from "@/components/providers/QueryProvider";
 import { SnackbarProvider } from "@/components/ui/Snackbar";
-import { AuthProvider } from "@/components/providers/AuthProvider";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -16,27 +15,25 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Quote Manager",
-  description: "Manage quotes and orders efficiently",
+  title: "Authentication - Quote Manager",
+  description: "Sign in to your account",
 };
 
-export default function RootLayout({
+export default function AuthLayout({
   children,
-}: Readonly<{
+}: {
   children: React.ReactNode;
-}>) {
+}) {
   return (
     <html lang="en">
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <AuthProvider>
-          <QueryProvider>
-            <SnackbarProvider>
-              {children}
-            </SnackbarProvider>
-          </QueryProvider>
-        </AuthProvider>
+        <QueryProvider>
+          <SnackbarProvider>
+            {children}
+          </SnackbarProvider>
+        </QueryProvider>
       </body>
     </html>
   );

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { AlertCircle, X } from 'lucide-react';
+import { CheckCircle, AlertCircle, X, Info, AlertTriangle } from 'lucide-react';
 
 interface SnackbarProps {
   message: string;
@@ -13,75 +13,115 @@ interface SnackbarProps {
 export const Snackbar = ({ 
   message, 
   type = 'error', 
-  duration = 5000, 
+  duration = 4000, 
   onClose 
 }: SnackbarProps) => {
-  const [isVisible, setIsVisible] = useState(true);
+  const [isVisible, setIsVisible] = useState(false);
+  const [isExiting, setIsExiting] = useState(false);
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setIsVisible(false);
-      setTimeout(onClose, 300); // Wait for fade out animation
+    // Small delay for entrance animation
+    const entranceTimer = setTimeout(() => {
+      setIsVisible(true);
+    }, 50);
+
+    const exitTimer = setTimeout(() => {
+      handleClose();
     }, duration);
 
-    return () => clearTimeout(timer);
-  }, [duration, onClose]);
+    return () => {
+      clearTimeout(entranceTimer);
+      clearTimeout(exitTimer);
+    };
+  }, [duration]);
 
   const handleClose = () => {
-    setIsVisible(false);
-    setTimeout(onClose, 300);
+    setIsExiting(true);
+    setTimeout(() => {
+      setIsVisible(false);
+      setTimeout(onClose, 100);
+    }, 200);
   };
 
   const getStyles = () => {
     switch (type) {
       case 'error':
-        return 'bg-red-500 text-white border-red-600';
+        return 'bg-red-50 border-red-200 text-red-800 shadow-red-100 hover:border-red-300';
       case 'success':
-        return 'bg-green-500 text-white border-green-600';
+        return 'bg-green-50 border-green-200 text-green-800 shadow-green-100 hover:border-green-300';
       case 'warning':
-        return 'bg-yellow-500 text-white border-yellow-600';
+        return 'bg-yellow-50 border-yellow-200 text-yellow-800 shadow-yellow-100 hover:border-yellow-300';
       case 'info':
-        return 'bg-blue-500 text-white border-blue-600';
+        return 'bg-blue-50 border-blue-200 text-blue-800 shadow-blue-100 hover:border-blue-300';
       default:
-        return 'bg-red-500 text-white border-red-600';
+        return 'bg-red-50 border-red-200 text-red-800 shadow-red-100 hover:border-red-300';
     }
   };
 
   const getIcon = () => {
     switch (type) {
       case 'error':
-        return <AlertCircle className="h-5 w-5 flex-shrink-0" />;
+        return <AlertCircle className="h-3.5 w-3.5 text-red-500" />;
       case 'success':
-        return <div className="h-5 w-5 flex-shrink-0 rounded-full bg-white bg-opacity-20 flex items-center justify-center">✓</div>;
+        return <CheckCircle className="h-3.5 w-3.5 text-green-500" />;
       case 'warning':
-        return <AlertCircle className="h-5 w-5 flex-shrink-0" />;
+        return <AlertTriangle className="h-3.5 w-3.5 text-yellow-500" />;
       case 'info':
-        return <div className="h-5 w-5 flex-shrink-0 rounded-full bg-white bg-opacity-20 flex items-center justify-center">i</div>;
+        return <Info className="h-3.5 w-3.5 text-blue-500" />;
       default:
-        return <AlertCircle className="h-5 w-5 flex-shrink-0" />;
+        return <AlertCircle className="h-3.5 w-3.5 text-red-500" />;
     }
   };
 
+  const getIconBg = () => {
+    switch (type) {
+      case 'error':
+        return 'bg-red-100';
+      case 'success':
+        return 'bg-green-100';
+      case 'warning':
+        return 'bg-yellow-100';
+      case 'info':
+        return 'bg-blue-100';
+      default:
+        return 'bg-red-100';
+    }
+  };
+
+  if (!isVisible) return null;
+
   return (
     <div
-      className={`fixed top-4 right-4 z-50 max-w-sm w-full transform transition-all duration-300 ease-in-out ${
-        isVisible ? 'translate-x-0 opacity-100' : 'translate-x-full opacity-0'
+      className={`fixed top-4 right-4 z-50 max-w-xs w-full transform transition-all duration-200 ease-out hover:scale-[1.02] ${
+        !isVisible 
+          ? 'translate-x-full opacity-0 scale-95' 
+          : isExiting 
+            ? 'translate-x-full opacity-0 scale-95' 
+            : 'translate-x-0 opacity-100 scale-100'
       }`}
     >
       <div
-        className={`${getStyles()} rounded-lg shadow-lg border-l-4 p-4 flex items-start space-x-3`}
+        className={`${getStyles()} rounded-lg border shadow-lg hover:shadow-xl backdrop-blur-sm flex items-center space-x-2.5 p-2.5 transition-all duration-200 ease-out`}
       >
-        {getIcon()}
+        {/* Icon with background */}
+        <div className={`${getIconBg()} rounded-md p-1 flex-shrink-0`}>
+          {getIcon()}
+        </div>
+        
+        {/* Message */}
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium leading-5 break-words">
+          <p className="text-xs font-medium leading-tight break-words">
             {message}
           </p>
         </div>
+        
+        {/* Close button */}
         <button
           onClick={handleClose}
-          className="flex-shrink-0 p-1 hover:bg-white hover:bg-opacity-20 rounded-full transition-colors"
+          className="flex-shrink-0 p-1 hover:bg-black hover:bg-opacity-5 rounded-md transition-all duration-150 ease-out hover:scale-110 active:scale-95"
+          title="Close notification"
         >
-          <X className="h-4 w-4" />
+          <X className="h-3 w-3 text-gray-500" />
         </button>
       </div>
     </div>
@@ -126,11 +166,11 @@ export const SnackbarProvider = ({ children }: SnackbarProviderProps) => {
   return (
     <SnackbarContext.Provider value={{ showSnackbar }}>
       {children}
-      {/* Render snackbars */}
+      {/* Render snackbars with proper spacing */}
       {snackbars.map((snackbar, index) => (
         <div
           key={snackbar.id}
-          style={{ top: `${1 + index * 5}rem` }}
+          style={{ top: `${1 + index * 3.5}rem` }}
           className="fixed right-4 z-50"
         >
           <Snackbar

@@ -132,23 +132,23 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
       }
 
       // Add to selected parts if not already present
-      setSelectedParts(prev => {
-        if (!prev.includes(matchedPartName)) {
-          return [...prev, matchedPartName];
-        }
-        return prev;
-      });
+        setSelectedParts(prev => {
+          if (!prev.includes(matchedPartName)) {
+            return [...prev, matchedPartName];
+          }
+          return prev;
+        });
 
       // Populate part details with confidence information
-      setPartDetails(prev => ({
-        ...prev,
-        [matchedPartName]: {
-          name: matchedPartName,
+        setPartDetails(prev => ({
+          ...prev,
+          [matchedPartName]: {
+            name: matchedPartName,
           number: part.partNumber !== 'Not found' ? cleanPartNumber(part.partNumber) : '',
           price: null,
           note: `AI-detected - Context: ${part.context || 'None'}`
-        }
-      }));
+          }
+        }));
     });
 
 
@@ -293,21 +293,21 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
             const parsedDay = parseInt(day);
             const parsedMonth = parseInt(month);
             const parsedYear = parseInt(year);
-
+            
             // Validate that day and month make sense for Australian format
             if (parsedDay > 31 || parsedMonth > 12) {
               throw new Error('Invalid date: day or month out of range');
             }
-
+            
             // Additional validation: ensure day doesn't exceed month limits
             const daysInMonth = new Date(parsedYear, parsedMonth, 0).getDate();
             if (parsedDay > daysInMonth) {
               throw new Error(`Invalid date: ${parsedDay} exceeds days in month ${parsedMonth}`);
             }
-
+            
             // Create Date object with explicit Australian DD/MM/YYYY interpretation
             const deadline = new Date(parsedYear, parsedMonth - 1, parsedDay, hours, minutes);
-
+            
 
 
             // Validate the created date
@@ -889,31 +889,31 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
                   <span>Vehicle Details</span>
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      VIN
-                    </label>
-                    <Input
-                      name="vin"
-                      value={fields.vin}
-                      onChange={handleChange}
-                      className="w-full h-8 text-sm"
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            VIN
+          </label>
+          <Input
+            name="vin"
+            value={fields.vin}
+            onChange={handleChange}
+            className="w-full h-8 text-sm"
                       placeholder="Enter VIN"
-                    />
-                  </div>
+          />
+        </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Registration (Rego)
-                    </label>
-                    <Input
-                      name="rego"
-                      value={fields.rego}
-                      onChange={handleChange}
-                      className="w-full h-8 text-sm"
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Registration (Rego)
+          </label>
+          <Input
+            name="rego"
+            value={fields.rego}
+            onChange={handleChange}
+            className="w-full h-8 text-sm"
                       placeholder="Enter registration"
-                    />
-                  </div>
+          />
+        </div>
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -926,7 +926,7 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
                       className="w-full h-8 text-sm"
                       placeholder="e.g., Toyota, Honda"
                     />
-                  </div>
+      </div>
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -939,7 +939,7 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
                       className="w-full h-8 text-sm"
                       placeholder="e.g., Camry, Civic"
                     />
-                  </div>
+      </div>
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -1087,8 +1087,8 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
                 type="button"
                 onClick={() => togglePart(part.name)}
                 className={`px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 cursor-pointer flex items-center space-x-2 ${isSelected
-                  ? 'bg-red-600 text-white shadow-md hover:bg-red-700 border-2 border-red-600'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200 border-2 border-gray-200'
+                    ? 'bg-red-600 text-white shadow-md hover:bg-red-700 border-2 border-red-600'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200 border-2 border-gray-200'
                   }`}
               >
                 {iconUrl && (
@@ -1111,36 +1111,36 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
             </h3>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {selectedParts.map((partName) => {
-                const part = partDetails[partName];
-                const iconUrl = getPartIcon(partName);
+            {selectedParts.map((partName) => {
+              const part = partDetails[partName];
+              const iconUrl = getPartIcon(partName);
 
-                return (
-                  <div key={partName} className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="flex items-center space-x-2">
-                        {iconUrl && (
-                          <div className="w-6 h-6 bg-white rounded-full flex items-center justify-center shadow-sm border border-gray-200">
-                            <img src={iconUrl} alt={partName} className="h-4 w-4 object-contain" />
-                          </div>
-                        )}
-                        <span className="font-medium text-gray-900">{partName}</span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => togglePart(partName)}
-                        className="p-1 text-gray-400 hover:text-red-600 transition-colors cursor-pointer"
-                        title="Remove part"
-                      >
-                        <X className="h-4 w-4" />
-                      </button>
+              return (
+                <div key={partName} className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center space-x-2">
+                      {iconUrl && (
+                        <div className="w-6 h-6 bg-white rounded-full flex items-center justify-center shadow-sm border border-gray-200">
+                          <img src={iconUrl} alt={partName} className="h-4 w-4 object-contain" />
+                        </div>
+                      )}
+                      <span className="font-medium text-gray-900">{partName}</span>
                     </div>
+                    <button
+                      type="button"
+                      onClick={() => togglePart(partName)}
+                        className="p-1 text-gray-400 hover:text-red-600 transition-colors cursor-pointer"
+                      title="Remove part"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
 
                     <div className="space-y-3">
-                      <div>
+                    <div>
                         <label className="block text-xs font-medium text-gray-600 mb-2">
-                          Part Number *
-                        </label>
+                        Part Number *
+                      </label>
                         {part.number ? (
                           <div className="space-y-2">
                             {part.number.split(',').map((singleNumber, index) => (
@@ -1161,20 +1161,20 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
                             ))}
                           </div>
                         ) : (
-                          <Input
+                      <Input
                             value=""
                             onChange={(e) => updatePartDetail(partName, 'number', cleanPartNumber(e.target.value))}
-                            placeholder="Enter part number"
-                            className="w-full h-8 text-sm"
-                          />
+                        placeholder="Enter part number"
+                        className="w-full h-8 text-sm"
+                      />
                         )}
-                      </div>
+                    </div>
 
                       {/* Price and Notes fields hidden in quote creation - will be added during pricing workflow */}
-                    </div>
                   </div>
-                );
-              })}
+                </div>
+              );
+            })}
             </div>
           </div>
         )}

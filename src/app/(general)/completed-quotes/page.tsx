@@ -4,6 +4,7 @@ import React from 'react';
 import QuoteTable from '@/components/ui/QuoteTable';
 import { useQuotes } from '@/hooks/useQuotesWithQuery';
 import { Part } from '@/components/ui/useQuotes';
+import { ProtectedRoute } from "@/components/common/ProtectedRoute";
 
 export default function CompletedQuotesPage() {
   const {
@@ -59,24 +60,22 @@ export default function CompletedQuotesPage() {
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">Completed Quotes</h1>
-        <p className="mt-2 text-gray-600">View and manage quotes that have been completed and are ready for ordering</p>
+    <ProtectedRoute allowedRoles={['price_manager', 'quality_controller', 'admin']}>
+      <div className="py-6">
+        <h1 className="text-2xl font-bold text-gray-900 mb-6">Completed Quotes</h1>
+        <QuoteTable
+          quotes={completedQuotes}
+          parts={parts}
+          onUpdateQuote={handleUpdateQuote}
+          onDeleteQuote={deleteQuote}
+          onUpdatePart={handleUpdatePart}
+          onUpdateMultipleParts={handleUpdateMultipleParts}
+          onMarkAsOrdered={handleMarkAsOrdered}
+          onMarkAsOrderedWithParts={handleMarkAsOrderedWithParts}
+          showCompleted={true}
+          isLoading={isLoading}
+        />
       </div>
-
-      <QuoteTable
-        quotes={completedQuotes}
-        parts={parts}
-        onUpdateQuote={handleUpdateQuote}
-        onDeleteQuote={deleteQuote}
-        onUpdatePart={handleUpdatePart}
-        onUpdateMultipleParts={handleUpdateMultipleParts}
-        onMarkAsOrdered={handleMarkAsOrdered}
-        onMarkAsOrderedWithParts={handleMarkAsOrderedWithParts}
-        showCompleted={true}
-        isLoading={isLoading}
-      />
-    </div>
+    </ProtectedRoute>
   );
 } 

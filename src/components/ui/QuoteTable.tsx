@@ -48,6 +48,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
   const [selectedPartIds, setSelectedPartIds] = useState<string[]>([]);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [quotePartsWithNotes, setQuotePartsWithNotes] = useState<Record<string, Part[]>>({});
+  const [copiedItems, setCopiedItems] = useState<Set<string>>(new Set());
 
   // Quote edit modal state
   const [editModalOpen, setEditModalOpen] = useState(false);
@@ -629,10 +630,28 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
   const copyToClipboard = async (text: string) => {
     try {
       await navigator.clipboard.writeText(text);
-      // You could add a toast notification here
+      
+      // Create a unique key for this copied item
+      const copiedKey = `${text}_${Date.now()}`;
+      setCopiedItems(prev => new Set([...prev, copiedKey]));
+      
+      // Remove the copied indicator after 1.5 seconds
+      setTimeout(() => {
+        setCopiedItems(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(copiedKey);
+          return newSet;
+        });
+      }, 1500);
+      
     } catch (err) {
       console.error('Failed to copy text: ', err);
     }
+  };
+
+  // Helper function to check if an item was recently copied
+  const isRecentlyCopied = (text: string) => {
+    return Array.from(copiedItems).some(key => key.startsWith(text + '_'));
   };
 
   const getVehicleLogo = (make: string) => {
@@ -674,8 +693,12 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
       'Right Headlamp': '/part-icons/headlight-right.png',
       'Condenser': '/part-icons/condenser.png',
       'Radar Sensor': '/part-icons/sensor.png',
-      'Fan Assembly': '/part-icons/fan.png',
+      'Fan Assembly': '/part-icons/fa.png',
       'Intercooler': '/part-icons/intercooler.png',
+      'Oil Cooler': '/part-icons/oilcooler.png',
+      'Auxiliary Radiator': '/part-icons/aux.png',
+      'Left DayLight': '/part-icons/lh.png',
+      'Right DayLight': '/part-icons/rh.png',
     };
     
     return iconMap[partName] || null;
@@ -1652,8 +1675,8 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                                 {index === 0 ? (
                                                   <>
                                                     {getPartIcon(part.name) && (
-                                                      <div className="flex-shrink-0 w-8 h-8 bg-gradient-to-br from-blue-50 to-indigo-100 rounded-lg p-1.5 shadow-sm border border-blue-200">
-                                                        <img src={getPartIcon(part.name)!} alt={part.name} className="w-full h-full object-contain" />
+                                                      <div className="flex-shrink-0 w-8 h-8 bg-white rounded-lg p-1.5 shadow-md border border-gray-200 hover:border-gray-300 transition-all duration-200">
+                                                        <img src={getPartIcon(part.name)!} alt={part.name} className="w-full h-full object-contain filter contrast-125 brightness-110" />
                                                       </div>
                                                     )}
                                                     <div className="flex-1">
@@ -1687,14 +1710,43 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                                     />
                                                   ) : (
                                                     <>
-                                                      <span className="text-sm font-medium text-gray-900 font-mono">{part.number || '-'}</span>
-                                                      <button
-                                                        onClick={() => copyToClipboard(part.number || '')}
-                                                        className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-md transition-all duration-200 cursor-pointer"
-                                                        title="Copy to clipboard"
-                                                      >
-                                                        <Copy className="h-3.5 w-3.5" />
-                                                      </button>
+                                                      {part.number && part.number.includes(',') ? (
+                                                        // Multiple part numbers - show each with its own copy button
+                                                        <div className="flex flex-wrap items-center gap-1">
+                                                          {part.number.split(',').map((pn, pnIndex) => (
+                                                            <div key={pnIndex} className="flex items-center space-x-1 bg-gray-50 px-2 py-1 rounded-md border border-gray-200">
+                                                              <span className="text-sm font-medium text-gray-900 font-mono">{pn.trim()}</span>
+                                                              <button
+                                                                onClick={() => copyToClipboard(pn.trim())}
+                                                                className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-all duration-200 cursor-pointer"
+                                                                title={`Copy ${pn.trim()} to clipboard`}
+                                                              >
+                                                                {isRecentlyCopied(pn.trim()) ? (
+                                                                  <CheckCircle className="h-3 w-3 text-green-500" />
+                                                                ) : (
+                                                                  <Copy className="h-3 w-3" />
+                                                                )}
+                                                              </button>
+                                                            </div>
+                                                          ))}
+                                                        </div>
+                                                      ) : (
+                                                        // Single part number - show with same box styling as multiple
+                                                        <div className="flex items-center space-x-1 bg-gray-50 px-2 py-1 rounded-md border border-gray-200">
+                                                          <span className="text-sm font-medium text-gray-900 font-mono">{part.number || '-'}</span>
+                                                          <button
+                                                            onClick={() => copyToClipboard(part.number || '')}
+                                                            className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-all duration-200 cursor-pointer"
+                                                            title="Copy to clipboard"
+                                                          >
+                                                            {isRecentlyCopied(part.number || '') ? (
+                                                              <CheckCircle className="h-3 w-3 text-green-500" />
+                                                            ) : (
+                                                              <Copy className="h-3 w-3" />
+                                                            )}
+                                                          </button>
+                                                        </div>
+                                                      )}
                                                     </>
                                                   )}
                                                 </div>
@@ -1731,7 +1783,11 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                                         className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-md transition-all duration-200 cursor-pointer"
                                                         title="Copy to clipboard"
                                                       >
-                                                        <Copy className="h-3.5 w-3.5" />
+                                                        {isRecentlyCopied(variant.final_price ? variant.final_price.toString() : '') ? (
+                                                          <CheckCircle className="h-3.5 w-3.5 text-green-500" />
+                                                        ) : (
+                                                          <Copy className="h-3.5 w-3.5" />
+                                                        )}
                                                       </button>
                                                     )}
                                                   </>
@@ -1760,7 +1816,11 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                                           className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-md transition-all duration-200 cursor-pointer"
                                                           title="Copy to clipboard"
                                                         >
-                                                          <Copy className="h-3.5 w-3.5" />
+                                                          {isRecentlyCopied(variant.note || '') ? (
+                                                            <CheckCircle className="h-3.5 w-3.5 text-green-500" />
+                                                          ) : (
+                                                            <Copy className="h-3.5 w-3.5" />
+                                                          )}
                                                         </button>
                                                       )}
                                                     </>
@@ -2083,8 +2143,8 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                 <div key={part.id} className="bg-white rounded-lg border border-gray-200 p-3 shadow-sm">
                                   <div className="relative">
                                     {getPartIcon(part.name) && (
-                                      <div className="absolute top-2 right-2 bg-white rounded-full p-1.5 shadow-sm border border-gray-200">
-                                        <img src={getPartIcon(part.name)!} alt={part.name} className="h-7 w-7 object-contain" />
+                                      <div className="absolute top-2 right-2 bg-white rounded-full p-2 shadow-md border border-gray-200 hover:border-gray-300 transition-all duration-200">
+                                        <img src={getPartIcon(part.name)!} alt={part.name} className="h-6 w-6 object-contain filter contrast-125 brightness-110" />
                                       </div>
                                     )}
                                     <div className="space-y-3 pr-12">
@@ -2107,14 +2167,43 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                                   />
                                                 ) : (
                                                   <>
-                                                    <span className="text-sm text-gray-600 font-mono">{part.number || '-'}</span>
-                                                    <button
-                                                      onClick={() => copyToClipboard(part.number || '')}
-                                                  className="p-1 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
-                                                      title="Copy to clipboard"
-                                                    >
-                                                      <Copy className="h-3 w-3" />
-                                                    </button>
+                                                    {part.number && part.number.includes(',') ? (
+                                                      // Multiple part numbers - show each with its own copy button
+                                                      <div className="flex flex-wrap items-center gap-1">
+                                                        {part.number.split(',').map((pn, pnIndex) => (
+                                                          <div key={pnIndex} className="flex items-center space-x-1 bg-gray-50 px-1.5 py-0.5 rounded border border-gray-200">
+                                                            <span className="text-xs text-gray-600 font-mono">{pn.trim()}</span>
+                                                            <button
+                                                              onClick={() => copyToClipboard(pn.trim())}
+                                                              className="p-0.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors cursor-pointer"
+                                                              title={`Copy ${pn.trim()} to clipboard`}
+                                                            >
+                                                              {isRecentlyCopied(pn.trim()) ? (
+                                                                <CheckCircle className="h-2.5 w-2.5 text-green-500" />
+                                                              ) : (
+                                                                <Copy className="h-2.5 w-2.5" />
+                                                              )}
+                                                            </button>
+                                                          </div>
+                                                        ))}
+                                                      </div>
+                                                    ) : (
+                                                      // Single part number - show with same box styling as multiple
+                                                      <div className="flex items-center space-x-1 bg-gray-50 px-1.5 py-0.5 rounded border border-gray-200">
+                                                        <span className="text-xs text-gray-600 font-mono">{part.number || '-'}</span>
+                                                        <button
+                                                          onClick={() => copyToClipboard(part.number || '')}
+                                                          className="p-0.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors cursor-pointer"
+                                                          title="Copy to clipboard"
+                                                        >
+                                                          {isRecentlyCopied(part.number || '') ? (
+                                                            <CheckCircle className="h-2.5 w-2.5 text-green-500" />
+                                                          ) : (
+                                                            <Copy className="h-2.5 w-2.5" />
+                                                          )}
+                                                        </button>
+                                                      </div>
+                                                    )}
                                                   </>
                                                 )}
                                           </div>
@@ -2138,12 +2227,16 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                                     <span className="text-sm font-medium text-gray-900">
                                                       {part.price ? `$${part.price.toFixed(2)}` : '-'}
                                                     </span>
-                                                    <button
+                                                                                                        <button
                                                       onClick={() => copyToClipboard(part.price ? part.price.toString() : '')}
-                                                  className="p-1 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
+                                                      className="p-1 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
                                                       title="Copy to clipboard"
                                                     >
-                                                      <Copy className="h-3 w-3" />
+                                                      {isRecentlyCopied(part.price ? part.price.toString() : '') ? (
+                                                        <CheckCircle className="h-3 w-3 text-green-500" />
+                                                      ) : (
+                                                        <Copy className="h-3 w-3" />
+                                                      )}
                                                     </button>
                                                   </>
                                                 )}
@@ -2163,13 +2256,17 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                                 ) : (
                                                   <>
                                                     <span className="text-sm text-gray-600">{part.note || '-'}</span>
-                                                    <button
-                                                      onClick={() => copyToClipboard(part.note || '')}
-                                                  className="p-1 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
-                                                      title="Copy to clipboard"
-                                                    >
-                                                      <Copy className="h-3 w-3" />
-                                                    </button>
+                                                                                                            <button
+                                                          onClick={() => copyToClipboard(part.note || '')}
+                                                          className="p-1 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
+                                                          title="Copy to clipboard"
+                                                        >
+                                                          {isRecentlyCopied(part.note || '') ? (
+                                                            <CheckCircle className="h-3 w-3 text-green-500" />
+                                                          ) : (
+                                                            <Copy className="h-3 w-3" />
+                                                          )}
+                                                        </button>
                                                   </>
                                                 )}
                                           </div>

@@ -295,25 +295,13 @@ export const ImagePasteArea = ({ onPartsExtracted, onPartRemoved, onClearAll }: 
 
   return (
     <div className="space-y-4">
-      {/* Performance Metrics */}
-      {/* {performanceMetrics.totalImages > 0 && (
-        <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
-          <div className="flex items-center justify-between text-xs text-gray-600">
-            <span>📊 Processing Stats:</span>
-            <span>{performanceMetrics.completedImages}/{performanceMetrics.totalImages} completed</span>
-          </div>
-          <div className="flex items-center justify-between text-xs text-gray-500 mt-1">
-            <span>Avg Confidence: {(performanceMetrics.avgConfidence * 100).toFixed(0)}%</span>
-            <span>Avg Time: {performanceMetrics.avgProcessingTime.toFixed(0)}ms</span>
-          </div>
-        </div>
-      )} */}
+    
 
       {/* Compact Paste Area */}
       <div
         ref={pasteAreaRef}
         className={`
-          h-24
+          h-32
           relative border-2 border-dashed rounded-lg p-4 text-center cursor-pointer transition-all duration-200 outline-none
           ${isDragOver 
             ? 'border-red-500 bg-red-50 shadow-lg' 

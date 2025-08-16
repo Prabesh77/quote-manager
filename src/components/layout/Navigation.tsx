@@ -13,6 +13,7 @@ const Navigation = () => {
   const pathname = usePathname();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
   const { connectionStatus } = useQuotes();
   const { user, signOut } = useAuth();
   const { profile, loading } = useUserProfile();
@@ -100,9 +101,15 @@ const Navigation = () => {
 
   const handleLogout = async () => {
     setIsProfileDropdownOpen(false); // Close dropdown before logout
-    await signOut();
-    // Redirect to login page
-    window.location.href = '/login';
+    setIsLoggingOut(true); // Start loading
+    try {
+      await signOut();
+      // Redirect to login page
+      window.location.href = '/login';
+    } catch (error) {
+      console.error('Logout error:', error);
+      setIsLoggingOut(false); // Reset loading state on error
+    }
   };
 
   const getRoleDisplayName = (role: string) => {
@@ -116,7 +123,24 @@ const Navigation = () => {
   };
 
   return (
-    <nav className="bg-white border-b border-gray-200 shadow-sm">
+    <>
+      {/* Full-page Logout Loader */}
+      {isLoggingOut && (
+        <div className="fixed inset-0 bg-white/95 backdrop-blur-sm z-[9999] flex items-center justify-center">
+          <div className="text-center">
+            <div className="relative">
+              {/* Spinning circle */}
+              <div className="w-16 h-16 border-4 border-gray-200 border-t-red-600 rounded-full animate-spin mx-auto mb-4"></div>
+              {/* Inner pulse circle */}
+              <div className="absolute inset-0 w-16 h-16 border-4 border-transparent border-t-red-400 rounded-full animate-ping mx-auto"></div>
+            </div>
+            <p className="text-gray-600 font-medium">Signing out...</p>
+            <p className="text-sm text-gray-500 mt-1">Please wait</p>
+          </div>
+        </div>
+      )}
+      
+      <nav className="bg-white border-b border-gray-200 shadow-sm">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16">
           {/* Logo/Brand */}
@@ -331,6 +355,7 @@ const Navigation = () => {
         </>
       )}
     </nav>
+    </>
   );
 };
 

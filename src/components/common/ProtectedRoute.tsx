@@ -24,30 +24,14 @@ export function ProtectedRoute({
   // Wait for both auth and profile to be fully loaded
   const isFullyLoaded = !authLoading && !profileLoading;
 
-  // Debug logging
-  console.log('🛡️ ProtectedRoute State:', {
-    pathname: typeof window !== 'undefined' ? window.location.pathname : 'unknown',
-    user: !!user,
-    profile: !!profile,
-    profileRole: profile?.role,
-    authLoading,
-    profileLoading,
-    isFullyLoaded,
-    allowedRoles
-  });
-
   useEffect(() => {
     // Only proceed when everything is loaded
     if (!isFullyLoaded) {
-      console.log('⏳ Waiting for full load...');
       return;
     }
 
-    console.log('✅ Fully loaded, checking permissions...');
-
     // If no user, redirect to login
     if (!user) {
-      console.log('❌ No user - redirecting to login');
       router.push('/login');
       return;
     }
@@ -56,7 +40,6 @@ export function ProtectedRoute({
     // this might indicate a real problem - but let's be more patient
     // Only redirect if we're certain there's no profile after multiple attempts
     if (!profile) {
-      console.log('⚠️ User authenticated but no profile - showing loading instead of redirecting');
       // Don't redirect immediately - just show loading
       // The profile might still be loading or there might be a temporary issue
       return;
@@ -65,12 +48,9 @@ export function ProtectedRoute({
     // Check role permissions
     if (allowedRoles.length > 0 && !allowedRoles.includes(profile.role)) {
       const redirectPath = redirectTo || getDefaultRedirectPath(profile.role);
-      console.log(`❌ Role mismatch - redirecting to: ${redirectPath}`);
       router.push(redirectPath);
       return;
     }
-
-    console.log('✅ User authorized - rendering children');
   }, [user, profile, isFullyLoaded, allowedRoles, redirectTo, router]);
 
   // Helper function to determine where to redirect based on user role

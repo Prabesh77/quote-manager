@@ -45,7 +45,7 @@ const DashboardSidebar = () => {
         </Link>
       </div>
       
-      {/* Delivery Button */}
+      {/* Delivery Button - Temporarily commented out
       <div className="relative mt-2">
         <Link
           href="/delivery"
@@ -56,20 +56,18 @@ const DashboardSidebar = () => {
             transform hover:scale-110 rounded-r-lg
           `}
         >
-          {/* Icon */}
           <div className="relative z-10">
             <Truck className={`h-4 w-4 text-white transition-all duration-300 ${isDeliveryActive ? 'scale-110' : ''}`} />
           </div>
           
-          {/* Active Indicator */}
           {isDeliveryActive && (
             <div className="absolute right-0 top-1/2 transform -translate-y-1/2 w-1 h-6 bg-white rounded-l-full"></div>
           )}
           
-          {/* Hover Effect */}
           <div className="absolute inset-0 bg-white/10 rounded-r-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
         </Link>
       </div>
+      */}
 
       {/* User Management Button - Only for admin users */}
       {showUserManagement && (

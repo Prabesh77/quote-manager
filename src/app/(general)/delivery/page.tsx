@@ -33,7 +33,7 @@ export default function DeliveryPage() {
   };
 
   return (
-    <ProtectedRoute allowedRoles={['quote_creator', 'price_manager', 'admin']}>
+    <ProtectedRoute allowedRoles={['admin', 'quality_controller']}>
       <div className="py-6">
         <h1 className="text-2xl font-bold text-gray-900 mb-6">Delivery</h1>
         <QuoteTable

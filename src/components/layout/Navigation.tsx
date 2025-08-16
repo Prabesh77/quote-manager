@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Plus, DollarSign, CheckCircle, ShoppingCart, FileText, BarChart3, Menu, X, Eye, User, LogOut, ChevronDown, Users } from 'lucide-react';
@@ -16,6 +16,32 @@ const Navigation = () => {
   const { connectionStatus } = useQuotes();
   const { user, signOut } = useAuth();
   const { profile, loading } = useUserProfile();
+  const profileDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Handle click outside profile dropdown
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (profileDropdownRef.current && !profileDropdownRef.current.contains(event.target as Node)) {
+        setIsProfileDropdownOpen(false);
+      }
+    };
+
+    const handleEscapeKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setIsProfileDropdownOpen(false);
+      }
+    };
+
+    if (isProfileDropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      document.addEventListener('keydown', handleEscapeKey);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleEscapeKey);
+    };
+  }, [isProfileDropdownOpen]);
 
   // Define all possible navigation items with their required roles
   const allNavItems = [
@@ -73,6 +99,7 @@ const Navigation = () => {
   };
 
   const handleLogout = async () => {
+    setIsProfileDropdownOpen(false); // Close dropdown before logout
     await signOut();
     // Redirect to login page
     window.location.href = '/login';
@@ -142,7 +169,7 @@ const Navigation = () => {
               
               {/* User Profile Dropdown */}
               {user && (
-                <div className="relative">
+                <div className="relative" ref={profileDropdownRef}>
                   <button
                     onClick={() => setIsProfileDropdownOpen(!isProfileDropdownOpen)}
                     className="flex items-center space-x-2 p-2 rounded-lg text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition-colors"
@@ -163,23 +190,32 @@ const Navigation = () => {
 
                   {/* Profile Dropdown */}
                   {isProfileDropdownOpen && (
-                    <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-50">
-                      <div className="px-4 py-2 border-b border-gray-100">
-                        <div className="text-sm font-medium text-gray-900">
-                          {profile?.full_name || profile?.username || user.email}
+                    <>
+                      {/* Backdrop */}
+                      <div 
+                        className="fixed inset-0 z-40"
+                        onClick={() => setIsProfileDropdownOpen(false)}
+                      />
+                      
+                      {/* Dropdown Content */}
+                      <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-50">
+                        <div className="px-4 py-2 border-b border-gray-100">
+                          <div className="text-sm font-medium text-gray-900">
+                            {profile?.full_name || profile?.username || user.email}
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            {profile ? getRoleDisplayName(profile.role) : 'Loading...'}
+                          </div>
                         </div>
-                        <div className="text-xs text-gray-500">
-                          {profile ? getRoleDisplayName(profile.role) : 'Loading...'}
-                        </div>
+                        <button
+                          onClick={handleLogout}
+                          className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center space-x-2 transition-colors"
+                        >
+                          <LogOut className="h-4 w-4" />
+                          <span>Sign Out</span>
+                        </button>
                       </div>
-                      <button
-                        onClick={handleLogout}
-                        className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center space-x-2"
-                      >
-                        <LogOut className="h-4 w-4" />
-                        <span>Sign Out</span>
-                      </button>
-                    </div>
+                    </>
                   )}
                 </div>
               )}
@@ -298,4 +334,4 @@ const Navigation = () => {
   );
 };
 
-export default Navigation; 
+export default Navigation;

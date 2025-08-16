@@ -7,7 +7,7 @@ import supabase from '@/utils/supabase';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useSnackbar } from '@/components/ui/Snackbar';
-import { Plus, X } from 'lucide-react';
+import { Plus, X, Edit, Power, PowerOff } from 'lucide-react';
 
 interface UserProfile {
   id: string;
@@ -229,7 +229,8 @@ export default function UserManagementPage() {
           </div>
           <Button
             onClick={() => setShowCreateForm(!showCreateForm)}
-            className="bg-red-600 hover:bg-red-700"
+            className="bg-red-600 hover:bg-red-700 cursor-pointer"
+            title={showCreateForm ? "Cancel creating user" : "Create a new user"}
           >
             <Plus className="h-4 w-4 mr-2" />
             {showCreateForm ? 'Cancel' : 'Create User'}
@@ -243,7 +244,8 @@ export default function UserManagementPage() {
               <h3 className="text-lg font-medium text-gray-900">Create New User</h3>
               <button
                 onClick={() => setShowCreateForm(false)}
-                className="text-gray-400 hover:text-gray-600"
+                className="text-gray-400 hover:text-gray-600 cursor-pointer p-1 rounded hover:bg-gray-100 transition-colors"
+                title="Close form"
               >
                 <X className="h-5 w-5" />
               </button>
@@ -258,6 +260,7 @@ export default function UserManagementPage() {
                   onChange={(e) => setCreateForm({ ...createForm, email: e.target.value })}
                   placeholder="user@example.com"
                   required
+                  className="cursor-pointer"
                 />
               </div>
               
@@ -269,6 +272,7 @@ export default function UserManagementPage() {
                   onChange={(e) => setCreateForm({ ...createForm, password: e.target.value })}
                   placeholder="Enter password"
                   required
+                  className="cursor-pointer"
                 />
               </div>
               
@@ -279,6 +283,7 @@ export default function UserManagementPage() {
                   onChange={(e) => setCreateForm({ ...createForm, username: e.target.value })}
                   placeholder="username"
                   required
+                  className="cursor-pointer"
                 />
               </div>
               
@@ -289,6 +294,7 @@ export default function UserManagementPage() {
                   onChange={(e) => setCreateForm({ ...createForm, full_name: e.target.value })}
                   placeholder="Full Name"
                   required
+                  className="cursor-pointer"
                 />
               </div>
               
@@ -297,7 +303,7 @@ export default function UserManagementPage() {
                 <select
                   value={createForm.role}
                   onChange={(e) => setCreateForm({ ...createForm, role: e.target.value as CreateUserForm['role'] })}
-                  className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-red-500 focus:border-red-500 sm:text-sm"
+                  className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-red-500 focus:border-red-500 sm:text-sm cursor-pointer"
                 >
                   <option value="quote_creator">Quote Creator</option>
                   <option value="price_manager">Price Manager</option>
@@ -311,13 +317,16 @@ export default function UserManagementPage() {
               <Button
                 onClick={() => setShowCreateForm(false)}
                 variant="outline"
+                className="cursor-pointer"
+                title="Cancel creating user"
               >
                 Cancel
               </Button>
               <Button
                 onClick={handleCreateUser}
                 disabled={creatingUser}
-                className="bg-red-600 hover:bg-red-700"
+                className="bg-red-600 hover:bg-red-700 cursor-pointer"
+                title={creatingUser ? "Creating user..." : "Create new user"}
               >
                 {creatingUser ? 'Creating...' : 'Create User'}
               </Button>
@@ -325,7 +334,8 @@ export default function UserManagementPage() {
           </div>
         )}
 
-        <div className="bg-white shadow-sm rounded-lg overflow-hidden">
+        {/* Users Table - Desktop View */}
+        <div className="hidden md:block bg-white shadow-sm rounded-lg overflow-hidden">
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
@@ -357,13 +367,13 @@ export default function UserManagementPage() {
                             value={editForm.username}
                             onChange={(e) => setEditForm({ ...editForm, username: e.target.value })}
                             placeholder="Username"
-                            className="w-32"
+                            className="w-32 cursor-pointer"
                           />
                           <Input
                             value={editForm.full_name}
                             onChange={(e) => setEditForm({ ...editForm, full_name: e.target.value })}
                             placeholder="Full Name"
-                            className="w-32"
+                            className="w-32 cursor-pointer"
                           />
                         </div>
                       ) : (
@@ -378,7 +388,7 @@ export default function UserManagementPage() {
                         <select
                           value={editForm.role}
                           onChange={(e) => setEditForm({ ...editForm, role: e.target.value as UserProfile['role'] })}
-                          className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-red-500 focus:border-red-500 sm:text-sm"
+                          className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-red-500 focus:border-red-500 sm:text-sm cursor-pointer"
                         >
                           <option value="quote_creator">Quote Creator</option>
                           <option value="price_manager">Price Manager</option>
@@ -393,12 +403,12 @@ export default function UserManagementPage() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       {editingUser === user.id ? (
-                        <label className="flex items-center">
+                        <label className="flex items-center cursor-pointer">
                           <input
                             type="checkbox"
                             checked={editForm.is_active}
                             onChange={(e) => setEditForm({ ...editForm, is_active: e.target.checked })}
-                            className="rounded border-gray-300 text-red-600 shadow-sm focus:border-red-300 focus:ring focus:ring-red-200 focus:ring-opacity-50"
+                            className="rounded border-gray-300 text-red-600 shadow-sm focus:border-red-300 focus:ring focus:ring-red-200 focus:ring-opacity-50 cursor-pointer"
                           />
                           <span className="ml-2 text-sm text-gray-900">Active</span>
                         </label>
@@ -419,7 +429,8 @@ export default function UserManagementPage() {
                           <Button
                             onClick={handleSave}
                             size="sm"
-                            className="bg-green-600 hover:bg-green-700"
+                            className="bg-green-600 hover:bg-green-700 cursor-pointer"
+                            title="Save changes"
                           >
                             Save
                           </Button>
@@ -427,6 +438,8 @@ export default function UserManagementPage() {
                             onClick={handleCancel}
                             size="sm"
                             variant="outline"
+                            className="cursor-pointer"
+                            title="Cancel editing"
                           >
                             Cancel
                           </Button>
@@ -437,16 +450,23 @@ export default function UserManagementPage() {
                             onClick={() => handleEdit(user)}
                             size="sm"
                             variant="outline"
+                            className="p-2 h-8 w-8 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700 transition-all duration-200 bg-white shadow-sm hover:shadow-md cursor-pointer"
+                            title="Edit user"
                           >
-                            Edit
+                            <Edit className="h-4 w-4" />
                           </Button>
                           <Button
                             onClick={() => handleToggleActive(user.id, user.is_active)}
                             size="sm"
                             variant={user.is_active ? "outline" : "default"}
-                            className={user.is_active ? "text-red-600 border-red-600 hover:bg-red-50" : "bg-green-600 hover:bg-green-700"}
+                            className={`p-2 h-8 w-8 transition-all duration-200 shadow-sm hover:shadow-md cursor-pointer ${
+                              user.is_active 
+                                ? "text-red-600 border-red-600 hover:bg-red-50 hover:border-red-700 bg-white" 
+                                : "bg-green-600 hover:bg-green-700 text-white"
+                            }`}
+                            title={user.is_active ? "Deactivate user" : "Activate user"}
                           >
-                            {user.is_active ? 'Deactivate' : 'Activate'}
+                            {user.is_active ? <PowerOff className="h-4 w-4" /> : <Power className="h-4 w-4" />}
                           </Button>
                         </div>
                       )}
@@ -458,9 +478,138 @@ export default function UserManagementPage() {
           </div>
         </div>
 
+        {/* Users Cards - Mobile View */}
+        <div className="md:hidden space-y-4">
+          {users.map((user) => (
+            <div key={user.id} className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+              {editingUser === user.id ? (
+                // Edit Mode
+                <div className="space-y-4">
+                  <div className="space-y-3">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Username</label>
+                      <Input
+                        value={editForm.username}
+                        onChange={(e) => setEditForm({ ...editForm, username: e.target.value })}
+                        placeholder="Username"
+                        className="w-full cursor-pointer"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
+                      <Input
+                        value={editForm.full_name}
+                        onChange={(e) => setEditForm({ ...editForm, full_name: e.target.value })}
+                        placeholder="Full Name"
+                        className="w-full cursor-pointer"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Role</label>
+                      <select
+                        value={editForm.role}
+                        onChange={(e) => setEditForm({ ...editForm, role: e.target.value as UserProfile['role'] })}
+                        className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-red-500 focus:border-red-500 sm:text-sm"
+                      >
+                        <option value="quote_creator">Quote Creator</option>
+                        <option value="price_manager">Price Manager</option>
+                        <option value="quality_controller">Quality Controller</option>
+                        <option value="admin">Administrator</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="flex items-center cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={editForm.is_active}
+                          onChange={(e) => setEditForm({ ...editForm, is_active: e.target.checked })}
+                          className="rounded border-gray-300 text-red-600 shadow-sm focus:border-red-300 focus:ring focus:ring-red-200 focus:ring-opacity-50 cursor-pointer"
+                        />
+                        <span className="ml-2 text-sm text-gray-900">Active</span>
+                      </label>
+                    </div>
+                  </div>
+                  <div className="flex space-x-2 pt-2">
+                    <Button
+                      onClick={handleSave}
+                      size="sm"
+                      className="bg-green-600 hover:bg-green-700 flex-1 cursor-pointer"
+                      title="Save changes"
+                    >
+                      Save
+                    </Button>
+                    <Button
+                      onClick={handleCancel}
+                      size="sm"
+                      variant="outline"
+                      className="flex-1 cursor-pointer"
+                      title="Cancel editing"
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                // View Mode
+                <div className="space-y-3">
+                  {/* User Info */}
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1 pr-4">
+                      <div className="text-lg font-semibold text-gray-900">{user.username}</div>
+                      <div className="text-sm text-gray-500">{user.full_name || 'No name'}</div>
+                    </div>
+                    <div className="flex flex-col space-y-2 flex-shrink-0">
+                      <Button
+                        onClick={() => handleEdit(user)}
+                        size="sm"
+                        variant="outline"
+                        className="p-2 h-8 w-8 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700 transition-all duration-200 bg-white shadow-sm hover:shadow-md cursor-pointer"
+                        title="Edit user"
+                      >
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        onClick={() => handleToggleActive(user.id, user.is_active)}
+                        size="sm"
+                        variant={user.is_active ? "outline" : "default"}
+                        className={`p-2 h-8 w-8 transition-all duration-200 shadow-sm hover:shadow-md cursor-pointer ${
+                          user.is_active 
+                            ? "text-red-600 border-red-600 hover:bg-red-50 hover:border-red-700 bg-white" 
+                            : "bg-green-600 hover:bg-green-700 text-white"
+                        }`}
+                        title={user.is_active ? "Deactivate user" : "Activate user"}
+                      >
+                        {user.is_active ? <PowerOff className="h-4 w-4" /> : <Power className="h-4 w-4" />}
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* Role and Status */}
+                  <div className="flex flex-wrap gap-2">
+                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getRoleColor(user.role)}`}>
+                      {getRoleDisplayName(user.role)}
+                    </span>
+                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                      user.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                    }`}>
+                      {user.is_active ? 'Active' : 'Inactive'}
+                    </span>
+                  </div>
+
+                  {/* Created Date */}
+                  <div className="text-sm text-gray-500">
+                    Created: {new Date(user.created_at).toLocaleDateString()}
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+
         {users.length === 0 && (
           <div className="text-center py-12">
-            <div className="text-gray-500">No users found</div>
+            <div className="text-gray-500 text-lg">No users found</div>
+            <div className="text-gray-400 text-sm mt-2">Create your first user to get started</div>
           </div>
         )}
       </div>

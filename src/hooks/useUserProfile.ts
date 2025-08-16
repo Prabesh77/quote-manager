@@ -18,18 +18,8 @@ export function useUserProfile() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Debug logging
-  console.log('👤 useUserProfile Debug:', {
-    user: !!user,
-    userId: user?.id,
-    profile: !!profile,
-    loading,
-    error
-  });
-
   useEffect(() => {
     if (!user) {
-      console.log('👤 No user, clearing profile');
       setProfile(null);
       setLoading(false);
       return;
@@ -37,7 +27,6 @@ export function useUserProfile() {
 
     const fetchProfile = async () => {
       try {
-        console.log('👤 Fetching profile for user:', user.id);
         setLoading(true);
         setError(null);
 
@@ -48,17 +37,13 @@ export function useUserProfile() {
           .single();
 
         if (error) {
-          console.error('👤 Error fetching profile:', error);
           throw error;
         }
 
-        console.log('👤 Profile fetched successfully:', data);
         setProfile(data);
       } catch (err) {
-        console.error('👤 Error in fetchProfile:', err);
         setError(err instanceof Error ? err.message : 'Failed to fetch profile');
       } finally {
-        console.log('👤 Setting loading to false');
         setLoading(false);
       }
     };

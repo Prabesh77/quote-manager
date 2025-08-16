@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/components/providers/AuthProvider';
 import { useUserProfile } from '@/hooks/useUserProfile';
@@ -21,53 +21,57 @@ export function ProtectedRoute({
   const { profile, loading: profileLoading } = useUserProfile();
   const router = useRouter();
 
-  // Combined loading state
-  const isLoading = authLoading || profileLoading;
+  // Wait for both auth and profile to be fully loaded
+  const isFullyLoaded = !authLoading && !profileLoading;
 
   // Debug logging
-  console.log('🔒 ProtectedRoute Debug:', {
+  console.log('🛡️ ProtectedRoute State:', {
+    pathname: typeof window !== 'undefined' ? window.location.pathname : 'unknown',
     user: !!user,
-    userId: user?.id,
     profile: !!profile,
     profileRole: profile?.role,
     authLoading,
     profileLoading,
-    isLoading,
-    allowedRoles,
-    hasAccess: profile ? allowedRoles.includes(profile.role) : false,
-    currentPathname: typeof window !== 'undefined' ? window.location.pathname : 'unknown'
+    isFullyLoaded,
+    allowedRoles
   });
 
   useEffect(() => {
-    if (isLoading) {
-      console.log('⏳ Still loading (auth or profile)...');
-      return; // Still loading, wait
+    // Only proceed when everything is loaded
+    if (!isFullyLoaded) {
+      console.log('⏳ Waiting for full load...');
+      return;
     }
 
+    console.log('✅ Fully loaded, checking permissions...');
+
+    // If no user, redirect to login
     if (!user) {
-      console.log('❌ No user, redirecting to login');
+      console.log('❌ No user - redirecting to login');
       router.push('/login');
       return;
     }
 
+    // If user exists but no profile after loading is complete, 
+    // this might indicate a real problem - but let's be more patient
+    // Only redirect if we're certain there's no profile after multiple attempts
     if (!profile) {
-      console.log('❌ No profile, redirecting to home');
-      router.push('/');
+      console.log('⚠️ User authenticated but no profile - showing loading instead of redirecting');
+      // Don't redirect immediately - just show loading
+      // The profile might still be loading or there might be a temporary issue
       return;
     }
 
-    // Check if user has required role
+    // Check role permissions
     if (allowedRoles.length > 0 && !allowedRoles.includes(profile.role)) {
-      console.log(`❌ User role ${profile.role} not allowed. Allowed roles:`, allowedRoles);
-      // Unauthorized, redirect to appropriate page based on role
       const redirectPath = redirectTo || getDefaultRedirectPath(profile.role);
-      console.log(`🔄 Redirecting to: ${redirectPath}`);
+      console.log(`❌ Role mismatch - redirecting to: ${redirectPath}`);
       router.push(redirectPath);
       return;
     }
 
-    console.log('✅ User authorized, rendering children');
-  }, [user, profile, isLoading, allowedRoles, redirectTo, router]);
+    console.log('✅ User authorized - rendering children');
+  }, [user, profile, isFullyLoaded, allowedRoles, redirectTo, router]);
 
   // Helper function to determine where to redirect based on user role
   const getDefaultRedirectPath = (role: string) => {
@@ -85,19 +89,26 @@ export function ProtectedRoute({
     }
   };
 
-  // Show loading while checking auth
-  if (isLoading) {
-    console.log('⏳ Showing loading skeleton...');
+  // Show loading until everything is fully loaded
+  if (!isFullyLoaded) {
     return <SkeletonLoader />;
   }
 
-  // Show loading while redirecting
-  if (!user || !profile || (allowedRoles.length > 0 && !allowedRoles.includes(profile.role))) {
-    console.log('⏳ Showing loading skeleton during redirect...');
+  // Show loading if no user
+  if (!user) {
+    return <SkeletonLoader />;
+  }
+
+  // Show loading if profile is still loading or not available
+  if (!profile) {
+    return <SkeletonLoader />;
+  }
+
+  // Show loading if user doesn't have required role
+  if (allowedRoles.length > 0 && !allowedRoles.includes(profile.role)) {
     return <SkeletonLoader />;
   }
 
   // User is authorized, render children
-  console.log('✅ Rendering protected content');
   return <>{children}</>;
 }

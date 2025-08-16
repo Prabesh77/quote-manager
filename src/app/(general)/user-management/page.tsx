@@ -7,6 +7,7 @@ import supabase from '@/utils/supabase';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useSnackbar } from '@/components/ui/Snackbar';
+import { Plus, X } from 'lucide-react';
 
 interface UserProfile {
   id: string;
@@ -18,11 +19,28 @@ interface UserProfile {
   updated_at: string;
 }
 
+interface CreateUserForm {
+  email: string;
+  password: string;
+  username: string;
+  full_name: string;
+  role: 'quote_creator' | 'price_manager' | 'quality_controller' | 'admin';
+}
+
 export default function UserManagementPage() {
-  const { profile: currentUserProfile } = useUserProfile();
+  // const { profile: currentUserProfile } = useUserProfile(); // Temporarily comment out
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingUser, setEditingUser] = useState<string | null>(null);
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [createForm, setCreateForm] = useState<CreateUserForm>({
+    email: '',
+    password: '',
+    username: '',
+    full_name: '',
+    role: 'quote_creator'
+  });
+  const [creatingUser, setCreatingUser] = useState(false);
   const [editForm, setEditForm] = useState({
     username: '',
     full_name: '',
@@ -38,18 +56,72 @@ export default function UserManagementPage() {
   const fetchUsers = async () => {
     try {
       setLoading(true);
+      
       const { data, error } = await supabase
         .from('user_profiles')
         .select('*')
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching users:', error);
+        // Remove showSnackbar to see if it's causing the loop
+        // showSnackbar('Failed to fetch users', 'error');
+        return;
+      }
+      
       setUsers(data || []);
     } catch (error) {
       console.error('Error fetching users:', error);
-      showSnackbar('Failed to fetch users', 'error');
+      // Remove showSnackbar to see if it's causing the loop
+      // showSnackbar('Failed to fetch users', 'error');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleCreateUser = async () => {
+    if (!createForm.email || !createForm.password || !createForm.username || !createForm.full_name) {
+      showSnackbar('Please fill in all required fields', 'error');
+      return;
+    }
+
+    try {
+      setCreatingUser(true);
+
+      // Call our API endpoint to create user
+      const response = await fetch('/api/users', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(createForm),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to create user');
+      }
+
+      showSnackbar('User created successfully', 'success');
+      
+      // Reset form and hide it
+      setCreateForm({
+        email: '',
+        password: '',
+        username: '',
+        full_name: '',
+        role: 'quote_creator'
+      });
+      setShowCreateForm(false);
+      
+      // Refresh users list
+      fetchUsers();
+    } catch (error) {
+      console.error('Error creating user:', error);
+      showSnackbar(`Failed to create user: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
+    } finally {
+      setCreatingUser(false);
     }
   };
 
@@ -150,10 +222,108 @@ export default function UserManagementPage() {
   return (
     <ProtectedRoute allowedRoles={['admin']}>
       <div className="py-6">
-        <div className="mb-6">
-          <h1 className="text-2xl font-bold text-gray-900">User Management</h1>
-          <p className="text-gray-600 mt-2">Manage users, roles, and permissions</p>
+        <div className="mb-6 flex justify-between items-center">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">User Management</h1>
+            <p className="text-gray-600 mt-2">Manage users, roles, and permissions</p>
+          </div>
+          <Button
+            onClick={() => setShowCreateForm(!showCreateForm)}
+            className="bg-red-600 hover:bg-red-700"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            {showCreateForm ? 'Cancel' : 'Create User'}
+          </Button>
         </div>
+
+        {/* Create User Form */}
+        {showCreateForm && (
+          <div className="bg-white shadow-sm rounded-lg p-6 mb-6 border border-gray-200">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-medium text-gray-900">Create New User</h3>
+              <button
+                onClick={() => setShowCreateForm(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Email *</label>
+                <Input
+                  type="email"
+                  value={createForm.email}
+                  onChange={(e) => setCreateForm({ ...createForm, email: e.target.value })}
+                  placeholder="user@example.com"
+                  required
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Password *</label>
+                <Input
+                  type="password"
+                  value={createForm.password}
+                  onChange={(e) => setCreateForm({ ...createForm, password: e.target.value })}
+                  placeholder="Enter password"
+                  required
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Username *</label>
+                <Input
+                  value={createForm.username}
+                  onChange={(e) => setCreateForm({ ...createForm, username: e.target.value })}
+                  placeholder="username"
+                  required
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Full Name *</label>
+                <Input
+                  value={createForm.full_name}
+                  onChange={(e) => setCreateForm({ ...createForm, full_name: e.target.value })}
+                  placeholder="Full Name"
+                  required
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Role *</label>
+                <select
+                  value={createForm.role}
+                  onChange={(e) => setCreateForm({ ...createForm, role: e.target.value as CreateUserForm['role'] })}
+                  className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-red-500 focus:border-red-500 sm:text-sm"
+                >
+                  <option value="quote_creator">Quote Creator</option>
+                  <option value="price_manager">Price Manager</option>
+                  <option value="quality_controller">Quality Controller</option>
+                  <option value="admin">Administrator</option>
+                </select>
+              </div>
+            </div>
+            
+            <div className="mt-6 flex justify-end space-x-3">
+              <Button
+                onClick={() => setShowCreateForm(false)}
+                variant="outline"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleCreateUser}
+                disabled={creatingUser}
+                className="bg-red-600 hover:bg-red-700"
+              >
+                {creatingUser ? 'Creating...' : 'Create User'}
+              </Button>
+            </div>
+          </div>
+        )}
 
         <div className="bg-white shadow-sm rounded-lg overflow-hidden">
           <div className="overflow-x-auto">

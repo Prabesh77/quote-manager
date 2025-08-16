@@ -60,13 +60,6 @@ const Navigation = () => {
       icon: ShoppingCart,
       description: 'Manage orders',
       requiredRoles: ['quality_controller', 'admin']
-    },
-    {
-      name: 'User Management',
-      href: '/user-management',
-      icon: Users,
-      description: 'Manage users and roles',
-      requiredRoles: ['admin']
     }
   ];
 
@@ -117,8 +110,7 @@ const Navigation = () => {
                 (item.href === '/pricing' && pathname.startsWith('/pricing')) ||
                 (item.href === '/priced' && pathname.startsWith('/priced')) ||
                 (item.href === '/completed-quotes' && pathname.startsWith('/completed-quotes')) ||
-                (item.href === '/orders' && pathname.startsWith('/orders')) ||
-                (item.href === '/user-management' && pathname.startsWith('/user-management'));
+                (item.href === '/orders' && pathname.startsWith('/orders'));
               
               const IconComponent = item.icon;
 
@@ -255,8 +247,7 @@ const Navigation = () => {
                       (item.href === '/pricing' && pathname.startsWith('/pricing')) ||
                       (item.href === '/priced' && pathname.startsWith('/priced')) ||
                       (item.href === '/completed-quotes' && pathname.startsWith('/completed-quotes')) ||
-                      (item.href === '/orders' && pathname.startsWith('/orders')) ||
-                      (item.href === '/user-management' && pathname.startsWith('/user-management'));
+                      (item.href === '/orders' && pathname.startsWith('/orders'));
                     
                     const IconComponent = item.icon;
 

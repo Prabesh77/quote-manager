@@ -1,134 +1,15 @@
 'use client';
 
 import { useQuotes } from '@/hooks/useQuotesWithQuery';
-import QuoteTable from '@/components/ui/QuoteTable';
-import { QuoteForm } from '@/components/ui/QuoteForm';
-import { Part } from '@/components/ui/useQuotes';
+import { QuoteForm } from "@/components/ui/QuoteForm";
+import { ProtectedRoute } from "@/components/common/ProtectedRoute";
 import { useSnackbar } from '@/components/ui/Snackbar';
 
-interface PartDetails {
-  name: string;
-  number: string;
-  price: number | null;
-  note: string;
-}
-
-// Function to validate and clean date string
-const validateDateString = (dateString: string): string | undefined => {
-  if (!dateString || dateString.trim() === '') {
-    return undefined;
-  }
-  
-  const trimmed = dateString.trim();
-  
-  // Handle Australian format like "11/08/2025" (DD/MM/YYYY)
-  if (trimmed.includes('/')) {
-    const parts = trimmed.split('/');
-    if (parts.length === 3) {
-      const day = parseInt(parts[0]);
-      const month = parseInt(parts[1]);
-      const year = parseInt(parts[2]);
-      if (!isNaN(day) && !isNaN(month) && !isNaN(year) && 
-          day >= 1 && day <= 31 && month >= 1 && month <= 12 && year >= 1900 && year <= 2100) {
-        return trimmed; // Return original string like "11/08/2025"
-      }
-    } else if (parts.length === 2) {
-      // Handle format like "08/2025" (MM/YYYY) - convert to DD/MM/YYYY
-      const month = parseInt(parts[0]);
-      const year = parseInt(parts[1]);
-      if (!isNaN(month) && !isNaN(year) && month >= 1 && month <= 12 && year >= 1900 && year <= 2100) {
-        return `01/${month}/${year}`; // Add day 01 to make it DD/MM/YYYY
-      }
-    }
-  }
-  
-  // Handle format like "2017" (just year)
-  const yearOnly = parseInt(trimmed);
-  if (!isNaN(yearOnly) && yearOnly >= 1900 && yearOnly <= 2100) {
-    return yearOnly.toString();
-  }
-  
-  // Handle format like "11-08-2025" or "08-2025" (convert to slash format)
-  if (trimmed.includes('-')) {
-    const parts = trimmed.split('-');
-    if (parts.length === 3) {
-      const day = parseInt(parts[0]);
-      const month = parseInt(parts[1]);
-      const year = parseInt(parts[2]);
-      if (!isNaN(day) && !isNaN(month) && !isNaN(year) && 
-          day >= 1 && day <= 31 && month >= 1 && month <= 12 && year >= 1900 && year <= 2100) {
-        return `${day}/${month}/${year}`; // Convert to slash format
-      }
-    } else if (parts.length === 2) {
-      const month = parseInt(parts[0]);
-      const year = parseInt(parts[1]);
-      if (!isNaN(month) && !isNaN(year) && month >= 1 && month <= 12 && year >= 1900 && year <= 2100) {
-        return `01/${month}/${year}`; // Convert to slash format with day 01
-      }
-    }
-  }
-  
-  return undefined;
-};
-
 export default function NewQuotePage() {
+  const { quotes, parts, isLoading, createQuote } = useQuotes();
   const { showSnackbar } = useSnackbar();
-  
-  const {
-    quotes,
-    parts,
-    createQuote,
-    updateQuote,
-    deleteQuote,
-    updatePart,
-    updateMultipleParts,
-    markQuoteCompleted,
-    markQuoteAsOrdered,
-    isLoading,
-  } = useQuotes();
 
-  // Filter quotes to only show those waiting for initial pricing (unpriced only)
-  const unpricedQuotes = quotes.filter(quote => {
-    // Use the database status directly - much simpler and more reliable
-    return quote.status === 'unpriced';
-  });
-
-  // Wrapper functions to match QuoteTableProps interface
-  const handleUpdateQuote = async (id: string, fields: Record<string, any>): Promise<{ error: Error | null }> => {
-    const result = await updateQuote(id, fields);
-    return { error: result.error ? new Error(String(result.error)) : null };
-  };
-
-  const handleDeleteQuote = async (id: string) => {
-    return await deleteQuote(id);
-  };
-
-  const handleUpdatePart = async (id: string, updates: Partial<Part>): Promise<{ data: Part; error: Error | null }> => {
-    const result = await updatePart(id, updates);
-    if (result.error) {
-      return { data: null as any, error: result.error };
-    }
-    return { data: result.data || null as any, error: null };
-  };
-
-  const handleUpdateMultipleParts = async (updates: Array<{ id: string; updates: Partial<Part> }>): Promise<void> => {
-    try {
-      await updateMultipleParts(updates);
-    } catch (error) {
-      console.error('Error updating multiple parts:', error);
-      // The function expects void return, so we just log errors
-    }
-  };
-
-  const handleMarkCompleted = async (id: string) => {
-    return await markQuoteCompleted(id);
-  };
-
-  const handleMarkAsOrdered = async (id: string, taxInvoiceNumber: string) => {
-    return await markQuoteAsOrdered(id, taxInvoiceNumber);
-  };
-
-  const handleSubmit = async (fields: Record<string, string>, parts: PartDetails[]) => {
+  const handleSubmit = async (fields: Record<string, string>, parts: any[]) => {
     try {
       const result = await createQuote({
         customer: {
@@ -141,12 +22,12 @@ export default function NewQuotePage() {
           make: fields.make,
           model: fields.model,
           series: fields.series || '',
-          year: fields.mthyr ? validateDateString(fields.mthyr) : undefined,
+          year: fields.mthyr,
           vin: fields.vin || '',
-          color: fields.color || '',
+          color: '',
           auto: fields.auto === 'true',
           body: fields.body || '',
-          notes: fields.notes || ''
+          notes: ''
         },
         parts: parts?.map((part: any) => ({
           name: part.name || '',
@@ -154,53 +35,29 @@ export default function NewQuotePage() {
           price: part.price || null,
           note: part.note || ''
         })) || [],
-        notes: fields.notes || '',
+        notes: '',
         requiredBy: fields.requiredBy || '',
-        quoteRef: fields.quoteRef // Pass the user-provided quote reference
+        quoteRef: fields.quoteRef
       });
 
       if (result.error) {
         throw result.error;
       }
 
-      console.log('Quote created successfully:', result.data);
-      
-      // Success is silent - no snackbar needed
-      // The quote will automatically appear in the table due to cache invalidation
-      
+      showSnackbar('Quote created successfully!', 'success');
     } catch (error) {
-      console.error('Quote creation failed with error:', error);
+      console.error('Quote creation failed:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       showSnackbar(`Error creating quote: ${errorMessage}`, 'error');
     }
   };
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-7xl">
-      <div className="space-y-8">
-        {/* Quote Form */}
-        <div className="bg-white rounded-lg shadow-md p-6">
-          <h2 className="text-xl font-semibold text-gray-900 mb-6">Create New Quote</h2>
-          <QuoteForm onSubmit={handleSubmit} />
-        </div>
-        
-        {/* Quote Table - Only Unpriced Quotes */}
-        <div className="bg-white rounded-lg shadow-md p-6">
-          <h2 className="text-xl font-semibold text-gray-900 mb-6">Quotes Waiting for Pricing</h2>
-          <QuoteTable
-            quotes={unpricedQuotes}
-            parts={parts}
-            onUpdateQuote={handleUpdateQuote}
-            onDeleteQuote={handleDeleteQuote}
-            onUpdatePart={handleUpdatePart}
-            onUpdateMultipleParts={handleUpdateMultipleParts}
-            onMarkCompleted={handleMarkCompleted}
-            onMarkAsOrdered={handleMarkAsOrdered}
-            showCompleted={false}
-            isLoading={isLoading}
-          />
-        </div>
+    <ProtectedRoute allowedRoles={['quote_creator', 'admin']}>
+      <div className="py-6">
+        <h1 className="text-2xl font-bold text-gray-900 mb-6">Create New Quote</h1>
+        <QuoteForm onSubmit={handleSubmit} />
       </div>
-    </div>
+    </ProtectedRoute>
   );
 }

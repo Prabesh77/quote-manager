@@ -35,6 +35,17 @@ type FilterType = 'all' | 'unpriced' | 'priced';
 type QuoteStatus = 'unpriced' | 'priced' | 'completed' | 'ordered' | 'delivered' | 'waiting_verification';
 
 export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote, onUpdatePart, onUpdateMultipleParts, onMarkCompleted, onMarkAsOrdered, onMarkAsOrderedWithParts, showCompleted = false, defaultFilter = 'all', isLoading = false }: QuoteTableProps) {
+  // Safety checks for undefined props
+  if (!quotes || !Array.isArray(quotes)) {
+    console.warn('QuoteTable: quotes prop is undefined or not an array, using empty array');
+    quotes = [];
+  }
+  
+  if (!parts || !Array.isArray(parts)) {
+    console.warn('QuoteTable: parts prop is undefined or not an array, using empty array');
+    parts = [];
+  }
+
   const [filter, setFilter] = useState<FilterType>(defaultFilter);
   const [searchTerm, setSearchTerm] = useState('');
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());

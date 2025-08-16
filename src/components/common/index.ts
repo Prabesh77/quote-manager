@@ -1,1 +1,2 @@
-export { ConnectionStatus } from './ConnectionStatus'; 
+export { ConnectionStatus } from './ConnectionStatus';
+export { ProtectedRoute } from './ProtectedRoute'; 

@@ -49,7 +49,7 @@ export const useQuotes = () => {
   // Determine loading state - show skeleton only on initial load when no data exists
   const isLoading = (quotesQuery.isLoading && !quotesQuery.data) || (partsQuery.isLoading && !partsQuery.data);
 
-  // Get data with fallbacks
+  // Get data with fallbacks - ensure we always return arrays
   const quotes = quotesQuery.data || [];
   const parts = partsQuery.data || [];
 

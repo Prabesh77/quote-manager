@@ -5,6 +5,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Eye, EyeOff, Lock, User } from 'lucide-react';
 import Image from 'next/image';
+import { useAuth } from '@/components/providers/AuthProvider';
+import { useRouter } from 'next/navigation';
 
 export default function LoginPage() {
   const [username, setUsername] = useState('');
@@ -12,6 +14,9 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  
+  const { signIn } = useAuth();
+  const router = useRouter();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -19,18 +24,18 @@ export default function LoginPage() {
     setIsLoading(true);
 
     try {
-      // TODO: Implement actual authentication logic
-      console.log('Login attempt:', { username, password });
+      // Use Supabase authentication
+      const { error } = await signIn(username, password);
       
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // TODO: Redirect based on role
-      // For now, just show success
-      alert('Login successful! (Authentication not implemented yet)');
+      if (error) {
+        setError(error.message || 'Login failed. Please try again.');
+      } else {
+        // Redirect to dashboard on successful login
+        router.push('/dashboard');
+      }
       
     } catch (err) {
-      setError('Login failed. Please try again.');
+      setError('An unexpected error occurred. Please try again.');
     } finally {
       setIsLoading(false);
     }

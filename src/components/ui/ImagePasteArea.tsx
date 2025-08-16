@@ -309,12 +309,12 @@ export const ImagePasteArea = ({ onPartsExtracted, onPartRemoved, onClearAll }: 
         </div>
       )} */}
 
-      {/* Paste Area */}
+      {/* Compact Paste Area */}
       <div
         ref={pasteAreaRef}
         className={`
-          h-32
-          relative border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-all duration-200 outline-none
+          h-24
+          relative border-2 border-dashed rounded-lg p-4 text-center cursor-pointer transition-all duration-200 outline-none
           ${isDragOver 
             ? 'border-red-500 bg-red-50 shadow-lg' 
             : isFocused || isReady
@@ -341,52 +341,48 @@ export const ImagePasteArea = ({ onPartsExtracted, onPartRemoved, onClearAll }: 
           className="hidden"
         />
         
-        {/* Focus Indicator */}
+        {/* Compact Focus Indicator */}
         {(isFocused || isReady) && (
-          <div className="absolute top-2 left-2">
-            <div className="flex items-center space-x-1 px-2 py-1 bg-blue-500 text-white rounded text-xs font-medium">
-              <Focus className="h-3 w-3" />
-              <span>Ready to Paste!</span>
+          <div className="absolute top-1 left-1">
+            <div className="flex items-center space-x-1 px-1.5 py-0.5 bg-blue-500 text-white rounded text-xs font-medium">
+              <Focus className="h-2.5 w-2.5" />
+              <span>Ready!</span>
             </div>
           </div>
         )}
 
-        {/* Processing Queue Indicator */}
+        {/* Compact Processing Queue Indicator */}
         {processingQueueMemo.length > 0 && (
-          <div className="absolute top-2 right-2">
-            <div className="flex items-center space-x-1 px-2 py-1 bg-orange-500 text-white rounded text-xs font-medium">
-              <Loader2 className="h-3 w-3 animate-spin" />
-              <span>{processingQueueMemo.length} processing</span>
+          <div className="absolute top-1 right-1">
+            <div className="flex items-center space-x-1 px-1.5 py-0.5 bg-orange-500 text-white rounded text-xs font-medium">
+              <Loader2 className="h-2.5 w-2.5 animate-spin" />
+              <span>{processingQueueMemo.length}</span>
             </div>
           </div>
         )}
         
-        <div className="space-y-2">
+        <div className="space-y-1">
           <div className="flex justify-center">
             {isFocused || isReady ? (
-              <Clipboard className="h-8 w-8 text-blue-500 animate-pulse" />
+              <Clipboard className="h-6 w-6 text-blue-500 animate-pulse" />
             ) : (
-              <ImageIcon className="h-8 w-8 text-gray-400" />
+              <ImageIcon className="h-6 w-6 text-gray-400" />
             )}
           </div>
           
-          <div className="text-sm text-gray-600">
+          <div className="text-xs text-gray-600">
             {isFocused || isReady ? (
-              <>
-                <span className="font-medium text-blue-600">Ready for pasting!</span>
-              </>
+              <span className="font-medium text-blue-600">Ready to paste!</span>
             ) : (
-              <>
-                <span className="font-medium">Click to focus, then paste screenshots</span>
-              </>
+              <span className="font-medium">Click to focus, then paste screenshots</span>
             )}
           </div>
           
           <div className="text-xs text-gray-500">
             {isFocused || isReady ? (
-              <span>🖼️ Paste screenshots with multiple parts (up to 10 parts per image)</span>
+              <span>🖼️ Multiple parts per image (up to 10)</span>
             ) : (
-              <span>Supports: JPG, PNG, GIF (extracts up to 10 parts per image)</span>
+              <span>JPG, PNG, GIF - extracts up to 10 parts per image</span>
             )}
           </div>
         </div>
@@ -400,19 +396,17 @@ export const ImagePasteArea = ({ onPartsExtracted, onPartRemoved, onClearAll }: 
         </div>
       )}
 
-      {/* Image Previews and Extracted Parts - Enhanced Layout */}
+      {/* Compact Extracted Parts Preview */}
       {allExtractedParts.length > 0 && (
-        <div className="mt-6">
-          <div className="flex items-center justify-between mb-4">
+        <div className="mt-4">
+          <div className="flex items-center justify-between mb-3">
             <h4 className="text-sm font-medium text-green-800">
               Extracted Parts ({allExtractedParts.length})
             </h4>
-            <div className="flex items-center space-x-2">
-                          <button
+            <button
               onClick={() => {
                 setImages([]);
                 onPartsExtracted([]);
-                // Also clear selected parts in the parent component
                 onClearAll?.();
               }}
               className="text-xs text-red-600 hover:text-red-800 hover:bg-red-50 px-2 py-1 rounded border border-red-200 transition-colors"
@@ -420,69 +414,51 @@ export const ImagePasteArea = ({ onPartsExtracted, onPartRemoved, onClearAll }: 
             >
               Clear All
             </button>
-            </div>
           </div>
           
-          {/* Enhanced grid layout for multiple parts */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 max-h-96 overflow-y-auto">
+          {/* 4-grid layout with specific text sizes */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 max-h-80 overflow-y-auto">
             {allExtractedParts.map((part, index) => (
-              <div key={index} className="relative bg-green-50 border border-green-200 rounded-lg p-3 hover:border-green-300 transition-colors">
-                {/* Close button */}
+              <div key={index} className="relative bg-gradient-to-br from-green-50 to-emerald-50 border border-green-200 rounded-lg p-3 hover:border-green-400 hover:shadow-md transition-all duration-200 group">
+                {/* Elegant close button */}
                 <button
                   onClick={() => removeExtractedPart(index)}
-                  className="absolute top-2 right-2 w-5 h-5 text-green-400 hover:text-red-500 hover:bg-red-50 rounded-full flex items-center justify-center transition-colors"
+                  className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-white border border-gray-200 text-gray-500 hover:text-red-500 hover:border-red-300 rounded-full flex items-center justify-center transition-all duration-200 shadow-sm z-10"
                   title="Remove this part"
                 >
-                  <X className="h-3 w-3" />
+                  <X className="h-3.5 w-3.5" />
                 </button>
                 
-                {/* Part details */}
-                <div className="pr-6">
-                  <div className="mb-2">
-                    <div className="font-medium text-green-800 text-sm truncate">
-                      {part.partName}
-                    </div>
+                {/* Part details with specific text sizes */}
+                <div className="space-y-2 text-left">
+                  {/* Part Name - 10px */}
+                  <div className="text-[10px] text-gray-600 font-medium leading-tight">
+                    {part.partName}
                   </div>
                   
-                  {/* Part number */}
+                  {/* Part Number - 12px semibold (plain text) */}
                   {part.partNumber && part.partNumber !== 'Not found' && (
-                    <div className="text-green-600 text-xs bg-white px-2 py-1 rounded border border-green-200 truncate mb-2 font-mono">
+                    <div className="text-[12px] font-semibold text-green-700 break-all">
                       {part.partNumber}
                     </div>
                   )}
                   
-                  {/* Context and metadata */}
-                  <div className="space-y-1">
-                    {part.context && (
-                      <div className="text-xs text-gray-600 bg-white px-2 py-1 rounded border border-gray-200">
-                        {part.context}
-                      </div>
-                    )}
-                    
-
-                    
-                    {part.isSupersession && (
-                      <div className="text-xs text-orange-600 bg-orange-100 px-2 py-1 rounded border border-orange-200">
-                        🔄 Supersession detected
-                      </div>
-                    )}
-                    
-                    {part.manufacturer && (
-                      <div className="text-xs text-blue-600 bg-blue-100 px-2 py-1 rounded border border-blue-200">
-                        🏭 {part.manufacturer}
-                      </div>
-                    )}
-                  </div>
+                  {/* Context - elegant badge */}
+                  {part.context && (
+                    <div className="text-[10px] text-blue-600 bg-blue-50 px-2 py-1 rounded-full border border-blue-200">
+                      {part.context}
+                    </div>
+                  )}
                 </div>
               </div>
             ))}
           </div>
           
-          {/* Summary information */}
-          <div className="mt-3 text-xs text-gray-600 bg-gray-50 rounded-lg p-2 border border-gray-200">
+          {/* Compact summary */}
+          <div className="mt-2 text-xs text-gray-600 bg-gray-50 rounded-md p-1.5 border border-gray-200">
             <div className="flex items-center justify-between">
-              <span>📊 Total parts extracted: {allExtractedParts.length}</span>
-              <span>🖼️ From {images.filter(img => img.status === 'completed').length} image(s)</span>
+              <span>📊 {allExtractedParts.length} parts</span>
+              <span>🖼️ {images.filter(img => img.status === 'completed').length} image(s)</span>
             </div>
           </div>
         </div>

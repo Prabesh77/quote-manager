@@ -110,13 +110,11 @@ const manufacturerTests = [
 
 // Run all tests
 export const runAllTests = () => {
-  console.log('🧪 Running Intelligent Part Matching Tests...\n');
   
   let passedTests = 0;
   let totalTests = 0;
   
   // Test basic part matching
-  console.log('📋 Testing Basic Part Matching:');
   testCases.forEach(test => {
     totalTests++;
     const result = findSmartPartMatch(test.input);
@@ -124,14 +122,10 @@ export const runAllTests = () => {
     
     if (passed) {
       passedTests++;
-      console.log(`✅ ${test.description}: ${test.input} → ${result?.mainPartName} (${(result?.confidence * 100).toFixed(0)}%)`);
-    } else {
-      console.log(`❌ ${test.description}: ${test.input} → Expected: ${test.expected}, Got: ${result?.mainPartName || 'null'}`);
     }
   });
   
   // Test headlamp context detection
-  console.log('\n🚗 Testing Headlamp Context Detection:');
   headlampContextTests.forEach(test => {
     totalTests++;
     const result = findSmartPartMatch(test.input, test.context);
@@ -139,14 +133,10 @@ export const runAllTests = () => {
     
     if (passed) {
       passedTests++;
-      console.log(`✅ ${test.description}: ${test.input} with context ${test.context} → ${result?.mainPartName} (${(result?.confidence * 100).toFixed(0)}%)`);
-    } else {
-      console.log(`❌ ${test.description}: ${test.input} with context ${test.context} → Expected: ${test.expected}, Got: ${result?.mainPartName || 'null'}`);
     }
   });
   
   // Test supersession detection
-  console.log('\n🔄 Testing Supersession Detection:');
   supersessionTests.forEach(test => {
     totalTests++;
     const supersessions = detectSupersession(test.lines);
@@ -154,14 +144,10 @@ export const runAllTests = () => {
     
     if (passed) {
       passedTests++;
-      console.log(`✅ ${test.description}: Detected ${supersessions.length} supersessions`);
-    } else {
-      console.log(`❌ ${test.description}: Expected ${test.expectedSupersessions}, Got ${supersessions.length}`);
     }
   });
   
   // Test part number detection
-  console.log('\n🔢 Testing Part Number Detection:');
   partNumberTests.forEach(test => {
     totalTests++;
     const result = isLikelyPartNumber(test.input);
@@ -169,14 +155,10 @@ export const runAllTests = () => {
     
     if (passed) {
       passedTests++;
-      console.log(`✅ ${test.description}: ${test.input} → ${result}`);
-    } else {
-      console.log(`❌ ${test.description}: ${test.input} → Expected: ${test.expected}, Got: ${result}`);
     }
   });
   
   // Test manufacturer detection
-  console.log('\n🏭 Testing Manufacturer Detection:');
   manufacturerTests.forEach(test => {
     totalTests++;
     const result = extractManufacturerHint(test.input);
@@ -184,14 +166,10 @@ export const runAllTests = () => {
     
     if (passed) {
       passedTests++;
-      console.log(`✅ ${test.description}: ${test.input} → ${result}`);
-    } else {
-      console.log(`❌ ${test.description}: ${test.input} → Expected: ${test.expected}, Got: ${result}`);
-    }
+    } 
   });
   
   // Test enhanced part extraction
-  console.log('\n🚀 Testing Enhanced Part Extraction:');
   const sampleText = [
     '84002vc160. 1. Lamp Assembly-Head Right',
     'Unit Assy, Headlamp, LH',
@@ -206,25 +184,6 @@ export const runAllTests = () => {
   
   if (passed) {
     passedTests++;
-    console.log(`✅ Enhanced extraction: Found ${extractedParts.length} parts`);
-    extractedParts.forEach((part, index) => {
-      console.log(`   ${index + 1}. ${part.mainPartName} (${(part.confidence * 100).toFixed(0)}%) - ${part.context}`);
-    });
-  } else {
-    console.log(`❌ Enhanced extraction: Expected ${expectedParts}, Got ${extractedParts.length}`);
-  }
-  
-  // Summary
-  console.log('\n📊 Test Results Summary:');
-  console.log(`Total Tests: ${totalTests}`);
-  console.log(`Passed: ${passedTests}`);
-  console.log(`Failed: ${totalTests - passedTests}`);
-  console.log(`Success Rate: ${((passedTests / totalTests) * 100).toFixed(1)}%`);
-  
-  if (passedTests === totalTests) {
-    console.log('\n🎉 All tests passed! The intelligent part matching system is working correctly.');
-  } else {
-    console.log('\n⚠️ Some tests failed. Please review the results above.');
   }
   
   return { passed: passedTests, total: totalTests, successRate: (passedTests / totalTests) * 100 };

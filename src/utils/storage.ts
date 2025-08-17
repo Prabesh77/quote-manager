@@ -3,7 +3,6 @@ import supabase from './supabase';
 // Function to ensure bucket exists and has proper policies
 export const ensureBucketExists = async () => {
   try {
-    console.log('Ensuring deliverymedia bucket exists...');
     
     // Try to create the bucket (this will fail if it already exists, which is fine)
     const { data: createData, error: createError } = await supabase.storage.createBucket('deliverymedia', {
@@ -11,16 +10,6 @@ export const ensureBucketExists = async () => {
       allowedMimeTypes: ['image/*'],
       fileSizeLimit: 52428800 // 50MB
     });
-    
-    if (createError) {
-      if (createError.message.includes('already exists')) {
-        console.log('Bucket already exists, continuing...');
-      } else {
-        console.error('Error creating bucket:', createError);
-      }
-    } else {
-      console.log('Bucket created successfully:', createData);
-    }
     
     // Test bucket access
     const { data: files, error: listError } = await supabase.storage
@@ -31,7 +20,6 @@ export const ensureBucketExists = async () => {
       console.error('Error listing files in bucket:', listError);
       return { error: listError };
     } else {
-      console.log('Bucket is accessible, files:', files);
       return { success: true, files };
     }
   } catch (error) {
@@ -43,26 +31,14 @@ export const ensureBucketExists = async () => {
 // Function to test bucket access and list available buckets
 export const testBucketAccess = async () => {
   try {
-    console.log('Testing bucket access...');
     
     // List all buckets
     const { data: buckets, error: bucketsError } = await supabase.storage.listBuckets();
-    if (bucketsError) {
-      console.error('Error listing buckets:', bucketsError);
-    } else {
-      console.log('Available buckets:', buckets);
-    }
     
     // Test deliverymedia bucket specifically
     const { data: files, error: filesError } = await supabase.storage
       .from('deliverymedia')
       .list('photos', { limit: 1 });
-    
-    if (filesError) {
-      console.error('Error accessing deliverymedia bucket:', filesError);
-    } else {
-      console.log('deliverymedia bucket is accessible, files:', files);
-    }
     
     return { buckets, files, bucketsError, filesError };
   } catch (error) {
@@ -152,8 +128,6 @@ export const uploadToStorage = async (
       fileName = `${prefix}-${Date.now()}-${file.name}`;
     }
 
-    console.log('Uploading file:', fileName, 'to path:', `${path}/${fileName}`);
-
     const { data, error } = await supabase.storage
       .from(bucket)
       .upload(`${path}/${fileName}`, fileData, {
@@ -166,8 +140,6 @@ export const uploadToStorage = async (
       throw error;
     }
 
-    console.log('Upload successful, data:', data);
-
     // Get signed URL instead of public URL
     const { data: signedUrlData, error: signedUrlError } = await supabase.storage
       .from(bucket)
@@ -177,8 +149,6 @@ export const uploadToStorage = async (
       console.error('Error creating signed URL:', signedUrlError);
       throw signedUrlError;
     }
-
-    console.log('Generated signed URL:', signedUrlData.signedUrl);
 
     if (!signedUrlData.signedUrl) {
       throw new Error('Failed to get signed URL for uploaded file');

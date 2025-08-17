@@ -240,8 +240,6 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
             // Parse the date (format: "11/08/2025" - dd/mm/yyyy for Australian format)
             const [day, month, year] = dateLine.split('/');
 
-            // Debug logging
-            console.log('Date parsing:', { dateLine, day, month, year });
 
             // Validate date components
             if (!day || !month || !year || isNaN(parseInt(day)) || isNaN(parseInt(month)) || isNaN(parseInt(year))) {
@@ -327,13 +325,9 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
         }
       }
 
-      console.log('Before continue check - key:', key, 'value:', value);
       if (!key || !value) {
-        console.log('Continue triggered - key or value is empty');
         continue;
       }
-
-      console.log('Processing key:', key, 'value:', value);
 
       // Map the keys to our form fields
       switch (key) {
@@ -370,15 +364,12 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
           break;
         case 'customer':
           parsed['customer'] = value;
-          console.log('Mapped customer to parsed:', value);
           break;
         case 'address':
           parsed['address'] = value;
-          console.log('Mapped address to parsed:', value);
           break;
         case 'phone':
           parsed['phone'] = value;
-          console.log('Mapped phone to parsed:', value);
           break;
       }
     }

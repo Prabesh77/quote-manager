@@ -2,13 +2,47 @@
 
 import QuoteTable from "@/components/ui/QuoteTable";
 import { ProtectedRoute } from "@/components/common/ProtectedRoute";
-import { useQuotes } from '@/hooks/useQuotesWithQuery';
+import { useQuotesQuery } from '@/hooks/queries/useQuotesQuery';
+import { usePartsQuery } from '@/hooks/queries/useQuotesQuery';
 
 export default function DeliveryPage() {
-  const { quotes, parts, updateQuote, deleteQuote, updatePart, updateMultipleParts, markQuoteCompleted, markQuoteAsOrdered } = useQuotes();
-
+  // Get all quotes for delivery page (no pagination needed here)
+  const { data: quotesData, isLoading: quotesLoading } = useQuotesQuery(1, 1000); // Get all quotes
+  const { data: parts, isLoading: partsLoading } = usePartsQuery();
+  
   // Filter quotes to only show delivery-related quotes
-  const deliveryQuotes = quotes.filter(quote => quote.status === 'ordered');
+  const deliveryQuotes = quotesData?.quotes?.filter(quote => quote.status === 'ordered') || [];
+
+  // Placeholder functions for now - these will need to be implemented with the new API
+  const updateQuote = async (id: string, fields: Record<string, any>) => {
+    // TODO: Implement with new API
+    return { error: new Error('Not implemented yet') };
+  };
+
+  const deleteQuote = async (id: string) => {
+    // TODO: Implement with new API
+    return { error: new Error('Not implemented yet') };
+  };
+
+  const updatePart = async (id: string, updates: any) => {
+    // TODO: Implement with new API
+    return { data: null, error: new Error('Not implemented yet') };
+  };
+
+  const updateMultipleParts = async (updates: Array<{ id: string; updates: any }>) => {
+    // TODO: Implement with new API
+    console.log('Update multiple parts:', updates);
+  };
+
+  const markQuoteCompleted = async (id: string) => {
+    // TODO: Implement with new API
+    return { error: new Error('Not implemented yet') };
+  };
+
+  const markQuoteAsOrdered = async (id: string, taxInvoiceNumber: string) => {
+    // TODO: Implement with new API
+    return { error: new Error('Not implemented yet') };
+  };
 
   // Wrapper functions to match QuoteTable's expected interface
   const handleUpdateQuote = async (id: string, fields: Record<string, any>): Promise<{ error: Error | null }> => {
@@ -38,7 +72,7 @@ export default function DeliveryPage() {
         <h1 className="text-2xl font-bold text-gray-900 mb-6">Delivery</h1>
         <QuoteTable
           quotes={deliveryQuotes}
-          parts={parts}
+          parts={parts || []}
           onUpdateQuote={handleUpdateQuote}
           onDeleteQuote={deleteQuote}
           onUpdatePart={handleUpdatePart}
@@ -46,7 +80,7 @@ export default function DeliveryPage() {
           onMarkCompleted={markQuoteCompleted}
           onMarkAsOrdered={markQuoteAsOrdered}
           showCompleted={false}
-          isLoading={false}
+          isLoading={quotesLoading || partsLoading}
         />
       </div>
     </ProtectedRoute>

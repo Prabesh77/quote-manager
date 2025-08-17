@@ -3,13 +3,47 @@
 import React from 'react';
 import QuoteTable from '@/components/ui/QuoteTable';
 import { ProtectedRoute } from '@/components/common/ProtectedRoute';
-import { useQuotes } from '@/hooks/useQuotesWithQuery';
+import { useQuotesQuery } from '@/hooks/queries/useQuotesQuery';
+import { usePartsQuery } from '@/hooks/queries/useQuotesQuery';
 
 export default function VerifyPricePage() {
-  const { quotes, parts, updateQuote, deleteQuote, updatePart, updateMultipleParts, markQuoteCompleted, markQuoteAsOrdered } = useQuotes();
-
+  // Get all quotes for verify price page (no pagination needed here)
+  const { data: quotesData, isLoading: quotesLoading } = useQuotesQuery(1, 1000); // Get all quotes
+  const { data: parts, isLoading: partsLoading } = usePartsQuery();
+  
   // Filter quotes to only show quotes that need verification
-  const quotesToVerify = quotes.filter(quote => quote.status === 'priced');
+  const quotesToVerify = quotesData?.quotes?.filter(quote => quote.status === 'priced') || [];
+
+  // Placeholder functions for now - these will need to be implemented with the new API
+  const updateQuote = async (id: string, fields: Record<string, any>) => {
+    // TODO: Implement with new API
+    return { error: new Error('Not implemented yet') };
+  };
+
+  const deleteQuote = async (id: string) => {
+    // TODO: Implement with new API
+    return { error: new Error('Not implemented yet') };
+  };
+
+  const updatePart = async (id: string, updates: any) => {
+    // TODO: Implement with new API
+    return { data: null, error: new Error('Not implemented yet') };
+  };
+
+  const updateMultipleParts = async (updates: Array<{ id: string; updates: any }>) => {
+    // TODO: Implement with new API
+    console.log('Update multiple parts:', updates);
+  };
+
+  const markQuoteCompleted = async (id: string) => {
+    // TODO: Implement with new API
+    return { error: new Error('Not implemented yet') };
+  };
+
+  const markQuoteAsOrdered = async (id: string, taxInvoiceNumber: string) => {
+    // TODO: Implement with new API
+    return { error: new Error('Not implemented yet') };
+  };
 
   // Wrapper functions to match QuoteTable's expected interface
   const handleUpdateQuote = async (id: string, fields: Record<string, any>): Promise<{ error: Error | null }> => {
@@ -39,7 +73,7 @@ export default function VerifyPricePage() {
         <h1 className="text-2xl font-bold text-gray-900 mb-6">Verify Price</h1>
         <QuoteTable
           quotes={quotesToVerify}
-          parts={parts}
+          parts={parts || []}
           onUpdateQuote={handleUpdateQuote}
           onDeleteQuote={deleteQuote}
           onUpdatePart={handleUpdatePart}
@@ -47,7 +81,7 @@ export default function VerifyPricePage() {
           onMarkCompleted={markQuoteCompleted}
           onMarkAsOrdered={markQuoteAsOrdered}
           showCompleted={false}
-          isLoading={false}
+          isLoading={quotesLoading || partsLoading}
         />
       </div>
     </ProtectedRoute>

@@ -9,14 +9,16 @@ import { createNormalizedQuote } from '@/utils/normalizedQuoteCreation';
 
 // Query Keys - centralized for consistency
 export const queryKeys = {
-  quotes: ['quotes'] as const,
+  quotes: (page: number = 1, limit: number = 20) => ['quotes', page, limit] as const,
+  quotesBase: ['quotes'] as const, // Base key for invalidating all quote queries
   parts: ['parts'] as const,
   quote: (id: string) => ['quotes', id] as const,
   part: (id: string) => ['parts', id] as const,
+  userProfile: (id: string) => ['userProfile', id] as const,
 };
 
 // Fetch functions
-const fetchQuotes = async (): Promise<Quote[]> => {
+const fetchQuotes = async (page: number = 1, limit: number = 20): Promise<{ quotes: Quote[]; total: number; totalPages: number }> => {
   try {
     // Get normalized quotes with customer and vehicle details
     const { data: normalizedQuotes, error: quotesError } = await supabase
@@ -76,7 +78,20 @@ const fetchQuotes = async (): Promise<Quote[]> => {
       return legacyQuote;
     });
 
-    return legacyQuotes;
+    // Calculate pagination info
+    const total = legacyQuotes.length;
+    const totalPages = Math.ceil(total / limit);
+    
+    // Apply pagination
+    const startIndex = (page - 1) * limit;
+    const endIndex = startIndex + limit;
+    const paginatedQuotes = legacyQuotes.slice(startIndex, endIndex);
+    
+    return {
+      quotes: paginatedQuotes,
+      total,
+      totalPages
+    };
   } catch (error) {
     console.error('Error fetching normalized quotes:', error);
     throw error;
@@ -113,10 +128,10 @@ const fetchParts = async (): Promise<Part[]> => {
 };
 
 // Custom hooks using TanStack Query
-export const useQuotesQuery = () => {
+export const useQuotesQuery = (page: number = 1, limit: number = 20) => {
   return useQuery({
-    queryKey: queryKeys.quotes,
-    queryFn: fetchQuotes,
+    queryKey: queryKeys.quotes(page, limit),
+    queryFn: () => fetchQuotes(page, limit),
     staleTime: 30 * 1000, // Consider data fresh for 30 seconds
     gcTime: 5 * 60 * 1000, // 5 minutes cache time
     refetchOnWindowFocus: false, // Don't refetch on window focus
@@ -139,7 +154,7 @@ export const usePartsQuery = () => {
 // Query to get quote parts with quote-specific data (price and notes)
 export const useQuotePartsQuery = (quoteId: string) => {
   return useQuery({
-    queryKey: [...queryKeys.quotes, 'parts', quoteId],
+    queryKey: [...queryKeys.quotesBase, 'parts', quoteId],
     queryFn: async () => {
       if (!quoteId) return [];
 
@@ -219,7 +234,7 @@ export const useCreateQuoteMutation = () => {
     },
     onSuccess: () => {
       // Invalidate and refetch quotes after successful creation
-      queryClient.invalidateQueries({ queryKey: queryKeys.quotes });
+      queryClient.invalidateQueries({ queryKey: queryKeys.quotesBase });
       queryClient.invalidateQueries({ queryKey: queryKeys.parts });
     },
     onError: (error) => {
@@ -295,7 +310,7 @@ export const useUpdateQuoteMutation = () => {
     },
     onSuccess: () => {
       // Invalidate and refetch quotes after successful update
-      queryClient.invalidateQueries({ queryKey: queryKeys.quotes });
+      queryClient.invalidateQueries({ queryKey: queryKeys.quotesBase });
     },
     onError: (error) => {
       console.error('Error updating quote:', error);
@@ -323,7 +338,7 @@ export const useDeleteQuoteMutation = () => {
     },
     onSuccess: () => {
       // Invalidate and refetch quotes
-      queryClient.invalidateQueries({ queryKey: queryKeys.quotes });
+      queryClient.invalidateQueries({ queryKey: queryKeys.quotesBase });
     },
     onError: (error) => {
       console.error('Error deleting quote:', error);
@@ -476,7 +491,7 @@ export const useUpdateQuotePartMutation = () => {
       }
       
       // Invalidate queries since quote_parts data affects quote display
-      queryClient.invalidateQueries({ queryKey: queryKeys.quotes });
+      queryClient.invalidateQueries({ queryKey: queryKeys.quotesBase });
     },
     onError: (error) => {
       console.error('Error updating quote part:', error);
@@ -521,7 +536,7 @@ export const useUpdateQuotePartLegacyMutation = (quoteId: string) => {
       // Status will be updated by JSON structure automatically
       
       // Invalidate both quotes and the specific quote parts query
-      queryClient.invalidateQueries({ queryKey: [...queryKeys.quotes, 'parts', quoteId] });
+      queryClient.invalidateQueries({ queryKey: [...queryKeys.quotesBase, 'parts', quoteId] });
       queryClient.invalidateQueries({ queryKey: queryKeys.quotes });
     },
     onError: (error) => {

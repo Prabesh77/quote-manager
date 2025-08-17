@@ -4,6 +4,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { ChevronDown, ChevronRight, Edit, Trash2, Save, X, Search, Eye, Copy, Car, CheckCircle, AlertTriangle, ShoppingCart, Package, Edit3, Plus } from 'lucide-react';
 import { Quote, Part } from './useQuotes';
 import { SkeletonLoader } from './SkeletonLoader';
+import { useQuotesQuery } from '@/hooks/queries/useQuotesQuery';
 import {
   Accordion,
   AccordionContent,
@@ -67,6 +68,10 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
 
   // Local quotes state for variant management
   const [localQuotes, setLocalQuotes] = useState<Quote[]>(quotes);
+
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const quotesPerPage = 1; // Testing with 1 quote per page
 
   // Helper functions for variant management
   const generateVariantId = () => `var_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -1025,6 +1030,35 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
   // Memoize the array of IDs so it doesn't change on every render
   const allQuoteIds = useMemo(() => filteredQuotes.map(q => q.id), [filteredQuotes]);
 
+  // Pagination logic - now using server-side pagination
+  const { data: quotesData, isLoading: quotesLoading } = useQuotesQuery(currentPage, quotesPerPage);
+  const totalPages = quotesData?.totalPages || 1;
+  const startIndex = (currentPage - 1) * quotesPerPage;
+  const endIndex = startIndex + (quotesData?.quotes?.length || 0);
+  const paginatedQuotes = quotesData?.quotes || [];
+
+  // Reset to first page when search term or filter changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, filter, showCompleted]);
+
+  // Pagination handlers
+  const goToPage = (page: number) => {
+    setCurrentPage(page);
+  };
+
+  const goToNextPage = () => {
+    if (currentPage < totalPages) {
+      setCurrentPage(currentPage + 1);
+    }
+  };
+
+  const goToPrevPage = () => {
+    if (currentPage > 1) {
+      setCurrentPage(currentPage - 1);
+    }
+  };
+
   const handleDeleteWithConfirm = async (quoteId: string) => {
     setShowDeleteConfirm(quoteId);
   };
@@ -1169,7 +1203,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden hidden lg:block relative">
 
         
-        {isLoading && filteredQuotes.length === 0 ? (
+        {quotesLoading && paginatedQuotes.length === 0 ? (
           <>
             {/* Table Header */}
             <div className="bg-white border-b border-gray-200 sticky top-0 z-10">
@@ -1184,7 +1218,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
             </div>
             <SkeletonLoader count={5} />
           </>
-        ) : filteredQuotes.length === 0 ? (
+        ) : paginatedQuotes.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 px-4">
             <div className="w-32 h-32 bg-gradient-to-br from-blue-100 to-purple-100 rounded-full flex items-center justify-center mb-8">
               <svg className="w-16 h-16 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1219,7 +1253,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
 
           {/* Quotes List */}
           <Accordion type="multiple" className="w-full">
-              {filteredQuotes.map((quote) => {
+              {paginatedQuotes.map((quote) => {
                 const quoteParts = getQuotePartsWithNotesSync(quote.id);
                 const status = getQuoteStatus(quoteParts, quote.status);
 
@@ -1887,7 +1921,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
           </div>
         ) : (
           <Accordion type="multiple" className="w-full">
-            {filteredQuotes.map((quote) => {
+            {paginatedQuotes.map((quote) => {
               const quoteParts = getQuotePartsWithNotesSync(quote.id);
               const status = getQuoteStatus(quoteParts, quote.status);
               
@@ -2458,6 +2492,77 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                 className="flex-1 px-4 py-2 text-white bg-red-600 hover:bg-red-700 rounded-lg font-medium transition-colors cursor-pointer"
               >
                 Mark as Order
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* Pagination Controls */}
+      {totalPages > 1 && (quotesData?.total || 0) > 0 && (
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+          <div className="flex items-center justify-between">
+            <div className="text-sm text-gray-700">
+              Showing {startIndex + 1} to {endIndex} of {quotesData?.total || 0} quotes
+            </div>
+            
+            <div className="flex items-center space-x-2">
+              {/* Previous Page Button */}
+              <button
+                onClick={goToPrevPage}
+                disabled={currentPage === 1}
+                className={`px-3 py-2 text-sm font-medium rounded-lg border transition-colors ${
+                  currentPage === 1
+                    ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
+                    : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50 hover:border-gray-400'
+                }`}
+              >
+                Previous
+              </button>
+              
+              {/* Page Numbers */}
+              <div className="flex items-center space-x-1">
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
+                  // Show first page, last page, current page, and pages around current page
+                  if (
+                    page === 1 ||
+                    page === totalPages ||
+                    (page >= currentPage - 1 && page <= currentPage + 1)
+                  ) {
+                    return (
+                      <button
+                        key={page}
+                        onClick={() => goToPage(page)}
+                        className={`px-3 py-2 text-sm font-medium rounded-lg border transition-colors ${
+                          page === currentPage
+                            ? 'bg-red-600 text-white border-red-600'
+                            : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50 hover:border-gray-400'
+                        }`}
+                      >
+                        {page}
+                      </button>
+                    );
+                  } else if (
+                    page === currentPage - 2 ||
+                    page === currentPage + 2
+                  ) {
+                    return <span key={page} className="px-2 text-gray-400">...</span>;
+                  }
+                  return null;
+                })}
+              </div>
+              
+              {/* Next Page Button */}
+              <button
+                onClick={goToNextPage}
+                disabled={currentPage === totalPages}
+                className={`px-3 py-2 text-sm font-medium rounded-lg border transition-colors ${
+                  currentPage === totalPages
+                    ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
+                    : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50 hover:border-gray-400'
+                }`}
+              >
+                Next
               </button>
             </div>
           </div>

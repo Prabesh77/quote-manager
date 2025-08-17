@@ -1,13 +1,22 @@
 'use client';
 
-import { useQuotes } from '@/hooks/useQuotesWithQuery';
+import { useQuotesQuery } from '@/hooks/queries/useQuotesQuery';
+import { usePartsQuery } from '@/hooks/queries/useQuotesQuery';
 import { QuoteForm } from "@/components/ui/QuoteForm";
 import { ProtectedRoute } from "@/components/common/ProtectedRoute";
 import { useSnackbar } from '@/components/ui/Snackbar';
 
 export default function NewQuotePage() {
-  const { quotes, parts, isLoading, createQuote } = useQuotes();
+  // Get all quotes and parts for new quote page (no pagination needed here)
+  const { data: quotesData, isLoading: quotesLoading } = useQuotesQuery(1, 1000); // Get all quotes
+  const { data: parts, isLoading: partsLoading } = usePartsQuery();
   const { showSnackbar } = useSnackbar();
+
+  // Placeholder function for now - this will need to be implemented with the new API
+  const createQuote = async (data: any) => {
+    // TODO: Implement with new API
+    return { error: new Error('Not implemented yet') };
+  };
 
   const handleSubmit = async (fields: Record<string, string>, parts: any[]) => {
     try {

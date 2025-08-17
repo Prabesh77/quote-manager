@@ -700,17 +700,12 @@ export const parsePartText = (text: string): { partNumber: string | null; partNa
   let partNumber: string | null = null;
   let partName: string | null = null;
   let remainingWords: string[] = [];
-  
-  console.log(`🔍 Parsing text: "${text}"`);
-  console.log(`🔍 Cleaned text: "${cleanedText}"`);
-  console.log(`🔍 Words: [${words.join(', ')}]`);
-  
+    
   // First pass: identify part numbers (mix of numbers and letters, or numbers only, 5+ chars)
   for (let i = 0; i < words.length; i++) {
     const word = words[i];
     if (isLikelyPartNumber(word)) {
       partNumber = word;
-      console.log(`🔢 Found part number: "${word}"`);
       // Remove the part number from remaining words
       words.splice(i, 1);
       break;
@@ -729,7 +724,6 @@ export const parsePartText = (text: string): { partNumber: string | null; partNa
       
       if (isKnownPartName) {
         partName = word;
-        console.log(`🏷️ Found actual part name: "${word}"`);
         // Don't remove the part name yet - we need it for context
         break;
       }
@@ -748,7 +742,6 @@ export const parsePartText = (text: string): { partNumber: string | null; partNa
         
         if (isPartIndicator) {
           partName = word;
-          console.log(`🏷️ Found part indicator: "${word}"`);
           words.splice(i, 1);
           break;
         }
@@ -765,7 +758,6 @@ export const parsePartText = (text: string): { partNumber: string | null; partNa
     remainingText: remainingWords.join(' ')
   };
   
-  console.log(`📊 Parse result:`, result);
   return result;
 };
 
@@ -773,9 +765,7 @@ export const parsePartText = (text: string): { partNumber: string | null; partNa
 export const extractPartsWithSmartParsing = (
   allTextLines: string[]
 ): Array<{ mainPartName: string; confidence: number; matchedVariation: string; context: string; partNumber?: string; isSupersession?: boolean }> => {
-  
-  console.log(`🚀 Starting smart parsing extraction with ${allTextLines.length} lines:`, allTextLines);
-  
+    
   const parts: Array<{ mainPartName: string; confidence: number; matchedVariation: string; context: string; partNumber?: string; isSupersession?: boolean }> = [];
   
   // First, detect supersessions
@@ -783,15 +773,12 @@ export const extractPartsWithSmartParsing = (
   
   // Combine all text for better context analysis
   const allText = allTextLines.join(' ').replace(/[,\.]/g, ' ').replace(/\s+/g, ' ');
-  console.log(`🔗 Combined text: "${allText}"`);
   
   // Process each line for part extraction
   for (let i = 0; i < allTextLines.length; i++) {
     const line = allTextLines[i].trim();
     if (!line) continue;
-    
-    console.log(`\n📝 Processing line ${i + 1}: "${line}"`);
-    
+        
     // Check if this line is part of a supersession
     const isSupersession = supersessions.some(s => 
       s.original === line || s.supersession === line
@@ -805,38 +792,22 @@ export const extractPartsWithSmartParsing = (
     
     // First try with the identified part name
     if (parsed.partName) {
-      console.log(`🔍 Trying to match part name: "${parsed.partName}"`);
       partMatch = findSmartPartMatch(parsed.partName, allTextLines);
-      if (partMatch) {
-        console.log(`✅ Matched with part name: ${partMatch.mainPartName} (${(partMatch.confidence * 100).toFixed(0)}%)`);
-      }
     }
     
     // If no match, try with the full remaining text
     if (!partMatch && parsed.remainingText) {
-      console.log(`🔍 Trying to match remaining text: "${parsed.remainingText}"`);
       partMatch = findSmartPartMatch(parsed.remainingText, allTextLines);
-      if (partMatch) {
-        console.log(`✅ Matched with remaining text: ${partMatch.mainPartName} (${(partMatch.confidence * 100).toFixed(0)}%)`);
-      }
     }
     
     // If still no match, try with the original line
     if (!partMatch) {
-      console.log(`🔍 Trying to match original line: "${line}"`);
       partMatch = findSmartPartMatch(line, allTextLines);
-      if (partMatch) {
-        console.log(`✅ Matched with original line: ${partMatch.mainPartName} (${(partMatch.confidence * 100).toFixed(0)}%)`);
-      }
     }
     
     // If still no match, try with the combined text (for multi-line context)
     if (!partMatch) {
-      console.log(`🔍 Trying to match combined text: "${allText}"`);
       partMatch = findSmartPartMatch(allText, allTextLines);
-      if (partMatch) {
-        console.log(`✅ Matched with combined text: ${partMatch.mainPartName} (${(partMatch.confidence * 100).toFixed(0)}%)`);
-      }
     }
     
     if (partMatch) {
@@ -845,12 +816,8 @@ export const extractPartsWithSmartParsing = (
         partNumber: parsed.partNumber || undefined,
         isSupersession
       });
-      console.log(`➕ Added part: ${partMatch.mainPartName} with number: ${parsed.partNumber || 'none'}`);
-    } else {
-      console.log(`❌ No match found for line: "${line}"`);
-    }
+    } 
   }
   
-  console.log(`🎯 Final result: ${parts.length} parts extracted`);
   return parts;
 };

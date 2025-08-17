@@ -33,7 +33,6 @@ const fetchQuotes = async (): Promise<Quote[]> => {
       throw new Error(quotesError.message);
     }
 
-    console.log('Normalized quotes found:', normalizedQuotes?.length || 0);
 
     // Convert normalized quotes to legacy format for QuoteTable compatibility
     const legacyQuotes: Quote[] = (normalizedQuotes || []).map(normalizedQuote => {
@@ -45,16 +44,12 @@ const fetchQuotes = async (): Promise<Quote[]> => {
         // New JSON format
         partsRequested = normalizedQuote.parts_requested;
         partIds = partsRequested.map(p => p.part_id).join(',');
-        console.log('Using JSON parts for quote:', normalizedQuote.id.slice(0, 8), 'parts:', partsRequested.length);
       } else {
         // Legacy format - this will be removed after migration
-        console.log('Using legacy parts format for quote:', normalizedQuote.id.slice(0, 8));
         partsRequested = [];
         partIds = ''; // Will be populated by legacy logic if needed
       }
 
-      // Debug: Log the vehicle data to see what's available
-      console.log('Vehicle data for quote', normalizedQuote.id, ':', normalizedQuote.vehicle);
 
       const legacyQuote = {
         id: normalizedQuote.id,
@@ -78,12 +73,9 @@ const fetchQuotes = async (): Promise<Quote[]> => {
         taxInvoiceNumber: normalizedQuote.tax_invoice_number || undefined,
       };
 
-      console.log('Converted quote:', legacyQuote.id, 'with parts:', partIds);
-      console.log('Body value:', legacyQuote.body);
       return legacyQuote;
     });
 
-    console.log('Final legacy quotes:', legacyQuotes.length);
     return legacyQuotes;
   } catch (error) {
     console.error('Error fetching normalized quotes:', error);
@@ -113,7 +105,6 @@ const fetchParts = async (): Promise<Part[]> => {
       createdAt: part.created_at,
     }));
 
-    console.log('Loaded normalized parts:', legacyParts.length);
     return legacyParts;
   } catch (error) {
     console.error('Error fetching normalized parts:', error);
@@ -764,18 +755,11 @@ const checkAndUpdateQuoteStatusJson = async (quoteId: string, partsArray?: Quote
     );
 
     if (hasPrice) {
-      console.log('💰 Quote has parts with prices, updating status to waiting_verification');
       
       const { error: statusUpdateError } = await supabase
         .from('quotes')
         .update({ status: 'waiting_verification' })
         .eq('id', quoteId);
-
-      if (statusUpdateError) {
-        console.error('❌ Error updating quote status:', statusUpdateError);
-      } else {
-        console.log('✅ Quote status updated to waiting_verification:', quoteId);
-      }
     }
   } catch (error) {
     console.error('❌ Error in checkAndUpdateQuoteStatusJson:', error);

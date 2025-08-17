@@ -328,12 +328,6 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [editingQuote, editingParts]);
 
-  // Debug: Log body values
-  useEffect(() => {
-    quotes.forEach(quote => {
-      console.log('Quote', quote.id, 'body value:', quote.body);
-    });
-  }, [quotes]);
 
   // Synchronize localQuotes with quotes prop
   useEffect(() => {
@@ -403,7 +397,6 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
     if (editingParts) {
       const quote = localQuotes.find(q => q.id === editingParts);
       if (quote) {
-        console.log('Saving parts with data:', partEditData);
         
         // First, update the local state with all variant changes
         setLocalQuotes(prev => prev.map(q => 
@@ -475,15 +468,9 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
             }
           }
         });
-        
-        console.log('Converted updates for backend:', updates);
-        console.log('All variants updated in local state');
-        
+                
         // Debug: Log the current state of all variants for this quote
         const currentQuote = localQuotes.find(q => q.id === editingParts);
-        if (currentQuote) {
-          console.log('Current quote variants after update:', currentQuote.partsRequested);
-        }
         
         // Update the JSON structure in the database with final_price calculations
         try {
@@ -511,19 +498,12 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
             }
             return p;
           });
-          
-          console.log('Saving updated parts_requested to database:', updatedPartsRequested);
-          
+                    
           const { error: jsonUpdateError } = await supabase
             .from('quotes')
             .update({ parts_requested: updatedPartsRequested })
             .eq('id', editingParts);
           
-          if (jsonUpdateError) {
-            console.error('Error updating JSON structure:', jsonUpdateError);
-          } else {
-            console.log('Successfully updated JSON structure with final_price calculations');
-          }
         } catch (error) {
           console.error('Error updating JSON structure:', error);
         }
@@ -531,7 +511,6 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
         if (updates.length > 0) {
           try {
             await onUpdateMultipleParts(updates);
-            console.log('Successfully saved default variants to backend');
           } catch (error) {
             console.error('Error saving parts to backend:', error);
           }
@@ -588,7 +567,6 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
       });
     }
     
-    console.log('Starting edit mode with data:', newPartEditData);
     setPartEditData(newPartEditData);
     setEditingParts(quoteId);
   };
@@ -919,7 +897,6 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
   const handleVerifyQuote = async (quoteId: string) => {
     try {
       await onUpdateQuote(quoteId, { status: 'priced' });
-      console.log('✅ Quote verified and moved to priced status:', quoteId);
     } catch (error) {
       console.error('❌ Error verifying quote:', error);
     }

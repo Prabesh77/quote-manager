@@ -105,8 +105,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log('User profile verified:', verifyProfile);
-
     return NextResponse.json({
       success: true,
       user: {

@@ -129,7 +129,6 @@ export const useQuotes = () => {
 
   const markQuoteAsOrderedWithParts = async (id: string, taxInvoiceNumber: string, selectedPartIds: string[]) => {
     try {
-      console.log('📦 Marking quote as ordered with selected parts:', { id, selectedPartIds });
       
       // If no parts selected, mark entire quote as ordered
       if (!selectedPartIds || selectedPartIds.length === 0) {
@@ -149,8 +148,6 @@ export const useQuotes = () => {
       }
       
       if (quote?.parts_requested && Array.isArray(quote.parts_requested)) {
-        // New JSON structure
-        console.log('📦 Using JSON structure for partial order');
         
         const currentParts = quote.parts_requested as QuotePartItem[];
         const selectedParts = currentParts.filter((p: QuotePartItem) => selectedPartIds.includes(p.part_id));
@@ -160,7 +157,6 @@ export const useQuotes = () => {
           return { error: new Error('No selected parts found in quote') };
         }
         
-        console.log('📦 Selected parts from JSON:', selectedParts.length, 'Total parts:', currentParts.length);
         
         // Update the quote with only selected parts and mark as ordered using TanStack Query
         const result = await updateQuote(id, {
@@ -174,12 +170,9 @@ export const useQuotes = () => {
           return { error: result.error };
         }
         
-        console.log('✅ Quote marked as ordered with', selectedParts.length, 'selected parts (JSON)');
         return { error: null };
         
       } else {
-        // Legacy quote_parts structure
-        console.log('📦 Using legacy quote_parts structure for partial order');
         
         // Get all quote_parts for this quote
         const { data: allQuoteParts, error: fetchError } = await supabase
@@ -201,7 +194,6 @@ export const useQuotes = () => {
         const selectedQuoteParts = allQuoteParts.filter((qp: any) => selectedPartIds.includes(qp.part_id));
         const unselectedQuoteParts = allQuoteParts.filter((qp: any) => !selectedPartIds.includes(qp.part_id));
         
-        console.log('📦 Selected parts:', selectedQuoteParts.length, 'Unselected parts:', unselectedQuoteParts.length);
         
         // Remove unselected parts from the quote
         if (unselectedQuoteParts.length > 0) {
@@ -216,15 +208,10 @@ export const useQuotes = () => {
             return { error: deleteError };
           }
           
-          console.log('✅ Removed', unselectedQuoteParts.length, 'unselected parts from quote');
         }
         
         // Mark the quote as ordered
         const result = await updateQuote(id, { status: 'ordered', tax_invoice_number: taxInvoiceNumber });
-        
-        if (!result.error) {
-          console.log('✅ Quote marked as ordered with', selectedQuoteParts.length, 'parts (legacy)');
-        }
         
         return result;
       }

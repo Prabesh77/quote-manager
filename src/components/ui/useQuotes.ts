@@ -201,8 +201,6 @@ export const useQuotes = () => {
         return;
       }
 
-      console.log('Normalized quotes found:', normalizedQuotes?.length || 0);
-      console.log('Quote parts found:', quoteParts?.length || 0);
 
       // Convert normalized quotes to legacy format for QuoteTable compatibility
       const legacyQuotes: Quote[] = (normalizedQuotes || []).map(normalizedQuote => {
@@ -210,8 +208,6 @@ export const useQuotes = () => {
         const quotePartsForThisQuote = (quoteParts || []).filter(qp => qp.quote_id === normalizedQuote.id);
         const partIds = quotePartsForThisQuote.map(qp => qp.part_id).join(',');
 
-        // Debug: Log the vehicle data to see what's available
-        console.log('Vehicle data for quote', normalizedQuote.id, ':', normalizedQuote.vehicle);
 
         const legacyQuote = {
           id: normalizedQuote.id,
@@ -244,17 +240,12 @@ export const useQuotes = () => {
           taxInvoiceNumber: normalizedQuote.tax_invoice_number || undefined,
         };
 
-        console.log('Converted quote:', legacyQuote.id, 'with parts:', partIds);
-        console.log('Body value:', legacyQuote.body);
         return legacyQuote;
       });
 
-      console.log('Final legacy quotes:', legacyQuotes.length);
       setQuotes(legacyQuotes);
       setConnectionStatus('connected');
-      console.log('Loaded normalized quotes:', legacyQuotes.length);
     } catch (error) {
-      console.error('Error fetching normalized quotes:', error);
       setConnectionStatus('error');
     } finally {
       setIsLoading(false);
@@ -285,7 +276,6 @@ export const useQuotes = () => {
       }));
 
       setParts(legacyParts);
-      console.log('Loaded normalized parts:', legacyParts.length);
     } catch (error) {
       console.error('Error fetching normalized parts:', error);
     } finally {

@@ -95,7 +95,6 @@ export const createNormalizedQuote = async (quoteData: QuoteData) => {
 
     if (existingCustomer && !customerCheckError) {
       customerId = existingCustomer.id;
-      console.log('Using existing customer:', quoteData.customer.name);
     } else {
       // Create new customer
       const { data: newCustomer, error: customerError } = await supabase
@@ -114,15 +113,11 @@ export const createNormalizedQuote = async (quoteData: QuoteData) => {
       }
 
       customerId = newCustomer.id;
-      console.log('Created new customer:', quoteData.customer.name);
     }
 
     // Step 2: Create or find vehicle
     let vehicleId: string;
-    
-    // Check if vehicle already exists by matching make, model, series, year, and color
-    console.log('Vehicle data received:', quoteData.vehicle);
-    
+        
     let vehicleQuery = supabase
       .from('vehicles')
       .select('id, make, model, series, year, color, auto, body')
@@ -165,9 +160,7 @@ export const createNormalizedQuote = async (quoteData: QuoteData) => {
     }
     
     const { data: existingVehicles, error: vehicleCheckError } = await vehicleQuery;
-    
-    console.log('Vehicle query result:', { existingVehicles, vehicleCheckError });
-    
+        
     if (vehicleCheckError) {
       console.error('Error checking for existing vehicle:', vehicleCheckError);
       throw vehicleCheckError;
@@ -176,7 +169,6 @@ export const createNormalizedQuote = async (quoteData: QuoteData) => {
     if (existingVehicles && existingVehicles.length > 0) {
       // Use existing vehicle
       vehicleId = existingVehicles[0].id;
-      console.log('Using existing vehicle:', `${existingVehicles[0].make} ${existingVehicles[0].model} ${existingVehicles[0].series || ''} ${existingVehicles[0].year || ''} ${existingVehicles[0].color || ''}`);
     } else {
               // Create new vehicle
         const { data: newVehicle, error: vehicleError } = await supabase
@@ -202,7 +194,6 @@ export const createNormalizedQuote = async (quoteData: QuoteData) => {
       }
 
       vehicleId = newVehicle.id;
-      console.log('Created new vehicle:', `${quoteData.vehicle.make} ${quoteData.vehicle.model} ${quoteData.vehicle.series || ''} ${quoteData.vehicle.year || ''} ${quoteData.vehicle.color || ''}`);
     }
 
     // Step 3: Create quote with JSON parts structure
@@ -232,8 +223,6 @@ export const createNormalizedQuote = async (quoteData: QuoteData) => {
       throw quoteError;
     }
 
-    console.log('Created quote:', quote.id);
-
     // Step 4: Create parts and update the JSON array with actual part IDs
     const finalPartsRequested = [];
     
@@ -251,7 +240,6 @@ export const createNormalizedQuote = async (quoteData: QuoteData) => {
 
       if (existingPart && !partCheckError) {
         partId = existingPart.id;
-        console.log('Using existing part:', partData.name);
       } else {
         // Create new part
         const { data: part, error: partError } = await supabase
@@ -271,7 +259,6 @@ export const createNormalizedQuote = async (quoteData: QuoteData) => {
         }
 
         partId = part.id;
-        console.log('Created new part:', partData.name);
       }
 
       // Add to final JSON array
@@ -294,10 +281,6 @@ export const createNormalizedQuote = async (quoteData: QuoteData) => {
       console.error('Error updating quote with parts:', updateQuoteError);
       throw updateQuoteError;
     }
-
-    console.log('✅ Successfully created normalized quote with JSON parts structure');
-    console.log('Quote ID:', quote.id);
-    console.log('Parts in quote:', finalPartsRequested.length);
 
     return {
       success: true,

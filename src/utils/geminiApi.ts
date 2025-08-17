@@ -176,8 +176,6 @@ RESPONSE FORMAT (JSON only):
         // Single part, no duplicates
         finalParts.push(groupData.part);
       } else {
-        // Multiple duplicates, combine part numbers
-        console.log(`AI: Grouped ${groupData.count} instances of "${groupData.part.partName}" with part numbers: ${groupData.partNumbers.join(', ')}`);
         finalParts.push({
           ...groupData.part,
           partNumber: groupData.partNumbers.join(', '),
@@ -402,10 +400,6 @@ function fallbackExtraction(ocrText: string): AIPartExtraction[] {
       // Create single entry with all part numbers (comma-separated)
       if (collectedPartNumbers.length > 0) {
         const finalPartNumber = collectedPartNumbers.join(', ');
-        
-        if (groupData.count > 1) {
-          console.log(`Nissan: Grouped ${groupData.count} instances of "${groupData.name}" with part numbers: ${finalPartNumber}`);
-        }
         
         parts.push({
           partName: groupData.name,

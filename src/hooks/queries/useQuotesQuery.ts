@@ -9,7 +9,7 @@ import { createNormalizedQuote } from '@/utils/normalizedQuoteCreation';
 
 // Query Keys - centralized for consistency
 export const queryKeys = {
-  quotes: (page: number = 1, limit: number = 20) => ['quotes', page, limit] as const,
+  quotes: (page: number = 1, limit: number = 20, filters?: { status?: string; customer?: string; make?: string }) => ['quotes', page, limit, filters] as const,
   quotesBase: ['quotes'] as const, // Base key for invalidating all quote queries
   parts: ['parts'] as const,
   quote: (id: string) => ['quotes', id] as const,
@@ -18,23 +18,43 @@ export const queryKeys = {
 };
 
 // Fetch functions
-const fetchQuotes = async (page: number = 1, limit: number = 20): Promise<{ quotes: Quote[]; total: number; totalPages: number }> => {
+const fetchQuotes = async (page: number = 1, limit: number = 20, filters?: { status?: string; customer?: string; make?: string }): Promise<{ quotes: Quote[]; total: number; totalPages: number }> => {
   try {
-    // Get normalized quotes with customer and vehicle details
-    const { data: normalizedQuotes, error: quotesError } = await supabase
+    // Build the base query
+    let query = supabase
       .from('quotes')
       .select(`
         *,
         customer:customers(*),
         vehicle:vehicles(*)
-      `)
-      .order('created_at', { ascending: false });
+      `, { count: 'exact' }); // Get exact count for pagination
+
+    // Apply filters if provided
+    if (filters?.status) {
+      query = query.eq('status', filters.status);
+    }
+    if (filters?.customer) {
+      query = query.ilike('customer.name', `%${filters.customer}%`);
+    }
+    if (filters?.make) {
+      query = query.ilike('vehicle.make', `%${filters.make}%`);
+    }
+
+    // Apply pagination using Supabase range
+    const startIndex = (page - 1) * limit;
+    const endIndex = startIndex + limit - 1; // Supabase range is inclusive
+    query = query.range(startIndex, endIndex);
+
+    // Order by creation date (newest first)
+    query = query.order('created_at', { ascending: false });
+
+    // Execute the query
+    const { data: normalizedQuotes, error: quotesError, count } = await query;
 
     if (quotesError) {
       console.error('Error fetching normalized quotes:', quotesError);
       throw new Error(quotesError.message);
     }
-
 
     // Convert normalized quotes to legacy format for QuoteTable compatibility
     const legacyQuotes: Quote[] = (normalizedQuotes || []).map(normalizedQuote => {
@@ -51,7 +71,6 @@ const fetchQuotes = async (page: number = 1, limit: number = 20): Promise<{ quot
         partsRequested = [];
         partIds = ''; // Will be populated by legacy logic if needed
       }
-
 
       const legacyQuote = {
         id: normalizedQuote.id,
@@ -78,17 +97,12 @@ const fetchQuotes = async (page: number = 1, limit: number = 20): Promise<{ quot
       return legacyQuote;
     });
 
-    // Calculate pagination info
-    const total = legacyQuotes.length;
+    // Calculate pagination info using the count from Supabase
+    const total = count || 0;
     const totalPages = Math.ceil(total / limit);
     
-    // Apply pagination
-    const startIndex = (page - 1) * limit;
-    const endIndex = startIndex + limit;
-    const paginatedQuotes = legacyQuotes.slice(startIndex, endIndex);
-    
     return {
-      quotes: paginatedQuotes,
+      quotes: legacyQuotes,
       total,
       totalPages
     };
@@ -128,10 +142,10 @@ const fetchParts = async (): Promise<Part[]> => {
 };
 
 // Custom hooks using TanStack Query
-export const useQuotesQuery = (page: number = 1, limit: number = 20) => {
+export const useQuotesQuery = (page: number = 1, limit: number = 20, filters?: { status?: string; customer?: string; make?: string }) => {
   return useQuery({
-    queryKey: queryKeys.quotes(page, limit),
-    queryFn: () => fetchQuotes(page, limit),
+    queryKey: queryKeys.quotes(page, limit, filters),
+    queryFn: () => fetchQuotes(page, limit, filters),
     staleTime: 30 * 1000, // Consider data fresh for 30 seconds
     gcTime: 5 * 60 * 1000, // 5 minutes cache time
     refetchOnWindowFocus: false, // Don't refetch on window focus
@@ -403,7 +417,7 @@ export const useUpdatePartMutation = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.parts });
-      queryClient.invalidateQueries({ queryKey: queryKeys.quotes });
+      queryClient.invalidateQueries({ queryKey: queryKeys.quotesBase });
     },
     onError: (error) => {
       console.error('Error updating part:', error);
@@ -537,7 +551,7 @@ export const useUpdateQuotePartLegacyMutation = (quoteId: string) => {
       
       // Invalidate both quotes and the specific quote parts query
       queryClient.invalidateQueries({ queryKey: [...queryKeys.quotesBase, 'parts', quoteId] });
-      queryClient.invalidateQueries({ queryKey: queryKeys.quotes });
+      queryClient.invalidateQueries({ queryKey: queryKeys.quotesBase });
     },
     onError: (error) => {
       console.error('Error updating quote part:', error);
@@ -565,7 +579,7 @@ export const useDeletePartMutation = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.parts });
-      queryClient.invalidateQueries({ queryKey: queryKeys.quotes });
+      queryClient.invalidateQueries({ queryKey: queryKeys.quotesBase });
     },
     onError: (error) => {
       console.error('Error deleting part:', error);
@@ -637,7 +651,7 @@ export const useUpdateMultiplePartsMutation = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.parts });
-      queryClient.invalidateQueries({ queryKey: queryKeys.quotes });
+      queryClient.invalidateQueries({ queryKey: queryKeys.quotesBase });
     },
     onError: (error) => {
       console.error('Error updating multiple parts:', error);
@@ -731,7 +745,7 @@ const updatePartInJsonQuotes = async (partId: string, updates: { price?: number 
 
     // Invalidate React Query cache if queryClient is provided
     if (queryClient && updatedQuoteIds.length > 0) {
-      await queryClient.invalidateQueries({ queryKey: queryKeys.quotes });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.quotesBase });
     }
 
   } catch (error) {

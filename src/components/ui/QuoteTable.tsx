@@ -4,7 +4,6 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { ChevronDown, ChevronRight, Edit, Trash2, Save, X, Search, Eye, Copy, Car, CheckCircle, AlertTriangle, ShoppingCart, Package, Edit3, Plus } from 'lucide-react';
 import { Quote, Part } from './useQuotes';
 import { SkeletonLoader } from './SkeletonLoader';
-import { useQuotesQuery } from '@/hooks/queries/useQuotesQuery';
 import {
   Accordion,
   AccordionContent,
@@ -29,13 +28,21 @@ interface QuoteTableProps {
   showCompleted?: boolean;
   defaultFilter?: FilterType;
   isLoading?: boolean;
+  itemsPerPage?: number; // New prop for configurable pagination
+  showPagination?: boolean; // New prop to control pagination display
+  // Server-driven pagination (optional). If provided, component will not slice locally
+  currentPage?: number;
+  total?: number;
+  totalPages?: number;
+  pageSize?: number;
+  onPageChange?: (page: number) => void;
 }
 
 type FilterType = 'all' | 'unpriced' | 'priced';
 
 type QuoteStatus = 'unpriced' | 'priced' | 'completed' | 'ordered' | 'delivered' | 'waiting_verification';
 
-export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote, onUpdatePart, onUpdateMultipleParts, onMarkCompleted, onMarkAsOrdered, onMarkAsOrderedWithParts, showCompleted = false, defaultFilter = 'all', isLoading = false }: QuoteTableProps) {
+export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote, onUpdatePart, onUpdateMultipleParts, onMarkCompleted, onMarkAsOrdered, onMarkAsOrderedWithParts, showCompleted = false, defaultFilter = 'all', isLoading = false, itemsPerPage = 10, showPagination = true, currentPage: externalCurrentPage, total: externalTotal, totalPages: externalTotalPages, pageSize: externalPageSize, onPageChange }: QuoteTableProps) {
   // Safety checks for undefined props
   if (!quotes || !Array.isArray(quotes)) {
     console.warn('QuoteTable: quotes prop is undefined or not an array, using empty array');
@@ -69,14 +76,67 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
   // Local quotes state for variant management
   const [localQuotes, setLocalQuotes] = useState<Quote[]>(quotes);
 
-  // Pagination state
+  // Pagination state (used only when server-driven props are not provided)
   const [currentPage, setCurrentPage] = useState(1);
-  const quotesPerPage = 1; // Testing with 1 quote per page
 
   // Helper functions for variant management
   const generateVariantId = () => `var_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
-    const addVariantToPart = (quoteId: string, partId: string) => {
+  // Determine if we are using server-driven pagination
+  const isServerPaginated = !!onPageChange && typeof externalCurrentPage === 'number' && typeof externalTotalPages === 'number' && typeof externalTotal === 'number' && typeof externalPageSize === 'number';
+
+  // Effective pagination values for UI
+  const uiPageSize = isServerPaginated ? (externalPageSize as number) : itemsPerPage;
+  const uiCurrentPage = isServerPaginated ? (externalCurrentPage as number) : currentPage;
+  const totalPages = isServerPaginated ? (externalTotalPages as number) : Math.ceil(quotes.length / itemsPerPage);
+  const totalCount = isServerPaginated ? (externalTotal as number) : quotes.length;
+
+  // Start/End indices purely for display purposes
+  const startIndex = (uiCurrentPage - 1) * uiPageSize;
+  const endIndex = Math.min(startIndex + (isServerPaginated ? quotes.length : uiPageSize), totalCount);
+
+  // For server pagination, do not slice; quotes already reflect the current page
+  const paginatedQuotes = isServerPaginated ? quotes : quotes.slice(startIndex, startIndex + uiPageSize);
+
+  // Reset local page to first when data set changes in client-mode only
+  useEffect(() => {
+    if (!isServerPaginated) {
+      setCurrentPage(1);
+    }
+  }, [quotes.length, isServerPaginated]);
+
+  // Pagination handlers
+  const goToPage = (page: number) => {
+    if (isServerPaginated && onPageChange) {
+      onPageChange(page);
+    } else {
+      setCurrentPage(page);
+    }
+  };
+
+  const goToNextPage = () => {
+    const next = uiCurrentPage + 1;
+    if (uiCurrentPage < totalPages) {
+      if (isServerPaginated && onPageChange) {
+        onPageChange(next);
+      } else {
+        setCurrentPage(next);
+      }
+    }
+  };
+
+  const goToPrevPage = () => {
+    const prev = uiCurrentPage - 1;
+    if (uiCurrentPage > 1) {
+      if (isServerPaginated && onPageChange) {
+        onPageChange(prev);
+      } else {
+        setCurrentPage(prev);
+      }
+    }
+  };
+
+  const addVariantToPart = (quoteId: string, partId: string) => {
     // Only add to local state, don't save to database yet
     const newVariantId = generateVariantId();
     
@@ -408,11 +468,11 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
           q.id === editingParts 
             ? {
                 ...q,
-                partsRequested: q.partsRequested.map(p => {
+                partsRequested: (q.partsRequested ?? []).map(p => {
                   const partEditDataForPart = partEditData[p.part_id];
                   if (partEditDataForPart) {
                     // Update all variants for this part
-                    const updatedVariants = p.variants.map(variant => {
+                    const updatedVariants = (Array.isArray(p.variants) ? p.variants : []).map(variant => {
                       const variantEditData = partEditDataForPart[variant.id];
                       if (variantEditData) {
                         return {
@@ -480,11 +540,11 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
         // Update the JSON structure in the database with final_price calculations
         try {
           // Use the updated partsRequested that includes user input, not the original from localQuotes
-          const updatedPartsRequested = quote.partsRequested.map(p => {
+          const updatedPartsRequested = (quote.partsRequested ?? []).map(p => {
             const partEditDataForPart = partEditData[p.part_id];
             if (partEditDataForPart) {
               // Update all variants for this part with user input
-              const updatedVariants = p.variants.map(variant => {
+              const updatedVariants = (Array.isArray(p.variants) ? p.variants : []).map(variant => {
                 const variantEditData = partEditDataForPart[variant.id];
                 if (variantEditData) {
                   return {
@@ -1030,34 +1090,10 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
   // Memoize the array of IDs so it doesn't change on every render
   const allQuoteIds = useMemo(() => filteredQuotes.map(q => q.id), [filteredQuotes]);
 
-  // Pagination logic - now using server-side pagination
-  const { data: quotesData, isLoading: quotesLoading } = useQuotesQuery(currentPage, quotesPerPage);
-  const totalPages = quotesData?.totalPages || 1;
-  const startIndex = (currentPage - 1) * quotesPerPage;
-  const endIndex = startIndex + (quotesData?.quotes?.length || 0);
-  const paginatedQuotes = quotesData?.quotes || [];
+  // Use paginated quotes for display
+  const quotesLoading = isLoading || false;
 
-  // Reset to first page when search term or filter changes
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [searchTerm, filter, showCompleted]);
 
-  // Pagination handlers
-  const goToPage = (page: number) => {
-    setCurrentPage(page);
-  };
-
-  const goToNextPage = () => {
-    if (currentPage < totalPages) {
-      setCurrentPage(currentPage + 1);
-    }
-  };
-
-  const goToPrevPage = () => {
-    if (currentPage > 1) {
-      setCurrentPage(currentPage - 1);
-    }
-  };
 
   const handleDeleteWithConfirm = async (quoteId: string) => {
     setShowDeleteConfirm(quoteId);
@@ -2499,20 +2535,20 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
       )}
       
       {/* Pagination Controls */}
-      {totalPages > 1 && (quotesData?.total || 0) > 0 && (
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+      {showPagination && quotes.length > 0 && (
+        <div className="mt-6 bg-white rounded-lg shadow-sm border border-gray-200 p-4">
           <div className="flex items-center justify-between">
             <div className="text-sm text-gray-700">
-              Showing {startIndex + 1} to {endIndex} of {quotesData?.total || 0} quotes
+              Showing {startIndex + 1} to {Math.min(endIndex, quotes.length)} of {quotes.length} quotes
             </div>
             
             <div className="flex items-center space-x-2">
               {/* Previous Page Button */}
               <button
                 onClick={goToPrevPage}
-                disabled={currentPage === 1}
+                disabled={uiCurrentPage === 1}
                 className={`px-3 py-2 text-sm font-medium rounded-lg border transition-colors ${
-                  currentPage === 1
+                  uiCurrentPage === 1
                     ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
                     : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50 hover:border-gray-400'
                 }`}
@@ -2522,42 +2558,30 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
               
               {/* Page Numbers */}
               <div className="flex items-center space-x-1">
-                {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
-                  // Show first page, last page, current page, and pages around current page
-                  if (
-                    page === 1 ||
-                    page === totalPages ||
-                    (page >= currentPage - 1 && page <= currentPage + 1)
-                  ) {
-                    return (
-                      <button
-                        key={page}
-                        onClick={() => goToPage(page)}
-                        className={`px-3 py-2 text-sm font-medium rounded-lg border transition-colors ${
-                          page === currentPage
-                            ? 'bg-red-600 text-white border-red-600'
-                            : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50 hover:border-gray-400'
-                        }`}
-                      >
-                        {page}
-                      </button>
-                    );
-                  } else if (
-                    page === currentPage - 2 ||
-                    page === currentPage + 2
-                  ) {
-                    return <span key={page} className="px-2 text-gray-400">...</span>;
-                  }
-                  return null;
+                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                  const page = i + 1;
+                  return (
+                    <button
+                      key={page}
+                      onClick={() => goToPage(page)}
+                      className={`px-3 py-2 text-sm font-medium rounded-lg border transition-colors ${
+                        page === uiCurrentPage
+                          ? 'bg-red-600 text-white border-red-600'
+                          : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50 hover:border-gray-400'
+                      }`}
+                    >
+                      {page}
+                    </button>
+                  );
                 })}
               </div>
               
               {/* Next Page Button */}
               <button
                 onClick={goToNextPage}
-                disabled={currentPage === totalPages}
+                disabled={uiCurrentPage === totalPages}
                 className={`px-3 py-2 text-sm font-medium rounded-lg border transition-colors ${
-                  currentPage === totalPages
+                  uiCurrentPage === totalPages
                     ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
                     : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50 hover:border-gray-400'
                 }`}

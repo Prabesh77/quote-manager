@@ -1,18 +1,21 @@
 'use client';
 
-import React from 'react';
-import QuoteTable from '@/components/ui/QuoteTable';
-import { ProtectedRoute } from '@/components/common/ProtectedRoute';
-import { useQuotesQuery } from '@/hooks/queries/useQuotesQuery';
+import { useQuotesQuery, useDeleteQuoteMutation } from '@/hooks/queries/useQuotesQuery';
 import { usePartsQuery } from '@/hooks/queries/useQuotesQuery';
+import QuoteTable from "@/components/ui/QuoteTable";
+import { ProtectedRoute } from "@/components/common/ProtectedRoute";
+import { useState } from 'react';
 
 export default function VerifyPricePage() {
-  // Get all quotes for verify price page (no pagination needed here)
-  const { data: quotesData, isLoading: quotesLoading } = useQuotesQuery(1, 1000); // Get all quotes
+  // Server-side pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+
+  // Get quotes for verify price page with server-side pagination (1 per page)
+  const { data: quotesData, isLoading: quotesLoading } = useQuotesQuery(currentPage, 1, { status: 'waiting_verification' });
   const { data: parts, isLoading: partsLoading } = usePartsQuery();
   
-  // Filter quotes to only show quotes that need verification
-  const quotesToVerify = quotesData?.quotes?.filter(quote => quote.status === 'priced') || [];
+  // Use the actual delete quote mutation
+  const deleteQuoteMutation = useDeleteQuoteMutation();
 
   // Placeholder functions for now - these will need to be implemented with the new API
   const updateQuote = async (id: string, fields: Record<string, any>) => {
@@ -21,8 +24,12 @@ export default function VerifyPricePage() {
   };
 
   const deleteQuote = async (id: string) => {
-    // TODO: Implement with new API
-    return { error: new Error('Not implemented yet') };
+    try {
+      await deleteQuoteMutation.mutateAsync(id);
+      return { error: null };
+    } catch (error) {
+      return { error: error instanceof Error ? error : new Error('Unknown error') };
+    }
   };
 
   const updatePart = async (id: string, updates: any) => {
@@ -71,8 +78,9 @@ export default function VerifyPricePage() {
     <ProtectedRoute allowedRoles={['quality_controller', 'admin']}>
       <div className="py-6">
         <h1 className="text-2xl font-bold text-gray-900 mb-6">Verify Price</h1>
+        <p className="text-gray-600 mb-6">Verify and approve quotes that have been priced.</p>
         <QuoteTable
-          quotes={quotesToVerify}
+          quotes={quotesData?.quotes || []}
           parts={parts || []}
           onUpdateQuote={handleUpdateQuote}
           onDeleteQuote={deleteQuote}
@@ -81,7 +89,15 @@ export default function VerifyPricePage() {
           onMarkCompleted={markQuoteCompleted}
           onMarkAsOrdered={markQuoteAsOrdered}
           showCompleted={false}
+          defaultFilter="priced"
           isLoading={quotesLoading || partsLoading}
+          showPagination={true}
+          // Server pagination props
+          currentPage={currentPage}
+          totalPages={quotesData?.totalPages || 1}
+          total={quotesData?.total || 0}
+          pageSize={1}
+          onPageChange={setCurrentPage}
         />
       </div>
     </ProtectedRoute>

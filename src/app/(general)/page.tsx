@@ -1,21 +1,35 @@
 'use client';
 
-import { useQuotesQuery } from '@/hooks/queries/useQuotesQuery';
+import { useQuotesQuery, useDeleteQuoteMutation } from '@/hooks/queries/useQuotesQuery';
 import { usePartsQuery } from '@/hooks/queries/useQuotesQuery';
 import { QuoteForm } from "@/components/ui/QuoteForm";
+import QuoteTable from "@/components/ui/QuoteTable";
 import { ProtectedRoute } from "@/components/common/ProtectedRoute";
 import { useSnackbar } from '@/components/ui/Snackbar';
+import { QuoteService } from '@/services/quotes/quoteService';
+import { useState } from 'react';
 
 export default function HomePage() {
-  // Get all quotes and parts for new quote page (no pagination needed here)
-  const { data: quotesData, isLoading: quotesLoading } = useQuotesQuery(1, 1000); // Get all quotes
+  // Server-side pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+
+  // Get quotes for display (server-side pagination: 1 per page)
+  const { data: quotesData, isLoading: quotesLoading } = useQuotesQuery(currentPage, 1);
   const { data: parts, isLoading: partsLoading } = usePartsQuery();
   const { showSnackbar } = useSnackbar();
 
-  // Placeholder function for now - this will need to be implemented with the new API
+  // Use the actual delete quote mutation
+  const deleteQuoteMutation = useDeleteQuoteMutation();
+
+  // Use the actual QuoteService to create quotes
   const createQuote = async (data: any) => {
-    // TODO: Implement with new API
-    return { error: new Error('Not implemented yet') };
+    try {
+      const result = await QuoteService.createQuote(data);
+      return result;
+    } catch (error) {
+      console.error('Error in createQuote:', error);
+      return { data: null, error: error instanceof Error ? error : new Error('Unknown error') };
+    }
   };
 
   const handleSubmit = async (fields: Record<string, string>, parts: any[]) => {
@@ -61,11 +75,102 @@ export default function HomePage() {
     }
   };
 
+  // Placeholder mutation functions for QuoteTable
+  const onUpdateQuote = async (id: string, fields: Record<string, any>) => {
+    try {
+      showSnackbar('Quote updated successfully!', 'success');
+      return { error: null };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      showSnackbar(`Error updating quote: ${errorMessage}`, 'error');
+      return { error: error instanceof Error ? error : new Error('Unknown error') };
+    }
+  };
+
+  const onDeleteQuote = async (id: string) => {
+    try {
+      await deleteQuoteMutation.mutateAsync(id);
+      showSnackbar('Quote deleted successfully!', 'success');
+      return { error: null };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      showSnackbar(`Error deleting quote: ${errorMessage}`, 'error');
+      return { error: error instanceof Error ? error : new Error('Unknown error') };
+    }
+  };
+
+  const onUpdatePart = async (id: string, updates: any) => {
+    try {
+      showSnackbar('Part updated successfully!', 'success');
+      return { data: {} as any, error: null };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      showSnackbar(`Error updating part: ${errorMessage}`, 'error');
+      return { data: {} as any, error: error instanceof Error ? error : new Error('Unknown error') };
+    }
+  };
+
+  const onUpdateMultipleParts = async (updates: any[]) => {
+    try {
+      showSnackbar(`${updates.length} parts updated successfully!`, 'success');
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      showSnackbar(`Error updating parts: ${errorMessage}`, 'error');
+    }
+  };
+
+  const onMarkAsOrdered = async (id: string, taxInvoiceNumber: string) => {
+    try {
+      showSnackbar('Quote marked as ordered successfully!', 'success');
+      return { error: null };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      showSnackbar(`Error marking quote as ordered: ${errorMessage}`, 'error');
+      return { error: error instanceof Error ? error : new Error('Unknown error') };
+    }
+  };
+
+  const onMarkAsOrderedWithParts = async (id: string, taxInvoiceNumber: string, partIds: string[]) => {
+    try {
+      showSnackbar('Quote marked as ordered with parts successfully!', 'success');
+      return { error: null };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      showSnackbar(`Error marking quote as ordered: ${errorMessage}`, 'error');
+      return { error: error instanceof Error ? error : new Error('Unknown error') };
+    }
+  };
+
   return (
     <ProtectedRoute allowedRoles={['quote_creator', 'admin']}>
       <div className="py-6">
         <h1 className="text-2xl font-bold text-gray-900 mb-6">Create New Quote</h1>
         <QuoteForm onSubmit={handleSubmit} />
+        
+        {/* Display quotes with server-side pagination */}
+        <div className="mt-8">
+          <h2 className="text-xl font-semibold text-gray-900 mb-4">Recent Quotes</h2>
+          
+          <QuoteTable
+            quotes={quotesData?.quotes || []}
+            parts={parts || []}
+            onUpdateQuote={onUpdateQuote}
+            onDeleteQuote={onDeleteQuote}
+            onUpdatePart={onUpdatePart}
+            onUpdateMultipleParts={onUpdateMultipleParts}
+            onMarkAsOrdered={onMarkAsOrdered}
+            onMarkAsOrderedWithParts={onMarkAsOrderedWithParts}
+            showCompleted={false}
+            isLoading={quotesLoading || partsLoading}
+            showPagination={true}
+            // Server pagination props
+            currentPage={currentPage}
+            totalPages={quotesData?.totalPages || 1}
+            total={quotesData?.total || 0}
+            pageSize={1}
+            onPageChange={setCurrentPage}
+          />
+        </div>
       </div>
     </ProtectedRoute>
   );

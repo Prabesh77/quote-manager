@@ -1,17 +1,21 @@
 'use client';
 
-import { useQuotesQuery } from '@/hooks/queries/useQuotesQuery';
+import { useQuotesQuery, useDeleteQuoteMutation } from '@/hooks/queries/useQuotesQuery';
 import { usePartsQuery } from '@/hooks/queries/useQuotesQuery';
 import QuoteTable from "@/components/ui/QuoteTable";
 import { ProtectedRoute } from "@/components/common/ProtectedRoute";
+import { useState } from 'react';
 
 export default function PricingPage() {
-  // Get all quotes for pricing page (no pagination needed here)
-  const { data: quotesData, isLoading: quotesLoading } = useQuotesQuery(1, 1000); // Get all quotes
+  // Server-side pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+
+  // Get quotes for pricing page with server-side pagination (1 per page)
+  const { data: quotesData, isLoading: quotesLoading } = useQuotesQuery(currentPage, 1, { status: 'unpriced' });
   const { data: parts, isLoading: partsLoading } = usePartsQuery();
   
-  // Filter quotes to only show unpriced quotes
-  const unpricedQuotes = quotesData?.quotes?.filter(quote => quote.status === 'unpriced') || [];
+  // Use the actual delete quote mutation
+  const deleteQuoteMutation = useDeleteQuoteMutation();
 
   // Placeholder functions for now - these will need to be implemented with the new API
   const updateQuote = async (id: string, fields: Record<string, any>) => {
@@ -20,8 +24,12 @@ export default function PricingPage() {
   };
 
   const deleteQuote = async (id: string) => {
-    // TODO: Implement with new API
-    return { error: new Error('Not implemented yet') };
+    try {
+      await deleteQuoteMutation.mutateAsync(id);
+      return { error: null };
+    } catch (error) {
+      return { error: error instanceof Error ? error : new Error('Unknown error') };
+    }
   };
 
   const updatePart = async (id: string, updates: any) => {
@@ -53,7 +61,7 @@ export default function PricingPage() {
   const handleUpdatePart = async (id: string, updates: any): Promise<{ data: any; error: Error | null }> => {
     const result = await updatePart(id, updates);
     if (result.error) {
-      return { data: null, error: result.error };
+      return { data: result.data || null, error: result.error };
     }
     return { data: result.data || null, error: null };
   };
@@ -72,7 +80,7 @@ export default function PricingPage() {
         <h1 className="text-2xl font-bold text-gray-900 mb-6">Quote Pricing</h1>
         <p className="text-gray-600 mb-6">Price pending quotes that need initial pricing.</p>
         <QuoteTable
-          quotes={unpricedQuotes}
+          quotes={quotesData?.quotes || []}
           parts={parts || []}
           onUpdateQuote={handleUpdateQuote}
           onDeleteQuote={deleteQuote}
@@ -83,6 +91,13 @@ export default function PricingPage() {
           showCompleted={false}
           defaultFilter="unpriced"
           isLoading={quotesLoading || partsLoading}
+          showPagination={true}
+          // Server pagination props
+          currentPage={currentPage}
+          totalPages={quotesData?.totalPages || 1}
+          total={quotesData?.total || 0}
+          pageSize={1}
+          onPageChange={setCurrentPage}
         />
       </div>
     </ProtectedRoute>

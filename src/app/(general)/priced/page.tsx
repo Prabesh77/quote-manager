@@ -1,7 +1,6 @@
 'use client';
 
-import { useQuotesQuery, useDeleteQuoteMutation } from '@/hooks/queries/useQuotesQuery';
-import { usePartsQuery } from '@/hooks/queries/useQuotesQuery';
+import { useQuotesQuery, useDeleteQuoteMutation, useQuotePartsFromJson, useUpdatePartInQuoteJsonMutation } from '@/hooks/queries/useQuotesQuery';
 import QuoteTable from "@/components/ui/QuoteTable";
 import { ProtectedRoute } from "@/components/common/ProtectedRoute";
 import { useState } from 'react';
@@ -12,10 +11,16 @@ export default function PricedPage() {
 
   // Get quotes for priced page with server-side pagination (1 per page)
   const { data: quotesData, isLoading: quotesLoading } = useQuotesQuery(currentPage, 1, { status: 'priced' });
-  const { data: parts, isLoading: partsLoading } = usePartsQuery();
   
-  // Use the actual delete quote mutation
+  // Get the current quote ID for fetching only related parts
+  const currentQuoteId = quotesData?.quotes?.[0]?.id;
+  
+  // Fetch only parts related to the current quote from parts_requested JSON column
+  const { data: parts, isLoading: partsLoading } = useQuotePartsFromJson(currentQuoteId || '');
+  
+  // Use the actual mutations
   const deleteQuoteMutation = useDeleteQuoteMutation();
+  const updatePartMutation = useUpdatePartInQuoteJsonMutation();
 
   // Placeholder functions for now - these will need to be implemented with the new API
   const updateQuote = async (id: string, fields: Record<string, any>) => {
@@ -33,13 +38,40 @@ export default function PricedPage() {
   };
 
   const updatePart = async (id: string, updates: any) => {
-    // TODO: Implement with new API
-    return { data: null, error: new Error('Not implemented yet') };
+    if (!currentQuoteId) {
+      return { data: null, error: new Error('No quote selected') };
+    }
+
+    try {
+      const result = await updatePartMutation.mutateAsync({ quoteId: currentQuoteId, partId: id, updates });
+      return { data: result.data, error: null };
+    } catch (error) {
+      return { data: null, error: error instanceof Error ? error : new Error('Unknown error') };
+    }
   };
 
   const updateMultipleParts = async (updates: Array<{ id: string; updates: any }>) => {
-    // TODO: Implement with new API
-    console.log('Update multiple parts:', updates);
+    if (!currentQuoteId) {
+      console.error('No quote selected for multiple parts update');
+      return;
+    }
+
+    console.log('🔄 Updating multiple parts:', updates);
+    
+    try {
+      // Update each part individually using the mutation
+      for (const { id, updates: partUpdates } of updates) {
+        console.log(`🔄 Updating part ${id}:`, partUpdates);
+        try {
+          await updatePartMutation.mutateAsync({ quoteId: currentQuoteId, partId: id, updates: partUpdates });
+          console.log(`✅ Successfully updated part ${id}`);
+        } catch (error) {
+          console.error(`❌ Error updating part ${id}:`, error);
+        }
+      }
+    } catch (error) {
+      console.error('❌ Error in updateMultipleParts:', error);
+    }
   };
 
   const markQuoteCompleted = async (id: string) => {

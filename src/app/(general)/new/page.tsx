@@ -1,14 +1,12 @@
 'use client';
 
-import { useQuotesQuery } from '@/hooks/queries/useQuotesQuery';
 import { usePartsQuery } from '@/hooks/queries/useQuotesQuery';
 import { QuoteForm } from "@/components/ui/QuoteForm";
 import { ProtectedRoute } from "@/components/common/ProtectedRoute";
 import { useSnackbar } from '@/components/ui/Snackbar';
 
 export default function NewQuotePage() {
-  // Get all quotes and parts for new quote page (no pagination needed here)
-  const { data: quotesData, isLoading: quotesLoading } = useQuotesQuery(1, 1000); // Get all quotes
+  // Only need parts for the form, not quotes
   const { data: parts, isLoading: partsLoading } = usePartsQuery();
   const { showSnackbar } = useSnackbar();
 

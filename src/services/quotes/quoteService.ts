@@ -393,7 +393,8 @@ export class QuoteService {
           vehicle_id: vehicleId,
           status: 'unpriced',
           notes: quoteData.notes,
-          required_by: requiredByIso
+          required_by: requiredByIso,
+          quote_ref: quoteData.quoteRef
         })
         .select('id')
         .single();
@@ -401,10 +402,12 @@ export class QuoteService {
       if (quoteError) throw quoteError;
       const quoteId = quote.id;
 
-      // Step 4: Create parts and quote_parts
+      // Step 4: Create parts and parts_requested JSON structure
       if (quoteData.parts && quoteData.parts.length > 0) {
+        const createdParts: Array<{ id: string; name: string; number: string }> = [];
+        
+        // Create parts in parts table
         for (const partData of quoteData.parts) {
-          // Create part
           const { data: part, error: partError } = await supabase
             .from('parts')
             .insert({
@@ -413,23 +416,30 @@ export class QuoteService {
               part_number: partData.number,
               price: partData.price
             })
-            .select('id')
+            .select('id, part_name, part_number')
             .single();
           
           if (partError) throw partError;
-
-          // Create quote_part relationship
-          const { error: quotePartError } = await supabase
-            .from('quote_parts')
-            .insert({
-              quote_id: quoteId,
-              part_id: part.id,
-              final_price: partData.price,
-              note: partData.note
-            });
-          
-          if (quotePartError) throw quotePartError;
+          createdParts.push({
+            id: part.id,
+            name: part.part_name,
+            number: part.part_number
+          });
         }
+
+        // Create parts_requested JSON structure for the quote using actual part IDs
+        const partsRequested = createdParts.map(part => ({
+          part_id: part.id, // Use the actual part ID from the parts table
+          variants: [] // Empty variants array initially - notes and prices will be added here during pricing
+        }));
+
+        // Update the quote with parts_requested JSON
+        const { error: updateError } = await supabase
+          .from('quotes')
+          .update({ parts_requested: partsRequested })
+          .eq('id', quoteId);
+
+        if (updateError) throw updateError;
       }
 
       // Return the created quote in legacy format for compatibility

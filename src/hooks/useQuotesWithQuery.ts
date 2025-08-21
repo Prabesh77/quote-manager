@@ -10,7 +10,7 @@ import {
   useUpdatePartMutation,
   useAddPartMutation,
   useDeletePartMutation,
-  useUpdateMultiplePartsMutation,
+
   useQuotePartsQuery,
   useUpdateQuotePartMutation
 } from './queries/useQuotesQuery';
@@ -33,7 +33,7 @@ export const useQuotes = () => {
   const updatePartMutation = useUpdatePartMutation();
   const addPartMutation = useAddPartMutation();
   const deletePartMutation = useDeletePartMutation();
-  const updateMultiplePartsMutation = useUpdateMultiplePartsMutation();
+
 
   // Update connection status based on query states
   useEffect(() => {
@@ -103,8 +103,13 @@ export const useQuotes = () => {
 
   const updateMultipleParts = async (updates: Array<{ id: string; updates: Partial<Part> }>) => {
     try {
-      const updatedParts = await updateMultiplePartsMutation.mutateAsync(updates);
-      return { data: updatedParts, error: null };
+      // Process updates sequentially to avoid race conditions
+      const results = [];
+      for (const { id, updates: partUpdates } of updates) {
+        const result = await updatePartMutation.mutateAsync({ id, updates: partUpdates });
+        results.push(result);
+      }
+      return { data: results, error: null };
     } catch (error) {
       return { data: null, error: error instanceof Error ? error : new Error(String(error)) };
     }

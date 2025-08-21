@@ -1,10 +1,11 @@
 'use client';
 
-import { useQuotesQuery, useDeleteQuoteMutation } from '@/hooks/queries/useQuotesQuery';
-import { usePartsQuery } from '@/hooks/queries/useQuotesQuery';
+import { useQuotesQuery, useDeleteQuoteMutation, useQuotePartsFromJson, useUpdatePartInQuoteJsonMutation } from '@/hooks/queries/useQuotesQuery';
 import QuoteTable from "@/components/ui/QuoteTable";
 import { ProtectedRoute } from "@/components/common/ProtectedRoute";
 import { useState } from 'react';
+import supabase from '@/utils/supabase';
+import { PartWithVariants } from '@/types/part';
 
 export default function PricingPage() {
   // Server-side pagination state
@@ -12,10 +13,18 @@ export default function PricingPage() {
 
   // Get quotes for pricing page with server-side pagination (1 per page)
   const { data: quotesData, isLoading: quotesLoading } = useQuotesQuery(currentPage, 1, { status: 'unpriced' });
-  const { data: parts, isLoading: partsLoading } = usePartsQuery();
   
-  // Use the actual delete quote mutation
+  // Get the current quote ID for fetching only related parts
+  const currentQuoteId = quotesData?.quotes?.[0]?.id;
+  
+  // Fetch only parts related to the current quote from parts_requested JSON column
+  const { data: parts, isLoading: partsLoading } = useQuotePartsFromJson(currentQuoteId || '') as { data: PartWithVariants[] | undefined; isLoading: boolean };
+  
+
+  
+  // Use the actual mutations
   const deleteQuoteMutation = useDeleteQuoteMutation();
+  const updatePartMutation = useUpdatePartInQuoteJsonMutation();
 
   // Placeholder functions for now - these will need to be implemented with the new API
   const updateQuote = async (id: string, fields: Record<string, any>) => {
@@ -33,13 +42,42 @@ export default function PricingPage() {
   };
 
   const updatePart = async (id: string, updates: any) => {
-    // TODO: Implement with new API
-    return { data: null, error: new Error('Not implemented yet') };
+    if (!currentQuoteId) {
+      return { data: {} as any, error: new Error('No quote selected') };
+    }
+
+    try {
+      const result = await updatePartMutation.mutateAsync({ quoteId: currentQuoteId, partId: id, updates });
+      return { data: result.data, error: null };
+    } catch (error) {
+      return { data: {} as any, error: error instanceof Error ? error : new Error('Unknown error') };
+    }
   };
 
   const updateMultipleParts = async (updates: Array<{ id: string; updates: any }>) => {
-    // TODO: Implement with new API
-    console.log('Update multiple parts:', updates);
+    if (!currentQuoteId) {
+      console.error('No quote selected for multiple parts update');
+      return;
+    }
+
+    console.log('🔄 Updating multiple parts:', updates);
+    
+    try {
+      // Update each part individually using the mutation
+      for (const { id, updates: partUpdates } of updates) {
+        console.log(`🔄 Updating part ${id}:`, partUpdates);
+        try {
+          await updatePartMutation.mutateAsync({ quoteId: currentQuoteId, partId: id, updates: partUpdates });
+          console.log(`✅ Successfully updated part ${id}`);
+        } catch (error) {
+          console.error(`❌ Error updating part ${id}:`, error);
+        }
+      }
+      
+
+    } catch (error) {
+      console.error('❌ Error in updateMultipleParts:', error);
+    }
   };
 
   const markQuoteCompleted = async (id: string) => {
@@ -79,6 +117,15 @@ export default function PricingPage() {
       <div className="py-6">
         <h1 className="text-2xl font-bold text-gray-900 mb-6">Quote Pricing</h1>
         <p className="text-gray-600 mb-6">Price pending quotes that need initial pricing.</p>
+
+        {(() => { 
+          console.log('🎯 Parts data being passed to QuoteTable:', parts);
+          console.log('🎯 First part variants:', parts?.[0]?.variants);
+          console.log('🎯 First part price:', parts?.[0]?.price);
+          console.log('🎯 First part first variant:', parts?.[0]?.variants?.[0]);
+          console.log('🎯 First part first variant final_price:', parts?.[0]?.variants?.[0]?.final_price);
+          return null; 
+        })()}
         <QuoteTable
           quotes={quotesData?.quotes || []}
           parts={parts || []}

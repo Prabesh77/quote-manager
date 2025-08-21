@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { ChevronDown, ChevronRight, Edit, Trash2, Save, X, Search, Eye, Copy, Car, CheckCircle, AlertTriangle, ShoppingCart, Package, Edit3, Plus } from 'lucide-react';
 import { Quote, Part } from './useQuotes';
+
 import { SkeletonLoader } from './SkeletonLoader';
 import {
   Accordion,
@@ -1710,14 +1711,16 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                     const isPartEditing = editingParts === quote.id;
                                     const localQuote = localQuotes.find(q => q.id === quote.id);
                                     const quotePart = localQuote?.partsRequested?.find(qp => qp.part_id === part.id);
+                                    console.log({quotePart});
                                     // Only create fallback variant if no variants exist AND we're not editing
-                                    // This prevents interference with user-added variants
-                                    const variants = quotePart?.variants && quotePart.variants.length > 0 
-                                      ? quotePart.variants 
+                                    // Use our transformed data with variants, fallback to part data if no variants
+                                    const partWithVariants = part as any; // Cast to access variants
+                                    const variants = partWithVariants.variants && partWithVariants.variants.length > 0 
+                                      ? partWithVariants.variants 
                                       : [{ 
                                           id: 'default', 
                                           note: part.note, 
-                                          final_price: null, // No base price, only variant prices
+                                          final_price: part.price, // Use part.price as fallback
                                           is_default: true 
                                         }];
                                     

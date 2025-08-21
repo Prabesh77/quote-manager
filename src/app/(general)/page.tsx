@@ -1,7 +1,6 @@
 'use client';
 
-import { useQuotesQuery, useDeleteQuoteMutation } from '@/hooks/queries/useQuotesQuery';
-import { usePartsQuery } from '@/hooks/queries/useQuotesQuery';
+import { useQuotesQuery, useDeleteQuoteMutation, useQuotePartsFromJson, useUpdatePartInQuoteJsonMutation } from '@/hooks/queries/useQuotesQuery';
 import { QuoteForm } from "@/components/ui/QuoteForm";
 import QuoteTable from "@/components/ui/QuoteTable";
 import { ProtectedRoute } from "@/components/common/ProtectedRoute";
@@ -15,11 +14,17 @@ export default function HomePage() {
 
   // Get quotes for display (server-side pagination: 1 per page)
   const { data: quotesData, isLoading: quotesLoading } = useQuotesQuery(currentPage, 1);
-  const { data: parts, isLoading: partsLoading } = usePartsQuery();
+  
+  // Get the current quote ID for fetching only related parts
+  const currentQuoteId = quotesData?.quotes?.[0]?.id;
+  
+  // Fetch only parts related to the current quote from parts_requested JSON column
+  const { data: parts, isLoading: partsLoading } = useQuotePartsFromJson(currentQuoteId || '');
   const { showSnackbar } = useSnackbar();
 
-  // Use the actual delete quote mutation
+  // Use the actual mutations
   const deleteQuoteMutation = useDeleteQuoteMutation();
+  const updatePartMutation = useUpdatePartInQuoteJsonMutation();
 
   // Use the actual QuoteService to create quotes
   const createQuote = async (data: any) => {
@@ -101,8 +106,13 @@ export default function HomePage() {
 
   const onUpdatePart = async (id: string, updates: any) => {
     try {
-      showSnackbar('Part updated successfully!', 'success');
-      return { data: {} as any, error: null };
+      if (!currentQuoteId) {
+        showSnackbar('No quote selected', 'error');
+        return { data: {} as any, error: new Error('No quote selected') };
+      }
+
+      const result = await updatePartMutation.mutateAsync({ quoteId: currentQuoteId, partId: id, updates });
+      return { data: result.data, error: null };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       showSnackbar(`Error updating part: ${errorMessage}`, 'error');
@@ -110,8 +120,27 @@ export default function HomePage() {
     }
   };
 
-  const onUpdateMultipleParts = async (updates: any[]) => {
+  const onUpdateMultipleParts = async (updates: Array<{ id: string; updates: any }>) => {
+    if (!currentQuoteId) {
+      showSnackbar('No quote selected', 'error');
+      return;
+    }
+
     try {
+      console.log('🔄 Updating multiple parts:', updates);
+      
+      // Update each part individually using the mutation
+      for (const { id, updates: partUpdates } of updates) {
+        console.log(`🔄 Updating part ${id}:`, partUpdates);
+        try {
+          await updatePartMutation.mutateAsync({ quoteId: currentQuoteId, partId: id, updates: partUpdates });
+          console.log(`✅ Successfully updated part ${id}`);
+        } catch (error) {
+          console.error(`❌ Error updating part ${id}:`, error);
+          showSnackbar(`Error updating part ${id}`, 'error');
+        }
+      }
+      
       showSnackbar(`${updates.length} parts updated successfully!`, 'success');
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';

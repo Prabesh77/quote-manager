@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Plus, DollarSign, CheckCircle, ShoppingCart, FileText, BarChart3, Menu, X, Eye, User, LogOut, ChevronDown, Users } from 'lucide-react';
 import { ConnectionStatus } from '@/components/common';
-import { useQuotes } from '@/hooks/quotes/useQuotes';
+
 import { useAuth } from '@/components/providers/AuthProvider';
 import { useUserProfile } from '@/hooks/useUserProfile';
 
@@ -14,7 +14,7 @@ const Navigation = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
-  const { connectionStatus } = useQuotes();
+
   const { user, signOut } = useAuth();
   const { profile, loading } = useUserProfile();
   const profileDropdownRef = useRef<HTMLDivElement>(null);
@@ -189,7 +189,7 @@ const Navigation = () => {
           {/* Right side - User Profile, Connection Status & Mobile Menu Button */}
           <div className="flex items-center">
             <div className="ml-4 flex items-center space-x-4">
-              <ConnectionStatus status={connectionStatus} />
+              <ConnectionStatus status="connected" />
               
               {/* User Profile Dropdown */}
               {user && (

@@ -59,18 +59,17 @@ const fetchQuotes = async (page: number = 1, limit: number = 20, filters?: { sta
 
     // Convert normalized quotes to legacy format for QuoteTable compatibility
     const legacyQuotes: Quote[] = (normalizedQuotes || []).map(normalizedQuote => {
-      // Use new JSON parts_requested if available, otherwise fall back to quote_parts table
+      // Use JSON parts_requested for all quotes
       let partsRequested: any[] = [];
       let partIds = '';
 
       if (normalizedQuote.parts_requested && Array.isArray(normalizedQuote.parts_requested)) {
-        // New JSON format
         partsRequested = normalizedQuote.parts_requested;
         partIds = partsRequested.map(p => p.part_id).join(',');
       } else {
-        // Legacy format - this will be removed after migration
+        // Fallback for quotes without parts
         partsRequested = [];
-        partIds = ''; // Will be populated by legacy logic if needed
+        partIds = '';
       }
 
       const legacyQuote = {
@@ -125,15 +124,15 @@ const fetchParts = async (): Promise<Part[]> => {
       throw new Error(error.message);
     }
 
-    // Convert normalized parts to legacy format
-    const legacyParts: Part[] = (normalizedParts || []).map(part => ({
-      id: part.id,
-      name: part.part_name,
-      number: part.part_number || '',
-      price: part.price,
-      note: '', // Notes are now stored in quote_parts, not parts
-      createdAt: part.created_at,
-    }));
+          // Convert normalized parts to legacy format
+      const legacyParts: Part[] = (normalizedParts || []).map(part => ({
+        id: part.id,
+        name: part.part_name,
+        number: part.part_number || '',
+        price: part.price,
+        note: '', // Notes are now stored in parts_requested JSON, not parts table
+        createdAt: part.created_at,
+      }));
 
     return legacyParts;
   } catch (error) {
@@ -166,53 +165,16 @@ export const usePartsQuery = () => {
   });
 };
 
-// Query to get quote parts with quote-specific data (price and notes)
+// DEPRECATED: This function used the old quote_parts table
+// Use useQuotePartsFromJson instead for JSON-based quote parts
 export const useQuotePartsQuery = (quoteId: string) => {
+  console.warn('useQuotePartsQuery is deprecated. Use useQuotePartsFromJson instead.');
   return useQuery({
     queryKey: [...queryKeys.quotesBase, 'parts', quoteId],
     queryFn: async () => {
-      if (!quoteId) return [];
-
-      const { data: quotePartsData, error } = await supabase
-        .from('quote_parts')
-        .select(`
-          id,
-          final_price,
-          note,
-          part:parts(
-            id,
-            part_name,
-            part_number,
-            price,
-            created_at
-          )
-        `)
-        .eq('quote_id', quoteId);
-
-      if (error) {
-        console.error('Error fetching quote parts:', error);
-        throw new Error(error.message);
-      }
-
-      // Convert to QuotePart format with quote-specific data
-      const quoteParts: QuotePart[] = (quotePartsData || []).map(qp => {
-        const part = qp.part as any; // Cast to any to handle Supabase nested object typing
-        return {
-          quotePartId: qp.id,
-          quoteId: quoteId,
-          partId: part?.id || '',
-          finalPrice: qp.final_price || null,
-          note: qp.note || '',
-          partName: part?.part_name || '',
-          partNumber: part?.part_number || '',
-          basePrice: part?.price || null,
-          createdAt: part?.created_at || '',
-        };
-      });
-
-      return quoteParts;
+      throw new Error('useQuotePartsQuery is deprecated. Use useQuotePartsFromJson instead.');
     },
-    enabled: !!quoteId,
+    enabled: false, // Disabled to prevent usage
   });
 };
 

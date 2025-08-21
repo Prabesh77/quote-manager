@@ -1,11 +1,10 @@
 'use client';
 
-import { useQuotesQuery, useDeleteQuoteMutation, useQuotePartsFromJson, useUpdatePartInQuoteJsonMutation } from '@/hooks/queries/useQuotesQuery';
+import { useQuotesQuery, useDeleteQuoteMutation, useQuotePartsFromJson, useUpdatePartInQuoteJsonMutation, useCreateQuoteMutation } from '@/hooks/queries/useQuotesQuery';
 import { QuoteForm } from "@/components/ui/QuoteForm";
 import QuoteTable from "@/components/ui/QuoteTable";
 import { ProtectedRoute } from "@/components/common/ProtectedRoute";
 import { useSnackbar } from '@/components/ui/Snackbar';
-import { QuoteService } from '@/services/quotes/quoteService';
 import { useState } from 'react';
 
 export default function HomePage() {
@@ -25,21 +24,11 @@ export default function HomePage() {
   // Use the actual mutations
   const deleteQuoteMutation = useDeleteQuoteMutation();
   const updatePartMutation = useUpdatePartInQuoteJsonMutation();
-
-  // Use the actual QuoteService to create quotes
-  const createQuote = async (data: any) => {
-    try {
-      const result = await QuoteService.createQuote(data);
-      return result;
-    } catch (error) {
-      console.error('Error in createQuote:', error);
-      return { data: null, error: error instanceof Error ? error : new Error('Unknown error') };
-    }
-  };
+  const createQuoteMutation = useCreateQuoteMutation();
 
   const handleSubmit = async (fields: Record<string, string>, parts: any[]) => {
     try {
-      const result = await createQuote({
+      const quoteData = {
         customer: {
           name: fields.customer,
           phone: fields.phone || '',
@@ -66,12 +55,9 @@ export default function HomePage() {
         notes: '',
         requiredBy: fields.requiredBy || '',
         quoteRef: fields.quoteRef
-      });
+      };
 
-      if (result.error) {
-        throw result.error;
-      }
-
+      await createQuoteMutation.mutateAsync(quoteData);
       showSnackbar('Quote created successfully!', 'success');
     } catch (error) {
       console.error('Quote creation failed:', error);

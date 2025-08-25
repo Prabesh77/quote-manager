@@ -962,7 +962,16 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
   // Function to handle quote verification confirmation
   const handleVerifyQuote = async (quoteId: string) => {
     try {
-      await onUpdateQuote(quoteId, { status: 'priced' });
+      const result = await onUpdateQuote(quoteId, { status: 'priced' });
+      
+      if (result.error) {
+        console.error('❌ Error verifying quote:', result.error);
+        // You could show a snackbar or error message here
+        return;
+      }
+      
+      console.log('✅ Quote verified successfully, status updated to "priced"');
+      // The UI will automatically refresh due to query invalidation
     } catch (error) {
       console.error('❌ Error verifying quote:', error);
     }
@@ -1128,10 +1137,13 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
   const confirmOrder = async () => {
     if (!showOrderConfirm || !taxInvoiceNumber.trim()) return;
     
+    console.log('🔍 confirmOrder called with:', { showOrderConfirm, taxInvoiceNumber, selectedPartIds });
+    
     let result: { error: Error | null } = { error: null };
     
     // Use onMarkAsOrderedWithParts if available (with part selection)
     if (onMarkAsOrderedWithParts) {
+      console.log('🔍 Using onMarkAsOrderedWithParts');
       // Validate that at least one part is selected
       if (selectedPartIds.length === 0) {
         alert('Please select at least one part to order');
@@ -1146,20 +1158,27 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
     } 
     // Fall back to onMarkAsOrdered (simple case without part selection)
     else if (onMarkAsOrdered) {
+      console.log('🔍 Using onMarkAsOrdered');
       result = await onMarkAsOrdered(
         showOrderConfirm,
         taxInvoiceNumber.trim()
       );
     }
     else {
+      console.log('❌ Neither onMarkAsOrderedWithParts nor onMarkAsOrdered is available');
       // Neither function is available
       return;
     }
+    
+    console.log('🔍 Order result:', result);
     
     if (!result.error) {
       setShowOrderConfirm(null);
       setTaxInvoiceNumber('');
       setSelectedPartIds([]);
+      console.log('✅ Order confirmed successfully');
+    } else {
+      console.error('❌ Error confirming order:', result.error);
     }
   };
 
@@ -1599,6 +1618,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
+                              console.log('🔍 Verify button clicked for quote:', quote.id);
                               handleVerifyQuote(quote.id);
                             }}
                             className="p-1 bg-green-600 hover:bg-green-700 text-white rounded-full transition-colors cursor-pointer"
@@ -1612,6 +1632,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
+                              console.log('🔍 Mark as Completed button clicked for quote:', quote.id);
                               onMarkCompleted(quote.id);
                             }}
                             className="p-1 text-green-600 hover:text-green-700 hover:bg-green-100 rounded transition-colors cursor-pointer"
@@ -1729,7 +1750,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                     return (
                                       <>
                                         {/* Primary Variant Row */}
-                                        {variants.map((variant, index) => (
+                                        {variants.map((variant: any, index: number) => (
                                           <tr key={`${part.id}_${variant.id}`} className={`${index === 0 ? 'bg-white border-b border-gray-100' : 'bg-gray-50/50 border-b border-gray-100/50'}`}>
                                             <td className="px-4 py-1">
                                               <div className="flex items-center space-x-3">
@@ -2083,6 +2104,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
+                                console.log('🔍 Verify button clicked for quote (second location):', quote.id);
                                 handleVerifyQuote(quote.id);
                               }}
                               className="p-1 bg-green-600 hover:bg-green-700 text-white rounded-full transition-colors cursor-pointer"
@@ -2096,6 +2118,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                   <button
                                     onClick={(e) => {
                                       e.stopPropagation();
+                                      console.log('🔍 Mark as Completed button clicked for quote (second location):', quote.id);
                                       onMarkCompleted(quote.id);
                                     }}
                               className="p-2 text-green-600 hover:text-green-700 hover:bg-green-100 rounded transition-colors cursor-pointer"

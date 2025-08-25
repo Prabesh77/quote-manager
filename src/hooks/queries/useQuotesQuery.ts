@@ -305,14 +305,14 @@ export const updatePartInQuoteJson = async (quoteId: string, partId: string, upd
     // Update the part in the JSON structure using variants
     const updatedPartsRequested = quote.parts_requested.map((partItem: any) => {
       if (partItem.part_id === partId) {
-        let updatedPart = { ...partItem };
+        const updatedPart = { ...partItem };
         
         // Handle price and note updates through variants
         if (updates.price !== undefined || updates.note !== undefined) {
           const variants = partItem.variants || [];
           
           // Find existing default variant or create new one
-          let defaultVariantIndex = variants.findIndex((v: any) => v.is_default === true);
+          const defaultVariantIndex = variants.findIndex((v: any) => v.is_default === true);
           
           if (defaultVariantIndex === -1) {
             // Create new default variant
@@ -430,20 +430,12 @@ export const updatePartInQuoteJson = async (quoteId: string, partId: string, upd
 
 // Helper function to get legacy parts array from quote parts (DEPRECATED - use useQuotePartsFromJson instead)
 export const useQuotePartsAsLegacyParts = (quoteId: string) => {
-  const quotePartsQuery = useQuotePartsQuery(quoteId);
-  
-  const legacyParts: Part[] = (quotePartsQuery.data || []).map(quotePartToLegacyPart);
-  
-  // Create a mapping of part ID to quote part ID for updates
-  const partToQuotePartMap: Record<string, string> = {};
-  (quotePartsQuery.data || []).forEach(qp => {
-    partToQuotePartMap[qp.partId] = qp.quotePartId;
-  });
-  
+  console.warn('useQuotePartsAsLegacyParts is deprecated. Use useQuotePartsFromJson instead.');
   return {
-    ...quotePartsQuery,
-    data: legacyParts,
-    partToQuotePartMap, // Include this mapping for updates
+    data: [],
+    partToQuotePartMap: {},
+    isLoading: false,
+    error: null,
   };
 };
 
@@ -721,48 +713,17 @@ export const useUpdateQuotePartMutation = () => {
   });
 };
 
-// Mutation to update quote parts using legacy Part interface (for UI compatibility)
+// Mutation to update quote parts using legacy Part interface (for UI compatibility) - DEPRECATED
 export const useUpdateQuotePartLegacyMutation = (quoteId: string) => {
-  const queryClient = useQueryClient();
-  const { showSnackbar } = useSnackbar();
-  const quotePartsQuery = useQuotePartsQuery(quoteId);
+  console.warn('useUpdateQuotePartLegacyMutation is deprecated. Use useUpdatePartInQuoteJsonMutation instead.');
   
   return useMutation({
     mutationFn: async ({ partId, updates }: { partId: string; updates: Partial<Part> }) => {
-      // Find the quote_parts record for this part in this quote
-      const quotePart = quotePartsQuery.data?.find(qp => qp.partId === partId);
-      
-      if (!quotePart) {
-        throw new Error(`Quote part not found for part ${partId} in quote ${quoteId}`);
-      }
-      
-      const { data, error } = await supabase
-        .from('quote_parts')
-        .update({
-          final_price: updates.price,
-          note: updates.note,
-        })
-        .eq('id', quotePart.quotePartId)
-        .select()
-        .single();
-      
-      if (error) {
-        throw new Error(error.message);
-      }
-      
-      return data;
+      throw new Error('useUpdateQuotePartLegacyMutation is deprecated. Use useUpdatePartInQuoteJsonMutation instead.');
     },
-    onSuccess: async () => {
-      // Check and update quote status if needed
-      // Status will be updated by JSON structure automatically
-      
-      // Invalidate both quotes and the specific quote parts query
-      queryClient.invalidateQueries({ queryKey: [...queryKeys.quotesBase, 'parts', quoteId] });
-      queryClient.invalidateQueries({ queryKey: queryKeys.quotesBase });
-    },
+    onSuccess: async () => {},
     onError: (error) => {
       console.error('Error updating quote part:', error);
-      showSnackbar(`Failed to update part: ${error.message}`, 'error');
     },
   });
 };
@@ -820,14 +781,14 @@ export const useUpdatePartInQuoteJsonMutation = () => {
       // Update the part in the JSON structure using variants
       const updatedPartsRequested = quote.parts_requested.map((partItem: any) => {
         if (partItem.part_id === partId) {
-          let updatedPart = { ...partItem };
+          const updatedPart = { ...partItem };
           
           // Handle price and note updates through variants
           if (updates.price !== undefined || updates.note !== undefined) {
             const variants = partItem.variants || [];
             
             // Find existing default variant or create new one
-            let defaultVariantIndex = variants.findIndex((v: any) => v.is_default === true);
+            const defaultVariantIndex = variants.findIndex((v: any) => v.is_default === true);
             
             if (defaultVariantIndex === -1) {
               // Create new default variant
@@ -858,15 +819,37 @@ export const useUpdatePartInQuoteJsonMutation = () => {
         return partItem;
       });
       
-      // Update the quote with the modified parts_requested JSON
+      // Check if all parts now have prices to determine if status should change
+      const allPartsHavePrices = updatedPartsRequested.every((part: any) => {
+        const defaultVariant = part.variants?.find((v: any) => v.is_default === true);
+        const hasPrice = defaultVariant?.final_price && defaultVariant.final_price > 0;
+        console.log(`Part ${part.part_id} has price:`, hasPrice, 'price:', defaultVariant?.final_price);
+        return hasPrice;
+      });
+
+      console.log('All parts have prices:', allPartsHavePrices);
+
+      // Update the quote with the modified parts_requested JSON and potentially status
+      const updateData: any = { parts_requested: updatedPartsRequested };
+      
+      // If all parts now have prices, update status to 'waiting_verification'
+      if (allPartsHavePrices) {
+        updateData.status = 'waiting_verification';
+        console.log('🎯 Updating quote status to "waiting_verification"');
+      }
+
+      console.log('💾 Saving to database:', updateData);
+
       const { error: updateError } = await supabase
         .from('quotes')
-        .update({ parts_requested: updatedPartsRequested })
+        .update(updateData)
         .eq('id', quoteId);
 
       if (updateError) {
         throw new Error(`Error updating quote: ${updateError.message}`);
       }
+
+      console.log('✅ Database update successful');
 
       // If updating name or number, also update the parts table
       if (updates.name !== undefined || updates.number !== undefined) {

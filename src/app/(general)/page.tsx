@@ -11,8 +11,8 @@ export default function HomePage() {
   // Server-side pagination state
   const [currentPage, setCurrentPage] = useState(1);
 
-  // Get quotes for display (server-side pagination: 1 per page)
-  const { data: quotesData, isLoading: quotesLoading } = useQuotesQuery(currentPage, 1);
+  // Get quotes for display (server-side pagination: 1 per page) - only show unpriced quotes
+  const { data: quotesData, isLoading: quotesLoading } = useQuotesQuery(currentPage, 1, { status: 'unpriced' });
   
   // Get the current quote ID for fetching only related parts
   const currentQuoteId = quotesData?.quotes?.[0]?.id;
@@ -164,7 +164,7 @@ export default function HomePage() {
         
         {/* Display quotes with server-side pagination */}
         <div className="mt-8">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">Recent Quotes</h2>
+          <h2 className="text-xl font-semibold text-gray-900 mb-4">Quotes Waiting for Pricing</h2>
           
           <QuoteTable
             quotes={quotesData?.quotes || []}
@@ -176,6 +176,7 @@ export default function HomePage() {
             onMarkAsOrdered={onMarkAsOrdered}
             onMarkAsOrderedWithParts={onMarkAsOrderedWithParts}
             showCompleted={false}
+            defaultFilter="unpriced"
             isLoading={quotesLoading || partsLoading}
             showPagination={true}
             // Server pagination props

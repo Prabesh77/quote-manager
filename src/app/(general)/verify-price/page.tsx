@@ -1,13 +1,15 @@
 'use client';
 
-import { useQuotesQuery, useDeleteQuoteMutation, useQuotePartsFromJson, useUpdatePartInQuoteJsonMutation } from '@/hooks/queries/useQuotesQuery';
+import { useQuotesQuery, useDeleteQuoteMutation, useQuotePartsFromJson, useUpdatePartInQuoteJsonMutation, queryKeys } from '@/hooks/queries/useQuotesQuery';
 import QuoteTable from "@/components/ui/QuoteTable";
 import { ProtectedRoute } from "@/components/common/ProtectedRoute";
 import { useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 
 export default function VerifyPricePage() {
   // Server-side pagination state
   const [currentPage, setCurrentPage] = useState(1);
+  const queryClient = useQueryClient();
 
   // Get quotes for verify price page with server-side pagination (1 per page)
   const { data: quotesData, isLoading: quotesLoading } = useQuotesQuery(currentPage, 1, { status: 'waiting_verification' });
@@ -22,10 +24,31 @@ export default function VerifyPricePage() {
   const deleteQuoteMutation = useDeleteQuoteMutation();
   const updatePartMutation = useUpdatePartInQuoteJsonMutation();
 
-  // Placeholder functions for now - these will need to be implemented with the new API
+  // Update quote function - handles status updates and other quote fields
   const updateQuote = async (id: string, fields: Record<string, any>) => {
-    // TODO: Implement with new API
-    return { error: new Error('Not implemented yet') };
+    try {
+      // Import supabase client
+      const supabase = (await import('@/utils/supabase')).default;
+      
+      // Update the quote
+      const { error } = await supabase
+        .from('quotes')
+        .update(fields)
+        .eq('id', id);
+      
+      if (error) {
+        console.error('Error updating quote:', error);
+        return { error: new Error(error.message) };
+      }
+      
+      // Invalidate queries to refresh the UI
+      queryClient.invalidateQueries({ queryKey: queryKeys.quotesBase });
+      
+      return { error: null };
+    } catch (error) {
+      console.error('Error updating quote:', error);
+      return { error: error instanceof Error ? error : new Error('Unknown error') };
+    }
   };
 
   const deleteQuote = async (id: string) => {

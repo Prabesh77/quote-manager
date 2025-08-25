@@ -1,11 +1,17 @@
 'use client';
 
-import { useQuotes } from '@/hooks/useQuotesWithQuery';
+import { useQuotesQuery } from '@/hooks/queries/useQuotesQuery';
+import { usePartsQuery } from '@/hooks/queries/useQuotesQuery';
 import { ProtectedRoute } from "@/components/common/ProtectedRoute";
 import { FileText, CheckCircle, Clock, DollarSign, Package, TrendingUp } from 'lucide-react';
 
 export default function DashboardPage() {
-  const { quotes, parts, isLoading } = useQuotes();
+  // Get all quotes for dashboard (no pagination needed here)
+  const { data: quotesData, isLoading: quotesLoading } = useQuotesQuery(1, 1000); // Get all quotes
+  const { data: parts, isLoading: partsLoading } = usePartsQuery();
+  
+  const quotes = quotesData?.quotes || [];
+  const isLoading = quotesLoading || partsLoading;
 
   // Calculate essential statistics
   const totalQuotes = quotes.length;
@@ -13,7 +19,7 @@ export default function DashboardPage() {
   const pricedQuotes = quotes.filter(q => q.status === 'priced').length;
   const completedQuotes = quotes.filter(q => q.status === 'completed').length;
   const orderedQuotes = quotes.filter(q => q.status === 'ordered').length;
-  const totalParts = parts.length;
+  const totalParts = parts?.length || 0;
 
   // Financial calculations
   const totalRevenue = quotes.reduce((sum, q) => {
@@ -45,7 +51,7 @@ export default function DashboardPage() {
     .sort(([,a], [,b]) => b - a)
     .slice(0, 5)
     .map(([partId, count]) => {
-      const part = parts.find(p => p.id === partId);
+      const part = parts?.find(p => p.id === partId);
       return {
         name: part?.name || partId,
         count

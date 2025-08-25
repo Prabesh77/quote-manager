@@ -103,6 +103,7 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
   const [validationMessage, setValidationMessage] = useState('');
   const [isFormAccordionOpen, setIsFormAccordionOpen] = useState(false);
 
+
   const handlePartsExtracted = (parts: ExtractedPartInfo[]) => {
     setExtractedParts(prevParts => [...prevParts, ...parts]);
 
@@ -458,6 +459,8 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
       }
     }));
   };
+
+
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1132,33 +1135,12 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
                         <label className="block text-xs font-medium text-gray-600 mb-2">
                         Part Number *
                       </label>
-                        {part.number ? (
-                          <div className="space-y-2">
-                            {part.number.split(',').map((singleNumber, index) => (
-                              <div key={index} className="flex items-center space-x-2">
-                                <div className="flex-1 bg-gray-50 px-3 py-2 rounded-md border border-gray-200 text-sm font-mono text-gray-700">
-                                  {cleanPartNumber(singleNumber.trim())}
-                                </div>
-                                <button
-                                  onClick={() => navigator.clipboard.writeText(cleanPartNumber(singleNumber.trim()))}
-                                  className="p-1.5 text-gray-400 hover:text-blue-600 transition-colors cursor-pointer"
-                                  title="Copy part number"
-                                >
-                                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                                  </svg>
-                                </button>
-                              </div>
-                            ))}
-                          </div>
-                        ) : (
-                      <Input
-                            value=""
-                            onChange={(e) => updatePartDetail(partName, 'number', cleanPartNumber(e.target.value))}
-                        placeholder="Enter part number"
-                        className="w-full h-8 text-sm"
-                      />
-                        )}
+                        <Input
+                          value={partDetails[partName]?.number || ''}
+                          onChange={(e) => updatePartDetail(partName, 'number', e.target.value)}
+                          placeholder="Enter part number"
+                          className="w-full h-8 text-sm"
+                        />
                     </div>
 
                       {/* Price and Notes fields hidden in quote creation - will be added during pricing workflow */}

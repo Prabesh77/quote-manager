@@ -4,18 +4,11 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Plus, DollarSign, CheckCircle, ShoppingCart, FileText, BarChart3, Menu, X } from 'lucide-react';
-import { ConnectionStatus } from './ConnectionStatus';
-import { useQuotes } from '@/hooks/useQuotesWithQuery';
+import { ConnectionStatus } from '@/components/common/ConnectionStatus';
 
 const Navigation = () => {
   const pathname = usePathname();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const {
-    connectionStatus,
-  } = useQuotes();
-
-  // Map connectionStatus to match ConnectionStatus component expectations
-  const mappedConnectionStatus = connectionStatus === 'disconnected' ? 'error' : connectionStatus;
 
   const navItems = [
     {
@@ -100,103 +93,70 @@ const Navigation = () => {
                   
                   {/* Active indicator */}
                   {isActive && (
-                    <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-red-600 rounded-full"></div>
+                    <div className="absolute inset-0 bg-red-50 rounded-lg border border-red-200 -z-10"></div>
                   )}
                 </Link>
               );
             })}
           </div>
 
-          {/* Right side - Connection Status & Mobile Menu Button */}
-          <div className="flex items-center">
-            <div className="ml-4 flex items-center space-x-4">
-              <ConnectionStatus status={mappedConnectionStatus} />
-              
-              {/* Mobile menu button */}
-              <button
-                onClick={() => setIsMobileMenuOpen(true)}
-                className="md:hidden p-2 rounded-lg text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition-colors"
-              >
-                <Menu className="h-6 w-6" />
-              </button>
+          {/* Right side - Connection Status and Mobile Menu */}
+          <div className="flex items-center space-x-4">
+            {/* Connection Status */}
+            <div className="hidden md:block">
+              <ConnectionStatus status="connected" />
             </div>
+
+            {/* Mobile menu button */}
+            <button
+              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+              className="md:hidden p-2 rounded-lg text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition-colors"
+            >
+              {isMobileMenuOpen ? (
+                <X className="h-6 w-6" />
+              ) : (
+                <Menu className="h-6 w-6" />
+              )}
+            </button>
           </div>
         </div>
-      </div>
 
-      {/* Mobile Menu Drawer */}
-      {isMobileMenuOpen && (
-        <>
-          {/* Backdrop */}
-          <div 
-            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 md:hidden"
-            onClick={closeMobileMenu}
-          />
-          
-          {/* Drawer */}
-          <div className={`fixed right-0 top-0 h-full w-80 bg-white shadow-xl z-50 transform transition-transform duration-300 ease-out md:hidden ${isMobileMenuOpen ? 'translate-x-0' : 'translate-x-full'}`}>
-            <div className="flex flex-col h-full">
-              {/* Header */}
-              <div className="flex items-center justify-between p-6 border-b border-gray-200">
-                <h2 className="text-lg font-semibold text-gray-900">Menu</h2>
-                <button
-                  onClick={closeMobileMenu}
-                  className="p-2 rounded-lg text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition-colors"
-                >
-                  <X className="h-6 w-6" />
-                </button>
-              </div>
+        {/* Mobile Navigation Menu */}
+        {isMobileMenuOpen && (
+          <div className="md:hidden">
+            <div className="px-2 pt-2 pb-3 space-y-1 bg-white border-t border-gray-200">
+              {navItems.map((item) => {
+                const isActive = pathname === item.href || 
+                  (item.href === '/new' && pathname === '/') ||
+                  (item.href === '/pricing' && pathname.startsWith('/pricing')) ||
+                  (item.href === '/priced' && pathname.startsWith('/priced')) ||
+                  (item.href === '/completed-quotes' && pathname.startsWith('/completed-quotes')) ||
+                  (item.href === '/orders' && pathname.startsWith('/orders'));
+                
+                const IconComponent = item.icon;
 
-              {/* Navigation Items */}
-              <div className="flex-1 p-6">
-                <div className="space-y-2">
-                  {navItems.map((item) => {
-                    const isActive = pathname === item.href || 
-                      (item.href === '/new' && pathname === '/') ||
-                      (item.href === '/pricing' && pathname.startsWith('/pricing')) ||
-                      (item.href === '/priced' && pathname.startsWith('/priced')) ||
-                      (item.href === '/completed-quotes' && pathname.startsWith('/completed-quotes')) ||
-                      (item.href === '/orders' && pathname.startsWith('/orders'));
-                    
-                    const IconComponent = item.icon;
-
-                    return (
-                      <Link
-                        key={item.name}
-                        href={item.href}
-                        onClick={closeMobileMenu}
-                        className={`
-                          flex items-center space-x-3 p-4 rounded-lg transition-all duration-200 cursor-pointer
-                          ${isActive 
-                            ? 'text-red-600 bg-red-50 border border-red-200' 
-                            : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
-                          }
-                        `}
-                      >
-                        <IconComponent className={`h-5 w-5 ${isActive ? 'text-red-600' : 'text-gray-500'}`} />
-                        <div className="flex flex-col">
-                          <span className="font-medium">{item.name}</span>
-                          <span className="text-sm text-gray-500">{item.description}</span>
-                        </div>
-                      </Link>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Footer */}
-              <div className="p-6 border-t border-gray-200">
-                <div className="text-sm text-gray-500">
-                  <div className="flex items-center space-x-2">
-                    <div className="w-2 h-2 bg-green-400 rounded-full"></div>
-                    <span>Connected</span>
-                  </div>
-                </div>
-              </div>
+                return (
+                  <Link
+                    key={item.name}
+                    href={item.href}
+                    onClick={closeMobileMenu}
+                    className={`
+                      flex items-center px-3 py-2 rounded-lg text-base font-medium transition-colors
+                      ${isActive 
+                        ? 'text-red-600 bg-red-50 border border-red-200' 
+                        : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                      }
+                    `}
+                  >
+                    <IconComponent className={`h-5 w-5 mr-3 ${isActive ? 'text-red-600' : 'text-gray-500'}`} />
+                    {item.name}
+                  </Link>
+                );
+              })}
             </div>
           </div>
-        </>
-      )}
+        )}
+      </div>
     </nav>
   );
 };

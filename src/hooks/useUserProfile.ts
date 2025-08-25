@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/components/providers/AuthProvider';
 import supabase from '@/utils/supabase';
 
@@ -12,44 +12,36 @@ export interface UserProfile {
   updated_at: string;
 }
 
+const fetchUserProfile = async (userId: string): Promise<UserProfile> => {
+  const { data, error } = await supabase
+    .from('user_profiles')
+    .select('*')
+    .eq('id', userId)
+    .single();
+
+  if (error) {
+    throw error;
+  }
+
+  return data;
+};
+
 export function useUserProfile() {
   const { user } = useAuth();
-  const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (!user) {
-      setProfile(null);
-      setLoading(false);
-      return;
-    }
-
-    const fetchProfile = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-
-        const { data, error } = await supabase
-          .from('user_profiles')
-          .select('*')
-          .eq('id', user.id)
-          .single();
-
-        if (error) {
-          throw error;
-        }
-
-        setProfile(data);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to fetch profile');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchProfile();
-  }, [user]);
+  const {
+    data: profile,
+    isLoading: loading,
+    error,
+  } = useQuery({
+    queryKey: ['userProfile', user?.id],
+    queryFn: () => fetchUserProfile(user!.id),
+    enabled: !!user?.id,
+    staleTime: 5 * 60 * 1000, // 5 minutes - profile data doesn't change often
+    gcTime: 10 * 60 * 1000, // 10 minutes - keep in cache longer
+    retry: 2,
+    retryDelay: 1000,
+  });
 
   const hasRole = (role: UserProfile['role']) => {
     return profile?.role === role;
@@ -67,7 +59,7 @@ export function useUserProfile() {
   return {
     profile,
     loading,
-    error,
+    error: error ? (error instanceof Error ? error.message : 'Failed to fetch profile') : null,
     hasRole,
     hasAnyRole,
     isAdmin,

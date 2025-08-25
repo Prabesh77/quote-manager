@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { ChevronDown, ChevronRight, Edit, Trash2, Save, X, Search, Eye, Copy, Car, CheckCircle, AlertTriangle, ShoppingCart, Package, Edit3, Plus } from 'lucide-react';
 import { Quote, Part } from './useQuotes';
+
 import { SkeletonLoader } from './SkeletonLoader';
 import {
   Accordion,
@@ -28,13 +29,21 @@ interface QuoteTableProps {
   showCompleted?: boolean;
   defaultFilter?: FilterType;
   isLoading?: boolean;
+  itemsPerPage?: number; // New prop for configurable pagination
+  showPagination?: boolean; // New prop to control pagination display
+  // Server-driven pagination (optional). If provided, component will not slice locally
+  currentPage?: number;
+  total?: number;
+  totalPages?: number;
+  pageSize?: number;
+  onPageChange?: (page: number) => void;
 }
 
 type FilterType = 'all' | 'unpriced' | 'priced';
 
 type QuoteStatus = 'unpriced' | 'priced' | 'completed' | 'ordered' | 'delivered' | 'waiting_verification';
 
-export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote, onUpdatePart, onUpdateMultipleParts, onMarkCompleted, onMarkAsOrdered, onMarkAsOrderedWithParts, showCompleted = false, defaultFilter = 'all', isLoading = false }: QuoteTableProps) {
+export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote, onUpdatePart, onUpdateMultipleParts, onMarkCompleted, onMarkAsOrdered, onMarkAsOrderedWithParts, showCompleted = false, defaultFilter = 'all', isLoading = false, itemsPerPage = 10, showPagination = true, currentPage: externalCurrentPage, total: externalTotal, totalPages: externalTotalPages, pageSize: externalPageSize, onPageChange }: QuoteTableProps) {
   // Safety checks for undefined props
   if (!quotes || !Array.isArray(quotes)) {
     console.warn('QuoteTable: quotes prop is undefined or not an array, using empty array');
@@ -68,10 +77,67 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
   // Local quotes state for variant management
   const [localQuotes, setLocalQuotes] = useState<Quote[]>(quotes);
 
+  // Pagination state (used only when server-driven props are not provided)
+  const [currentPage, setCurrentPage] = useState(1);
+
   // Helper functions for variant management
   const generateVariantId = () => `var_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
-    const addVariantToPart = (quoteId: string, partId: string) => {
+  // Determine if we are using server-driven pagination
+  const isServerPaginated = !!onPageChange && typeof externalCurrentPage === 'number' && typeof externalTotalPages === 'number' && typeof externalTotal === 'number' && typeof externalPageSize === 'number';
+
+  // Effective pagination values for UI
+  const uiPageSize = isServerPaginated ? (externalPageSize as number) : itemsPerPage;
+  const uiCurrentPage = isServerPaginated ? (externalCurrentPage as number) : currentPage;
+  const totalPages = isServerPaginated ? (externalTotalPages as number) : Math.ceil(quotes.length / itemsPerPage);
+  const totalCount = isServerPaginated ? (externalTotal as number) : quotes.length;
+
+  // Start/End indices purely for display purposes
+  const startIndex = (uiCurrentPage - 1) * uiPageSize;
+  const endIndex = Math.min(startIndex + (isServerPaginated ? quotes.length : uiPageSize), totalCount);
+
+  // For server pagination, do not slice; quotes already reflect the current page
+  const paginatedQuotes = isServerPaginated ? quotes : quotes.slice(startIndex, startIndex + uiPageSize);
+
+  // Reset local page to first when data set changes in client-mode only
+  useEffect(() => {
+    if (!isServerPaginated) {
+      setCurrentPage(1);
+    }
+  }, [quotes.length, isServerPaginated]);
+
+  // Pagination handlers
+  const goToPage = (page: number) => {
+    if (isServerPaginated && onPageChange) {
+      onPageChange(page);
+    } else {
+      setCurrentPage(page);
+    }
+  };
+
+  const goToNextPage = () => {
+    const next = uiCurrentPage + 1;
+    if (uiCurrentPage < totalPages) {
+      if (isServerPaginated && onPageChange) {
+        onPageChange(next);
+      } else {
+        setCurrentPage(next);
+      }
+    }
+  };
+
+  const goToPrevPage = () => {
+    const prev = uiCurrentPage - 1;
+    if (uiCurrentPage > 1) {
+      if (isServerPaginated && onPageChange) {
+        onPageChange(prev);
+      } else {
+        setCurrentPage(prev);
+      }
+    }
+  };
+
+  const addVariantToPart = (quoteId: string, partId: string) => {
     // Only add to local state, don't save to database yet
     const newVariantId = generateVariantId();
     
@@ -403,11 +469,11 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
           q.id === editingParts 
             ? {
                 ...q,
-                partsRequested: q.partsRequested.map(p => {
+                partsRequested: (q.partsRequested ?? []).map(p => {
                   const partEditDataForPart = partEditData[p.part_id];
                   if (partEditDataForPart) {
                     // Update all variants for this part
-                    const updatedVariants = p.variants.map(variant => {
+                    const updatedVariants = (Array.isArray(p.variants) ? p.variants : []).map(variant => {
                       const variantEditData = partEditDataForPart[variant.id];
                       if (variantEditData) {
                         return {
@@ -475,11 +541,11 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
         // Update the JSON structure in the database with final_price calculations
         try {
           // Use the updated partsRequested that includes user input, not the original from localQuotes
-          const updatedPartsRequested = quote.partsRequested.map(p => {
+          const updatedPartsRequested = (quote.partsRequested ?? []).map(p => {
             const partEditDataForPart = partEditData[p.part_id];
             if (partEditDataForPart) {
               // Update all variants for this part with user input
-              const updatedVariants = p.variants.map(variant => {
+              const updatedVariants = (Array.isArray(p.variants) ? p.variants : []).map(variant => {
                 const variantEditData = partEditDataForPart[variant.id];
                 if (variantEditData) {
                   return {
@@ -896,7 +962,16 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
   // Function to handle quote verification confirmation
   const handleVerifyQuote = async (quoteId: string) => {
     try {
-      await onUpdateQuote(quoteId, { status: 'priced' });
+      const result = await onUpdateQuote(quoteId, { status: 'priced' });
+      
+      if (result.error) {
+        console.error('❌ Error verifying quote:', result.error);
+        // You could show a snackbar or error message here
+        return;
+      }
+      
+      console.log('✅ Quote verified successfully, status updated to "priced"');
+      // The UI will automatically refresh due to query invalidation
     } catch (error) {
       console.error('❌ Error verifying quote:', error);
     }
@@ -1025,6 +1100,11 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
   // Memoize the array of IDs so it doesn't change on every render
   const allQuoteIds = useMemo(() => filteredQuotes.map(q => q.id), [filteredQuotes]);
 
+  // Use paginated quotes for display
+  const quotesLoading = isLoading || false;
+
+
+
   const handleDeleteWithConfirm = async (quoteId: string) => {
     setShowDeleteConfirm(quoteId);
   };
@@ -1089,6 +1169,8 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
       setShowOrderConfirm(null);
       setTaxInvoiceNumber('');
       setSelectedPartIds([]);
+    } else {
+      console.error('❌ Error confirming order:', result.error);
     }
   };
 
@@ -1169,7 +1251,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden hidden lg:block relative">
 
         
-        {isLoading && filteredQuotes.length === 0 ? (
+        {quotesLoading && paginatedQuotes.length === 0 ? (
           <>
             {/* Table Header */}
             <div className="bg-white border-b border-gray-200 sticky top-0 z-10">
@@ -1184,7 +1266,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
             </div>
             <SkeletonLoader count={5} />
           </>
-        ) : filteredQuotes.length === 0 ? (
+        ) : paginatedQuotes.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 px-4">
             <div className="w-32 h-32 bg-gradient-to-br from-blue-100 to-purple-100 rounded-full flex items-center justify-center mb-8">
               <svg className="w-16 h-16 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1219,7 +1301,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
 
           {/* Quotes List */}
           <Accordion type="multiple" className="w-full">
-              {filteredQuotes.map((quote) => {
+              {paginatedQuotes.map((quote) => {
                 const quoteParts = getQuotePartsWithNotesSync(quote.id);
                 const status = getQuoteStatus(quoteParts, quote.status);
 
@@ -1526,10 +1608,10 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                         {/* Confirmation button for waiting_verification status */}
                         {status === 'waiting_verification' && (
                           <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleVerifyQuote(quote.id);
-                            }}
+                                        onClick={(e) => {
+              e.stopPropagation();
+              handleVerifyQuote(quote.id);
+            }}
                             className="p-1 bg-green-600 hover:bg-green-700 text-white rounded-full transition-colors cursor-pointer"
                             title="Confirm pricing and move to priced status"
                           >
@@ -1539,10 +1621,10 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                         
                         {status === 'priced' && onMarkCompleted && (
                           <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onMarkCompleted(quote.id);
-                            }}
+                                        onClick={(e) => {
+              e.stopPropagation();
+              onMarkCompleted(quote.id);
+            }}
                             className="p-1 text-green-600 hover:text-green-700 hover:bg-green-100 rounded transition-colors cursor-pointer"
                             title="Mark as completed"
                           >
@@ -1640,14 +1722,16 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                     const isPartEditing = editingParts === quote.id;
                                     const localQuote = localQuotes.find(q => q.id === quote.id);
                                     const quotePart = localQuote?.partsRequested?.find(qp => qp.part_id === part.id);
+
                                     // Only create fallback variant if no variants exist AND we're not editing
-                                    // This prevents interference with user-added variants
-                                    const variants = quotePart?.variants && quotePart.variants.length > 0 
-                                      ? quotePart.variants 
+                                    // Use our transformed data with variants, fallback to part data if no variants
+                                    const partWithVariants = part as any; // Cast to access variants
+                                    const variants = partWithVariants.variants && partWithVariants.variants.length > 0 
+                                      ? partWithVariants.variants 
                                       : [{ 
                                           id: 'default', 
                                           note: part.note, 
-                                          final_price: null, // No base price, only variant prices
+                                          final_price: part.price, // Use part.price as fallback
                                           is_default: true 
                                         }];
                                     
@@ -1656,7 +1740,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                     return (
                                       <>
                                         {/* Primary Variant Row */}
-                                        {variants.map((variant, index) => (
+                                        {variants.map((variant: any, index: number) => (
                                           <tr key={`${part.id}_${variant.id}`} className={`${index === 0 ? 'bg-white border-b border-gray-100' : 'bg-gray-50/50 border-b border-gray-100/50'}`}>
                                             <td className="px-4 py-1">
                                               <div className="flex items-center space-x-3">
@@ -1887,7 +1971,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
           </div>
         ) : (
           <Accordion type="multiple" className="w-full">
-            {filteredQuotes.map((quote) => {
+            {paginatedQuotes.map((quote) => {
               const quoteParts = getQuotePartsWithNotesSync(quote.id);
               const status = getQuoteStatus(quoteParts, quote.status);
               
@@ -2008,10 +2092,10 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                           {/* Confirmation button for waiting_verification status */}
                           {status === 'waiting_verification' && (
                             <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleVerifyQuote(quote.id);
-                              }}
+                                          onClick={(e) => {
+              e.stopPropagation();
+              handleVerifyQuote(quote.id);
+            }}
                               className="p-1 bg-green-600 hover:bg-green-700 text-white rounded-full transition-colors cursor-pointer"
                               title="Confirm pricing and move to priced status"
                             >
@@ -2021,10 +2105,10 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                           
                           {status === 'priced' && onMarkCompleted && (
                                   <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      onMarkCompleted(quote.id);
-                                    }}
+                                                onClick={(e) => {
+              e.stopPropagation();
+              onMarkCompleted(quote.id);
+            }}
                               className="p-2 text-green-600 hover:text-green-700 hover:bg-green-100 rounded transition-colors cursor-pointer"
                               title="Mark as completed"
                                   >
@@ -2458,6 +2542,65 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                 className="flex-1 px-4 py-2 text-white bg-red-600 hover:bg-red-700 rounded-lg font-medium transition-colors cursor-pointer"
               >
                 Mark as Order
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* Pagination Controls */}
+      {showPagination && quotes.length > 0 && (
+        <div className="mt-6 bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+          <div className="flex items-center justify-between">
+            <div className="text-sm text-gray-700">
+              Showing {startIndex + 1} to {Math.min(endIndex, quotes.length)} of {quotes.length} quotes
+            </div>
+            
+            <div className="flex items-center space-x-2">
+              {/* Previous Page Button */}
+              <button
+                onClick={goToPrevPage}
+                disabled={uiCurrentPage === 1}
+                className={`px-3 py-2 text-sm font-medium rounded-lg border transition-colors ${
+                  uiCurrentPage === 1
+                    ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
+                    : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50 hover:border-gray-400'
+                }`}
+              >
+                Previous
+              </button>
+              
+              {/* Page Numbers */}
+              <div className="flex items-center space-x-1">
+                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                  const page = i + 1;
+                  return (
+                    <button
+                      key={page}
+                      onClick={() => goToPage(page)}
+                      className={`px-3 py-2 text-sm font-medium rounded-lg border transition-colors ${
+                        page === uiCurrentPage
+                          ? 'bg-red-600 text-white border-red-600'
+                          : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50 hover:border-gray-400'
+                      }`}
+                    >
+                      {page}
+                    </button>
+                  );
+                })}
+              </div>
+              
+              {/* Next Page Button */}
+              <button
+                onClick={goToNextPage}
+                disabled={uiCurrentPage === totalPages}
+                className={`px-3 py-2 text-sm font-medium rounded-lg border transition-colors ${
+                  uiCurrentPage === totalPages
+                    ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
+                    : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50 hover:border-gray-400'
+                }`}
+              >
+                Next
               </button>
             </div>
           </div>

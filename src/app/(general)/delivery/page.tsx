@@ -9,8 +9,8 @@ export default function DeliveryPage() {
   // Server-side pagination state
   const [currentPage, setCurrentPage] = useState(1);
 
-  // Get quotes for delivery page with server-side pagination (1 per page)
-  const { data: quotesData, isLoading: quotesLoading } = useQuotesQuery(currentPage, 1, { status: 'delivered' });
+  // Get quotes for delivery page with server-side pagination (10 per page)
+  const { data: quotesData, isLoading: quotesLoading } = useQuotesQuery(currentPage, 10, { status: 'delivered' });
   
   // Get the current quote ID for fetching only related parts
   const currentQuoteId = quotesData?.quotes?.[0]?.id;
@@ -56,15 +56,11 @@ export default function DeliveryPage() {
       return;
     }
 
-    console.log('🔄 Updating multiple parts:', updates);
-    
     try {
       // Update each part individually using the mutation
       for (const { id, updates: partUpdates } of updates) {
-        console.log(`🔄 Updating part ${id}:`, partUpdates);
         try {
           await updatePartMutation.mutateAsync({ quoteId: currentQuoteId, partId: id, updates: partUpdates });
-          console.log(`✅ Successfully updated part ${id}`);
         } catch (error) {
           console.error(`❌ Error updating part ${id}:`, error);
         }

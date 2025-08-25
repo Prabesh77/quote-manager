@@ -11,8 +11,8 @@ export default function PricingPage() {
   // Server-side pagination state
   const [currentPage, setCurrentPage] = useState(1);
 
-  // Get quotes for pricing page with server-side pagination (1 per page)
-  const { data: quotesData, isLoading: quotesLoading } = useQuotesQuery(currentPage, 1, { status: 'unpriced' });
+  // Get quotes for pricing page with server-side pagination (10 per page)
+  const { data: quotesData, isLoading: quotesLoading } = useQuotesQuery(currentPage, 10, { status: 'unpriced' });
   
   // Get the current quote ID for fetching only related parts
   const currentQuoteId = quotesData?.quotes?.[0]?.id;
@@ -60,21 +60,15 @@ export default function PricingPage() {
       return;
     }
 
-    console.log('🔄 Updating multiple parts:', updates);
-    
     try {
       // Update each part individually using the mutation
       for (const { id, updates: partUpdates } of updates) {
-        console.log(`🔄 Updating part ${id}:`, partUpdates);
         try {
           await updatePartMutation.mutateAsync({ quoteId: currentQuoteId, partId: id, updates: partUpdates });
-          console.log(`✅ Successfully updated part ${id}`);
         } catch (error) {
           console.error(`❌ Error updating part ${id}:`, error);
         }
       }
-      
-
     } catch (error) {
       console.error('❌ Error in updateMultipleParts:', error);
     }
@@ -119,11 +113,7 @@ export default function PricingPage() {
         <p className="text-gray-600 mb-6">Price pending quotes that need initial pricing.</p>
 
         {(() => { 
-          console.log('🎯 Parts data being passed to QuoteTable:', parts);
-          console.log('🎯 First part variants:', parts?.[0]?.variants);
-          console.log('🎯 First part price:', parts?.[0]?.price);
-          console.log('🎯 First part first variant:', parts?.[0]?.variants?.[0]);
-          console.log('🎯 First part first variant final_price:', parts?.[0]?.variants?.[0]?.final_price);
+          
           return null; 
         })()}
         <QuoteTable

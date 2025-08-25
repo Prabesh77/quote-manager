@@ -11,8 +11,8 @@ export default function HomePage() {
   // Server-side pagination state
   const [currentPage, setCurrentPage] = useState(1);
 
-  // Get quotes for display (server-side pagination: 1 per page) - only show unpriced quotes
-  const { data: quotesData, isLoading: quotesLoading } = useQuotesQuery(currentPage, 1, { status: 'unpriced' });
+  // Get quotes for display (server-side pagination: 10 per page) - only show unpriced quotes
+  const { data: quotesData, isLoading: quotesLoading } = useQuotesQuery(currentPage, 10, { status: 'unpriced' });
   
   // Get the current quote ID for fetching only related parts
   const currentQuoteId = quotesData?.quotes?.[0]?.id;
@@ -113,14 +113,10 @@ export default function HomePage() {
     }
 
     try {
-      console.log('🔄 Updating multiple parts:', updates);
-      
       // Update each part individually using the mutation
       for (const { id, updates: partUpdates } of updates) {
-        console.log(`🔄 Updating part ${id}:`, partUpdates);
         try {
           await updatePartMutation.mutateAsync({ quoteId: currentQuoteId, partId: id, updates: partUpdates });
-          console.log(`✅ Successfully updated part ${id}`);
         } catch (error) {
           console.error(`❌ Error updating part ${id}:`, error);
           showSnackbar(`Error updating part ${id}`, 'error');
@@ -183,7 +179,7 @@ export default function HomePage() {
             currentPage={currentPage}
             totalPages={quotesData?.totalPages || 1}
             total={quotesData?.total || 0}
-            pageSize={1}
+            pageSize={10}
             onPageChange={setCurrentPage}
           />
         </div>

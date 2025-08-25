@@ -1137,13 +1137,10 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
   const confirmOrder = async () => {
     if (!showOrderConfirm || !taxInvoiceNumber.trim()) return;
     
-    console.log('🔍 confirmOrder called with:', { showOrderConfirm, taxInvoiceNumber, selectedPartIds });
-    
     let result: { error: Error | null } = { error: null };
     
     // Use onMarkAsOrderedWithParts if available (with part selection)
     if (onMarkAsOrderedWithParts) {
-      console.log('🔍 Using onMarkAsOrderedWithParts');
       // Validate that at least one part is selected
       if (selectedPartIds.length === 0) {
         alert('Please select at least one part to order');
@@ -1158,25 +1155,20 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
     } 
     // Fall back to onMarkAsOrdered (simple case without part selection)
     else if (onMarkAsOrdered) {
-      console.log('🔍 Using onMarkAsOrdered');
       result = await onMarkAsOrdered(
         showOrderConfirm,
         taxInvoiceNumber.trim()
       );
     }
     else {
-      console.log('❌ Neither onMarkAsOrderedWithParts nor onMarkAsOrdered is available');
       // Neither function is available
       return;
     }
-    
-    console.log('🔍 Order result:', result);
     
     if (!result.error) {
       setShowOrderConfirm(null);
       setTaxInvoiceNumber('');
       setSelectedPartIds([]);
-      console.log('✅ Order confirmed successfully');
     } else {
       console.error('❌ Error confirming order:', result.error);
     }
@@ -1616,11 +1608,10 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                         {/* Confirmation button for waiting_verification status */}
                         {status === 'waiting_verification' && (
                           <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              console.log('🔍 Verify button clicked for quote:', quote.id);
-                              handleVerifyQuote(quote.id);
-                            }}
+                                        onClick={(e) => {
+              e.stopPropagation();
+              handleVerifyQuote(quote.id);
+            }}
                             className="p-1 bg-green-600 hover:bg-green-700 text-white rounded-full transition-colors cursor-pointer"
                             title="Confirm pricing and move to priced status"
                           >
@@ -1630,11 +1621,10 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                         
                         {status === 'priced' && onMarkCompleted && (
                           <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              console.log('🔍 Mark as Completed button clicked for quote:', quote.id);
-                              onMarkCompleted(quote.id);
-                            }}
+                                        onClick={(e) => {
+              e.stopPropagation();
+              onMarkCompleted(quote.id);
+            }}
                             className="p-1 text-green-600 hover:text-green-700 hover:bg-green-100 rounded transition-colors cursor-pointer"
                             title="Mark as completed"
                           >
@@ -1732,7 +1722,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                     const isPartEditing = editingParts === quote.id;
                                     const localQuote = localQuotes.find(q => q.id === quote.id);
                                     const quotePart = localQuote?.partsRequested?.find(qp => qp.part_id === part.id);
-                                    console.log({quotePart});
+
                                     // Only create fallback variant if no variants exist AND we're not editing
                                     // Use our transformed data with variants, fallback to part data if no variants
                                     const partWithVariants = part as any; // Cast to access variants
@@ -2102,11 +2092,10 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                           {/* Confirmation button for waiting_verification status */}
                           {status === 'waiting_verification' && (
                             <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                console.log('🔍 Verify button clicked for quote (second location):', quote.id);
-                                handleVerifyQuote(quote.id);
-                              }}
+                                          onClick={(e) => {
+              e.stopPropagation();
+              handleVerifyQuote(quote.id);
+            }}
                               className="p-1 bg-green-600 hover:bg-green-700 text-white rounded-full transition-colors cursor-pointer"
                               title="Confirm pricing and move to priced status"
                             >
@@ -2116,11 +2105,10 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                           
                           {status === 'priced' && onMarkCompleted && (
                                   <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      console.log('🔍 Mark as Completed button clicked for quote (second location):', quote.id);
-                                      onMarkCompleted(quote.id);
-                                    }}
+                                                onClick={(e) => {
+              e.stopPropagation();
+              onMarkCompleted(quote.id);
+            }}
                               className="p-2 text-green-600 hover:text-green-700 hover:bg-green-100 rounded transition-colors cursor-pointer"
                               title="Mark as completed"
                                   >

@@ -193,15 +193,11 @@ export const useQuotePartsFromJson = (quoteId: string) => {
   return useQuery({
     queryKey: [...queryKeys.quotesBase, 'json-parts', quoteId],
     queryFn: async () => {
-      console.log('🔍 useQuotePartsFromJson called with quoteId:', quoteId);
-      
       if (!quoteId) {
-        console.log('❌ No quoteId provided, returning empty array');
         return [];
       }
 
       // Get the quote with its parts_requested JSON
-      console.log('🔍 Fetching quote with ID:', quoteId);
       const { data: quote, error: quoteError } = await supabase
         .from('quotes')
         .select('parts_requested')
@@ -215,11 +211,8 @@ export const useQuotePartsFromJson = (quoteId: string) => {
       }
       
       if (!quote) {
-        console.log('❌ No quote found with ID:', quoteId);
         return [];
       }
-      
-      console.log('✅ Quote fetched successfully:', quote);
       
       if (!quote.parts_requested || !Array.isArray(quote.parts_requested)) {
         return [];
@@ -269,11 +262,9 @@ export const useQuotePartsFromJson = (quoteId: string) => {
         variants: partItem.variants || []
       };
       
-      console.log('🔍 Final legacyPart:', legacyPart);
       return legacyPart;
     });
     
-    console.log('🎯 All legacyParts:', legacyParts);
     return legacyParts;
     },
     enabled: !!quoteId,
@@ -346,26 +337,20 @@ export const updatePartInQuoteJson = async (quoteId: string, partId: string, upd
       return partItem;
     });
     
-          // Check if all parts now have prices to determine if status should change
-      const allPartsHavePrices = updatedPartsRequested.every((part: any) => {
-        const defaultVariant = part.variants?.find((v: any) => v.is_default === true);
-        const hasPrice = defaultVariant?.final_price && defaultVariant.final_price > 0;
-        console.log(`Part ${part.part_id} has price:`, hasPrice, 'price:', defaultVariant?.final_price);
-        return hasPrice;
-      });
+                  // Check if all parts now have prices to determine if status should change
+        const allPartsHavePrices = updatedPartsRequested.every((part: any) => {
+          const defaultVariant = part.variants?.find((v: any) => v.is_default === true);
+          const hasPrice = defaultVariant?.final_price && defaultVariant.final_price > 0;
+          return hasPrice;
+        });
 
-      console.log('All parts have prices:', allPartsHavePrices);
-
-      // Update the quote with the modified parts_requested JSON and potentially status
-      const updateData: any = { parts_requested: updatedPartsRequested };
-      
-      // If all parts now have prices, update status to 'priced'
-      if (allPartsHavePrices) {
-        updateData.status = 'priced';
-        console.log('🎯 Updating quote status to "priced"');
-      }
-
-      console.log('💾 Saving to database:', updateData);
+        // Update the quote with the modified parts_requested JSON and potentially status
+        const updateData: any = { parts_requested: updatedPartsRequested };
+        
+        // If all parts now have prices, update status to 'priced'
+        if (allPartsHavePrices) {
+          updateData.status = 'priced';
+        }
 
       const { error: updateError } = await supabase
         .from('quotes')
@@ -375,10 +360,6 @@ export const updatePartInQuoteJson = async (quoteId: string, partId: string, upd
       if (updateError) {
         throw new Error(`Error updating quote: ${updateError.message}`);
       }
-
-      console.log('✅ Database update successful');
-
-
 
     // If updating name or number, also update the parts table
     if (updates.name !== undefined || updates.number !== undefined) {
@@ -823,11 +804,8 @@ export const useUpdatePartInQuoteJsonMutation = () => {
       const allPartsHavePrices = updatedPartsRequested.every((part: any) => {
         const defaultVariant = part.variants?.find((v: any) => v.is_default === true);
         const hasPrice = defaultVariant?.final_price && defaultVariant.final_price > 0;
-        console.log(`Part ${part.part_id} has price:`, hasPrice, 'price:', defaultVariant?.final_price);
         return hasPrice;
       });
-
-      console.log('All parts have prices:', allPartsHavePrices);
 
       // Update the quote with the modified parts_requested JSON and potentially status
       const updateData: any = { parts_requested: updatedPartsRequested };
@@ -835,10 +813,7 @@ export const useUpdatePartInQuoteJsonMutation = () => {
       // If all parts now have prices, update status to 'waiting_verification'
       if (allPartsHavePrices) {
         updateData.status = 'waiting_verification';
-        console.log('🎯 Updating quote status to "waiting_verification"');
       }
-
-      console.log('💾 Saving to database:', updateData);
 
       const { error: updateError } = await supabase
         .from('quotes')
@@ -848,8 +823,6 @@ export const useUpdatePartInQuoteJsonMutation = () => {
       if (updateError) {
         throw new Error(`Error updating quote: ${updateError.message}`);
       }
-
-      console.log('✅ Database update successful');
 
       // If updating name or number, also update the parts table
       if (updates.name !== undefined || updates.number !== undefined) {

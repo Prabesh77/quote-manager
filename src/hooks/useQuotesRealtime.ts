@@ -19,7 +19,7 @@ export const useQuotesRealtime = () => {
           schema: 'public',
           table: 'quotes'
         },
-        (payload) => {
+        (payload: any) => {
           console.log('📡 Quotes realtime event:', payload.eventType, payload.new?.id || payload.old?.id);
           
           // Invalidate quotes queries to trigger refetch
@@ -51,7 +51,7 @@ export const useQuotesRealtime = () => {
           schema: 'public',
           table: 'parts'
         },
-        (payload) => {
+        (payload: any) => {
           console.log('📡 Parts realtime event:', payload.eventType, payload.new?.id || payload.old?.id);
           
           // Invalidate parts queries and quotes (since parts affect quotes)
@@ -78,7 +78,7 @@ export const useQuotesRealtime = () => {
           schema: 'public',
           table: 'vehicles'
         },
-        (payload) => {
+        (payload: any) => {
           console.log('📡 Vehicles realtime event:', payload.eventType, payload.new?.id || payload.old?.id);
           
           // Invalidate quotes since vehicle changes affect quote display

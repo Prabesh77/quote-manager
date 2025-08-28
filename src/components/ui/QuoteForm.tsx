@@ -24,7 +24,7 @@ const cleanPartNumber = (partNumber: string): string => {
   if (!partNumber) return '';
   return partNumber
     .replace(/O/g, '0') // Replace O with 0 to avoid confusion
-    .replace(/[^a-zA-Z0-9]/g, ''); // Remove all special characters
+    .replace(/[^a-zA-Z0-9,]/g, ''); // Remove special characters but preserve commas
 };
 
 // Function to get part icon from /public/part-icons

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { ChevronDown, ChevronRight, Edit, Trash2, Save, X, Search, Eye, Copy, Car, CheckCircle, AlertTriangle, ShoppingCart, Package, Edit3, Plus } from 'lucide-react';
+import { ChevronDown, ChevronRight, Edit, Trash2, Save, X, Search, Eye, Copy, Car, CheckCircle, AlertTriangle, ShoppingCart, Edit3, Plus } from 'lucide-react';
 import { Quote, Part } from './useQuotes';
 
 import { SkeletonLoader } from './SkeletonLoader';
@@ -14,6 +14,7 @@ import {
 import supabase from '@/utils/supabase';
 import { getQuotePartsFromJson } from '@/utils/quotePartsHelpers';
 import { QuoteEditModal } from './QuoteEditModal';
+import { QuoteStatus, getQuoteStatus, VehicleDetails, Pagination, SmallActionButton, LargeActionButton, ButtonGroup, VerifyButton, CompleteButton, OrderButton } from '@/components/common';
 
 
 interface QuoteTableProps {
@@ -40,8 +41,6 @@ interface QuoteTableProps {
 }
 
 type FilterType = 'all' | 'unpriced' | 'priced';
-
-type QuoteStatus = 'unpriced' | 'priced' | 'completed' | 'ordered' | 'delivered' | 'waiting_verification';
 
 export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote, onUpdatePart, onUpdateMultipleParts, onMarkCompleted, onMarkAsOrdered, onMarkAsOrderedWithParts, showCompleted = false, defaultFilter = 'all', isLoading = false, itemsPerPage = 10, showPagination = true, currentPage: externalCurrentPage, total: externalTotal, totalPages: externalTotalPages, pageSize: externalPageSize, onPageChange }: QuoteTableProps) {
   // Safety checks for undefined props
@@ -664,23 +663,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
     }));
   };
 
-  const getQuoteStatus = (quoteParts: Part[], quoteStatus?: string): QuoteStatus => {
-    // Prioritize database status over calculated status
-    if (quoteStatus === 'delivered') return 'delivered';
-    if (quoteStatus === 'ordered') return 'ordered';
-    if (quoteStatus === 'completed') return 'completed';
-    if (quoteStatus === 'priced') return 'priced';
-    if (quoteStatus === 'waiting_verification') return 'waiting_verification';
-    if (quoteStatus === 'unpriced') return 'unpriced';
-    if (quoteStatus === 'active') {
-      // Fallback to calculation for legacy quotes
-      if (quoteParts.length === 0) return 'unpriced';
-      // Since we're ignoring base part prices, we need to check variants
-      // For now, assume unpriced if we can't determine from variants
-      return 'unpriced';
-    }
-    return 'unpriced';
-  };
+
 
   const copyToClipboard = async (text: string) => {
     try {
@@ -709,37 +692,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
     return Array.from(copiedItems).some(key => key.startsWith(text + '_'));
   };
 
-  const getVehicleLogo = (make: string) => {
-    const logos: Record<string, string> = {
-      'toyota': '/car-logos/toyota.png',
-      'honda': '/car-logos/honda.png',
-      'ford': '/car-logos/ford.png',
-      'bmw': '/car-logos/bmw.png',
-      'mercedes': '/car-logos/mercedes.png',
-      'audi': '/car-logos/audi.png',
-      'volkswagen': '/car-logos/volkswagen.png',
-      'nissan': '/car-logos/nissan.png',
-      'hyundai': '/car-logos/hyundai.png',
-      'kia': '/car-logos/kia.png',
-      'chevrolet': '/car-logos/chevrolet.png',
-      'mazda': '/car-logos/mazda.png',
-      'lexus': '/car-logos/lexus.png',
-      'volvo': '/car-logos/volvo.png',
-      'subaru': '/car-logos/subaru.png',
-      'land rover': '/car-logos/landrover.png',
-      'jaguar': '/car-logos/jaguar.png',
-      'mini': '/car-logos/mini.png',
-      'peugeot': '/car-logos/peugeot.png',
-      'renault': '/car-logos/renault.png',
-      'skoda': '/car-logos/skoda.png',
-      'alfa romeo': '/car-logos/alfaromeo.png',
-      'infiniti': '/car-logos/infiniti.png',
-      'jeep': '/car-logos/jeep.png',
-      'mg': '/car-logos/mg.png',
-      'mitsubishi': '/car-logos/mitsubisi.png',
-    };
-    return logos[make.toLowerCase()] || '/car-logos/toyota.png'; // Default to Toyota if make not found
-  };
+
 
   const getPartIcon = (partName: string): string | null => {
     const iconMap: Record<string, string> = {
@@ -977,62 +930,8 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
     }
   };
 
-  const getStatusChip = (status: QuoteStatus) => {
-    const statusConfig = {
-      unpriced: {
-        bg: 'bg-yellow-100',
-        text: 'text-yellow-800',
-        border: 'border-yellow-200',
-        icon: AlertTriangle,
-        label: 'Waiting for Price'
-      },
-      priced: {
-        bg: 'bg-green-100',
-        text: 'text-green-800',
-        border: 'border-green-200',
-        icon: CheckCircle,
-        label: 'Priced'
-      },
-      completed: {
-        bg: 'bg-blue-100',
-        text: 'text-blue-800',
-        border: 'border-blue-200',
-        icon: CheckCircle,
-        label: 'Completed'
-      },
-      ordered: {
-        bg: 'bg-purple-100',
-        text: 'text-purple-800',
-        border: 'border-purple-200',
-        icon: ShoppingCart,
-        label: 'Ordered'
-      },
-      delivered: {
-        bg: 'bg-orange-100',
-        text: 'text-orange-800',
-        border: 'border-orange-200',
-        icon: Package,
-        label: 'Delivered'
-      },
-      waiting_verification: {
-        bg: 'bg-amber-100',
-        text: 'text-amber-800',
-        border: 'border-amber-200',
-        icon: AlertTriangle,
-        label: 'Waiting for Verification'
-      }
-    };
 
-    const config = statusConfig[status];
-    const IconComponent = config.icon;
 
-    return (
-      <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-semibold border ${config.bg} ${config.text} ${config.border} shadow-sm whitespace-nowrap`}>
-        <IconComponent className="h-4 w-4" />
-        <span>{config.label}</span>
-      </div>
-    );
-  };
 
   // Function to calculate deadline priority (lower number = higher priority)
   const getDeadlinePriority = (quote: Quote) => {
@@ -1426,121 +1325,17 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                           </div>
 
                   {/* Vehicle */}
-                  <div className="flex items-center space-x-2">
-                    <span className="text-lg">
-                      <img 
-                        src={getVehicleLogo(editingQuote === quote.id ? (editData.make || quote.make) : quote.make)} 
-                        alt={editingQuote === quote.id ? (editData.make || quote.make) : quote.make} 
-                        className="h-8 w-8 object-contain" 
-                      />
-                    </span>
-                    {editingQuote === quote.id ? (
-                      <div className="flex flex-col space-y-1">
-                        <div className="flex items-center space-x-2">
-                          <div className="flex flex-col space-y-1 flex-1">
-                            <label className="text-xs text-gray-500 font-medium">Make</label>
-                            <input
-                              type="text"
-                              value={editData.make || quote.make || ''}
-                              onChange={(e) => handleQuoteEditChange('make', e.target.value)}
-                              className="px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                              onClick={(e) => e.stopPropagation()}
-                              placeholder="Make"
-                            />
-                          </div>
-                          <div className="flex flex-col space-y-1 flex-1">
-                            <label className="text-xs text-gray-500 font-medium">Model</label>
-                            <input
-                              type="text"
-                              value={editData.model || quote.model || ''}
-                              onChange={(e) => handleQuoteEditChange('model', e.target.value)}
-                              className="px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                              onClick={(e) => e.stopPropagation()}
-                              placeholder="Model"
-                            />
-                          </div>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <div className="flex flex-col space-y-1 flex-1">
-                            <label className="text-xs text-gray-500 font-medium">Year</label>
-                            <input
-                              type="text"
-                              value={editData.mthyr || quote.mthyr || ''}
-                              onChange={(e) => handleQuoteEditChange('mthyr', e.target.value)}
-                              className="px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                              onClick={(e) => e.stopPropagation()}
-                              placeholder="e.g. 9/2017"
-                            />
-                          </div>
-                          <div className="flex flex-col space-y-1 flex-1">
-                            <label className="text-xs text-gray-500 font-medium">Series</label>
-                            <input
-                              type="text"
-                              value={editData.series || quote.series || ''}
-                              onChange={(e) => handleQuoteEditChange('series', e.target.value)}
-                              className="px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                              onClick={(e) => e.stopPropagation()}
-                              placeholder="Series"
-                            />
-                          </div>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <div className="flex flex-col space-y-1 flex-1">
-                            <label className="text-xs text-gray-500 font-medium">Body</label>
-                            <input
-                              type="text"
-                              value={editData.body || quote.body || ''}
-                              onChange={(e) => handleQuoteEditChange('body', e.target.value)}
-                              className="px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                              onClick={(e) => e.stopPropagation()}
-                              placeholder="e.g. 5 Door Hatchback"
-                            />
-                          </div>
-                          <div className="flex flex-col space-y-1 flex-1">
-                            <label className="text-xs text-gray-500 font-medium">Transmission</label>
-                            <select
-                              value={editData.auto !== undefined ? editData.auto.toString() : quote.auto.toString()}
-                              onChange={(e) => handleQuoteEditChange('auto', e.target.value === 'true')}
-                              className="px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              <option value="true">Auto</option>
-                              <option value="false">Manual</option>
-                            </select>
-                          </div>
-                        </div>
-                      </div>
-                        ) : (
-                      <div className="flex flex-col space-y-1">
-                        <div className="flex items-center space-x-2">
-                          <span className="font-medium text-gray-900">{quote.make} • {quote.model}</span>
-                        </div>
-                        <div className="flex items-center space-x-1 text-xs text-gray-600">
-                          <span>{quote.mthyr || '-'}</span>
-                          {quote.series && (
-                            <>
-                              <span>•</span>
-                              <span>{quote.series}</span>
-                            </>
-                          )}
-                        </div>
-                        <div className="flex items-center space-x-1 text-xs text-gray-600">
-                          <span>{quote.body || '-'}</span>
-                          {quote.auto !== undefined && (
-                            <>
-                              <span>•</span>
-                              <span>{quote.auto ? 'Auto' : 'Manual'}</span>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                    )}
-                  </div>
+                  <VehicleDetails
+                    quote={quote}
+                    editingQuote={editingQuote === quote.id ? editingQuote : null}
+                    editData={editData}
+                    onQuoteEditChange={handleQuoteEditChange}
+                  />
 
                   {/* Status */}
                   <div>
                     <div className="flex space-y-1">
-                      {getStatusChip(status)}
+                      <QuoteStatus status={status} />
                      
                     </div>
                   </div>
@@ -1607,42 +1402,33 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                         
                         {/* Confirmation button for waiting_verification status */}
                         {status === 'waiting_verification' && (
-                          <button
+                          <VerifyButton
                                         onClick={(e) => {
               e.stopPropagation();
               handleVerifyQuote(quote.id);
             }}
-                            className="p-1 bg-green-600 hover:bg-green-700 text-white rounded-full transition-colors cursor-pointer"
                             title="Confirm pricing and move to priced status"
-                          >
-                            <CheckCircle className="h-5 w-5 font-bold" />
-                          </button>
+                          />
                         )}
                         
                         {status === 'priced' && onMarkCompleted && (
-                          <button
+                          <CompleteButton
                                         onClick={(e) => {
               e.stopPropagation();
               onMarkCompleted(quote.id);
             }}
-                            className="p-1 text-green-600 hover:text-green-700 hover:bg-green-100 rounded transition-colors cursor-pointer"
                             title="Mark as completed"
-                          >
-                            <CheckCircle className="h-4 w-4" />
-                          </button>
+                          />
                         )}
                         
                         {status === 'completed' && (onMarkAsOrdered || onMarkAsOrderedWithParts) && (
-                          <button
+                          <OrderButton
                             onClick={(e) => {
                               e.stopPropagation();
                               handleMarkAsOrder(quote.id);
                             }}
-                            className="p-1 text-purple-600 hover:text-purple-700 hover:bg-purple-100 rounded transition-colors cursor-pointer"
                             title="Mark as order"
-                          >
-                            <ShoppingCart className="h-4 w-4" />
-                          </button>
+                          />
                         )}
                       </>
                     )}
@@ -1661,43 +1447,43 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                           <span className="text-sm text-gray-500">No parts linked to this quote</span>
                         )}
                         {quoteParts.length > 0 && editingParts !== quote.id && quote.status !== 'completed' && (
-                          <button
+                          <SmallActionButton
                             onClick={(e) => {
                               e.stopPropagation();
                               startEditingParts(quoteParts, quote.id);
                             }}
-                            className="px-3 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700 transition-colors cursor-pointer flex items-center space-x-1"
+                            variant="danger"
+                            icon={<Edit className="h-3 w-3" />}
                             title="Edit all parts in this quote"
                           >
-                            <Edit className="h-3 w-3" />
-                            <span>Edit Parts</span>
-                          </button>
+                            Edit Parts
+                          </SmallActionButton>
                         )}
                         {editingParts === quote.id && (
                           <div className="flex space-x-1">
-                            <button
+                            <SmallActionButton
                               onClick={(e) => {
                                 e.stopPropagation();
                                 handleSave();
                               }}
-                              className="px-3 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700 transition-colors cursor-pointer flex items-center space-x-1"
+                              variant="success"
+                              icon={<Save className="h-3 w-3" />}
                               title="Save all part changes"
                             >
-                              <Save className="h-3 w-3" />
-                              <span>Save All</span>
-                            </button>
-                            <button
+                              Save All
+                            </SmallActionButton>
+                            <SmallActionButton
                               onClick={(e) => {
                                 e.stopPropagation();
                                 setEditingParts(null);
                                 setPartEditData({});
                               }}
-                              className="px-3 py-1 text-xs bg-gray-600 text-white rounded hover:bg-gray-700 transition-colors cursor-pointer flex items-center space-x-1"
+                              variant="secondary"
+                              icon={<X className="h-3 w-3" />}
                               title="Cancel editing and discard changes"
                             >
-                              <X className="h-3 w-3" />
-                              <span>Cancel</span>
-                            </button>
+                              Cancel
+                            </SmallActionButton>
                           </div>
                         )}
                       </div>
@@ -2017,7 +1803,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                           </div>
                         </div>
                         <div className="flex flex-col items-end space-y-1">
-                          {getStatusChip(status)}
+                          <QuoteStatus status={status} />
                           <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
                             {quoteParts.length} {quoteParts.length === 1 ? 'part' : 'parts'}
                           </span>
@@ -2030,39 +1816,13 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                       </div>
                       
                       {/* Row 2: Vehicle Info Actions */}
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-2">
-                          <span className="text-lg">
-                            <img 
-                              src={getVehicleLogo(quote.make)} 
-                              alt={quote.make} 
-                              className="h-8 w-8 object-contain" 
+                                              <div className="flex items-center justify-between">
+                          <div className="flex items-center space-x-2">
+                            <VehicleDetails
+                              quote={quote}
+                              isCompact={true}
                             />
-                          </span>
-                          <div className="flex flex-col space-y-1">
-                            <div className="flex items-center space-x-2">
-                              <span className="text-sm font-medium text-gray-900">{quote.make} - {quote.model}</span>
-                            </div>
-                            <div className="flex items-center space-x-2 text-xs text-gray-600">
-                              <span>{quote.mthyr || '-'}</span>
-                              {quote.series && (
-                                <>
-                                  <span>•</span>
-                                  <span>{quote.series}</span>
-                                </>
-                              )}
-                            </div>
-                            <div className="flex items-center space-x-2 text-xs text-gray-600">
-                              <span>{quote.body || '-'}</span>
-                              {quote.auto !== undefined && (
-                                <>
-                                  <span>•</span>
-                                  <span>{quote.auto ? 'Auto' : 'Manual'}</span>
-                                </>
-                              )}
-                            </div>
                           </div>
-                      </div>
                       
                       {/* Action Buttons for Mobile */}
                       {(quote.status !== 'completed' || showCompleted) && (
@@ -2091,42 +1851,33 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                           
                           {/* Confirmation button for waiting_verification status */}
                           {status === 'waiting_verification' && (
-                            <button
+                            <VerifyButton
                                           onClick={(e) => {
               e.stopPropagation();
               handleVerifyQuote(quote.id);
             }}
-                              className="p-1 bg-green-600 hover:bg-green-700 text-white rounded-full transition-colors cursor-pointer"
                               title="Confirm pricing and move to priced status"
-                            >
-                              <CheckCircle className="h-5 w-5 font-bold" />
-                            </button>
+                            />
                           )}
                           
                           {status === 'priced' && onMarkCompleted && (
-                                  <button
+                                  <CompleteButton
                                                 onClick={(e) => {
               e.stopPropagation();
               onMarkCompleted(quote.id);
             }}
-                              className="p-2 text-green-600 hover:text-green-700 hover:bg-green-100 rounded transition-colors cursor-pointer"
                               title="Mark as completed"
-                                  >
-                                    <CheckCircle className="h-4 w-4" />
-                                  </button>
+                                  />
                                 )}
                           
                           {status === 'completed' && (onMarkAsOrdered || onMarkAsOrderedWithParts) && (
-                                <button
+                                <OrderButton
                                   onClick={(e) => {
                                     e.stopPropagation();
                                 handleMarkAsOrder(quote.id);
                                   }}
-                              className="p-2 text-purple-600 hover:text-purple-700 hover:bg-purple-100 rounded transition-colors cursor-pointer"
                               title="Mark as order"
-                                >
-                              <ShoppingCart className="h-4 w-4" />
-                                </button>
+                                />
                             )}
                           </div>
                         )}
@@ -2165,43 +1916,43 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                   <span className="text-sm text-gray-500">No parts linked to this quote</span>
                                 )}
                           {quoteParts.length > 0 && editingParts !== quote.id && quote.status !== 'completed' && (
-                                  <button
+                                  <SmallActionButton
                               onClick={(e) => {
                                 e.stopPropagation();
                                 startEditingParts(quoteParts, quote.id);
                               }}
-                              className="px-3 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700 transition-colors cursor-pointer flex items-center space-x-1"
+                              variant="danger"
+                              icon={<Edit className="h-3 w-3" />}
                               title="Edit all parts in this quote"
                                   >
-                                    <Edit className="h-3 w-3" />
-                              <span>Edit Parts</span>
-                                  </button>
+                                    Edit Parts
+                                  </SmallActionButton>
                                 )}
                           {editingParts === quote.id && (
                                   <div className="flex space-x-1">
-                                    <button
+                                    <SmallActionButton
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   handleSave();
                                 }}
-                                className="px-3 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700 transition-colors cursor-pointer flex items-center space-x-1"
+                                variant="success"
+                                icon={<Save className="h-3 w-3" />}
                                 title="Save all part changes"
                                     >
-                                      <Save className="h-3 w-3" />
-                                      <span>Save All</span>
-                                    </button>
-                                    <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setEditingParts(null);
+                                      Save All
+                                    </SmallActionButton>
+                                                                         <SmallActionButton
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setEditingParts(null);
                                         setPartEditData({});
                                       }}
-                                className="px-3 py-1 text-xs bg-gray-600 text-white rounded hover:bg-gray-700 transition-colors cursor-pointer flex items-center space-x-1"
+                                variant="secondary"
+                                icon={<X className="h-3 w-3" />}
                                 title="Cancel editing and discard changes"
                                     >
-                                      <X className="h-3 w-3" />
-                                      <span>Cancel</span>
-                                    </button>
+                                      Cancel
+                                    </SmallActionButton>
                                   </div>
                                 )}
                               </div>
@@ -2388,20 +2139,22 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
               Are you sure you want to delete this quote? This will permanently remove the quote and all associated parts.
             </p>
             
-            <div className="flex space-x-3">
-              <button
-                onClick={cancelDelete}
-                className="flex-1 px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg font-medium transition-colors cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => confirmDelete(showDeleteConfirm)}
-                className="flex-1 px-4 py-2 text-white bg-red-600 hover:bg-red-700 rounded-lg font-medium transition-colors cursor-pointer"
-              >
-                Delete Quote
-              </button>
-            </div>
+                         <ButtonGroup className="flex space-x-3">
+               <LargeActionButton
+                  onClick={cancelDelete}
+                  variant="ghost"
+                  fullWidth
+                >
+                  Cancel
+                </LargeActionButton>
+                <LargeActionButton
+                  onClick={() => confirmDelete(showDeleteConfirm)}
+                  variant="danger"
+                  fullWidth
+                >
+                  Delete Quote
+                </LargeActionButton>
+              </ButtonGroup>
           </div>
         </div>
       )}
@@ -2530,80 +2283,36 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
               );
             })()}
            
-            <div className="flex space-x-3">
-              <button
-                onClick={cancelOrder}
-                className="flex-1 px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg font-medium transition-colors cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => confirmOrder()}
-                className="flex-1 px-4 py-2 text-white bg-red-600 hover:bg-red-700 rounded-lg font-medium transition-colors cursor-pointer"
-              >
-                Mark as Order
-              </button>
-            </div>
+                         <ButtonGroup className="flex space-x-3">
+               <LargeActionButton
+                  onClick={cancelOrder}
+                  variant="ghost"
+                  fullWidth
+                >
+                  Cancel
+                </LargeActionButton>
+                <LargeActionButton
+                  onClick={() => confirmOrder()}
+                  variant="danger"
+                  fullWidth
+                >
+                  Mark as Order
+                </LargeActionButton>
+              </ButtonGroup>
           </div>
         </div>
       )}
       
       {/* Pagination Controls */}
       {showPagination && quotes.length > 0 && (
-        <div className="mt-6 bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-          <div className="flex items-center justify-between">
-            <div className="text-sm text-gray-700">
-              Showing {startIndex + 1} to {Math.min(endIndex, quotes.length)} of {quotes.length} quotes
-            </div>
-            
-            <div className="flex items-center space-x-2">
-              {/* Previous Page Button */}
-              <button
-                onClick={goToPrevPage}
-                disabled={uiCurrentPage === 1}
-                className={`px-3 py-2 text-sm font-medium rounded-lg border transition-colors ${
-                  uiCurrentPage === 1
-                    ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
-                    : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50 hover:border-gray-400'
-                }`}
-              >
-                Previous
-              </button>
-              
-              {/* Page Numbers */}
-              <div className="flex items-center space-x-1">
-                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                  const page = i + 1;
-                  return (
-                    <button
-                      key={page}
-                      onClick={() => goToPage(page)}
-                      className={`px-3 py-2 text-sm font-medium rounded-lg border transition-colors ${
-                        page === uiCurrentPage
-                          ? 'bg-red-600 text-white border-red-600'
-                          : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50 hover:border-gray-400'
-                      }`}
-                    >
-                      {page}
-                    </button>
-                  );
-                })}
-              </div>
-              
-              {/* Next Page Button */}
-              <button
-                onClick={goToNextPage}
-                disabled={uiCurrentPage === totalPages}
-                className={`px-3 py-2 text-sm font-medium rounded-lg border transition-colors ${
-                  uiCurrentPage === totalPages
-                    ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
-                    : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50 hover:border-gray-400'
-                }`}
-              >
-                Next
-              </button>
-            </div>
-          </div>
+        <div className="mt-6">
+          <Pagination
+            currentPage={uiCurrentPage}
+            totalPages={totalPages}
+            totalItems={quotes.length}
+            pageSize={uiPageSize}
+            onPageChange={goToPage}
+          />
         </div>
       )}
       

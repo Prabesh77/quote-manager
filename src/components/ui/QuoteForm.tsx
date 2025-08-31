@@ -94,6 +94,7 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
     customer: '',
     address: '',
     phone: '',
+    notes: '',
   });
   const [selectedParts, setSelectedParts] = useState<string[]>([]);
   const [partDetails, setPartDetails] = useState<Record<string, PartDetails>>({});
@@ -389,6 +390,7 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
       customer: parsed['customer'] || '',
       address: parsed['address'] || '',
       phone: parsed['phone'] || '',
+      notes: parsed['notes'] || '',
     });
 
     // Auto-open the form accordion when data is populated
@@ -421,6 +423,7 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
       customer: '',
       address: '',
       phone: '',
+      notes: '',
     });
     setSelectedParts([]);
     setPartDetails({});
@@ -530,9 +533,9 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
                 value={rawText}
                 onChange={(e) => setRawText(e.target.value)}
                 onPaste={(e) => {
-                  // Get the pasted text immediately
                   const pastedText = e.clipboardData.getData('text');
                   setRawText(pastedText);
+                                    
                   // Process the pasted text directly
                   const lines = pastedText.split('\n');
                   const parsed: Record<string, string> = {};
@@ -547,16 +550,25 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
                     let key = '';
                     let value = '';
 
-                    // Pattern 1: "Reference28495#2" (no space) - but exclude "Model Nr"
-                    if (trimmedLine.match(/^(Reference|Make|Series|Trans|Body|Mth\/Yr|Veh Reg)(.+)$/i)) {
+                    // Pattern 1: "Reference28495#2" (no space) - OLD FORMAT ONLY (no colons)
+                    if (!trimmedLine.includes(':') && trimmedLine.match(/^(Reference|Make|Series|Trans|Body|Mth\/Yr|Veh Reg)(.+)$/i)) {
                       const match = trimmedLine.match(/^(Reference|Make|Series|Trans|Body|Mth\/Yr|Veh Reg)(.+)$/i);
                       if (match) {
                         key = match[1].toLowerCase();
                         value = match[2].trim();
+                        switch (key) {
+                          case 'reference': parsed['quoteRef'] = value; break;
+                          case 'make': parsed['make'] = value; break;
+                          case 'series': parsed['series'] = value; break;
+                          case 'trans': parsed['auto'] = value.toLowerCase().includes('auto') ? 'true' : 'false'; break;
+                          case 'body': parsed['body'] = value; break;
+                          case 'mth/yr': parsed['mthyr'] = value; break;
+                          case 'veh reg': parsed['rego'] = value; break;
+                        }
                       }
                     }
-                    // Pattern 1.5: "ModelAccent" (Model without space) - but ignore "Model Nr"
-                    else if (trimmedLine.match(/^Model(.+)$/i)) {
+                    // Pattern 1.5: "ModelAccent" (Model without space) - OLD FORMAT ONLY (no colons)
+                    else if (!trimmedLine.includes(':') && trimmedLine.match(/^Model(.+)$/i)) {
                       const match = trimmedLine.match(/^Model(.+)$/i);
                       if (match) {
                         const modelValue = match[1].trim();
@@ -564,15 +576,25 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
                         if (modelValue !== 'Nr') {
                           key = 'model';
                           value = modelValue;
+                          parsed['model'] = modelValue;
                         }
                       }
                     }
-                    // Pattern 2: "Reference 28495#2" (with space)
-                    else if (trimmedLine.match(/^(Reference|Make|Series|Trans|Body|Mth\/Yr|Veh Reg)\s+(.+)$/i)) {
+                    // Pattern 2: "Reference 28495#2" (with space) - OLD FORMAT ONLY (no colons)
+                    else if (!trimmedLine.includes(':') && trimmedLine.match(/^(Reference|Make|Series|Trans|Body|Mth\/Yr|Veh Reg)\s+(.+)$/i)) {
                       const match = trimmedLine.match(/^(Reference|Make|Series|Trans|Body|Mth\/Yr|Veh Reg)\s+(.+)$/i);
                       if (match) {
                         key = match[1].toLowerCase();
                         value = match[2].trim();
+                        switch (key) {
+                          case 'reference': parsed['quoteRef'] = value; break;
+                          case 'make': parsed['make'] = value; break;
+                          case 'series': parsed['series'] = value; break;
+                          case 'trans': parsed['auto'] = value.toLowerCase().includes('auto') ? 'true' : 'false'; break;
+                          case 'body': parsed['body'] = value; break;
+                          case 'mth/yr': parsed['mthyr'] = value; break;
+                          case 'veh reg': parsed['rego'] = value; break;
+                        }
                       }
                     }
                     // Pattern 3: "Ph:" followed by phone number (check before general colon pattern)
@@ -583,10 +605,90 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
                     }
                     // Pattern 4: "Reference: 28495#2" (with colon)
                     else if (trimmedLine.includes(':')) {
-                      const [k, ...rest] = trimmedLine.split(':');
-                      key = k.trim().toLowerCase();
-                      value = rest.join(':').trim();
+                      const colonIndex = trimmedLine.indexOf(':');
+                      key = trimmedLine.substring(0, colonIndex).trim().toLowerCase();
+                      value = trimmedLine.substring(colonIndex + 1).trim(); // +1 to skip the colon
 
+                      // Special handling for purchaser field - split customer name, address, and phone
+                      if (key === 'purchaser') {
+                        // Format: "Customer Name - Address Ph: Phone"
+                        if (value.includes(' - ') && value.includes('Ph:')) {
+                          const dashIndex = value.indexOf(' - ');
+                          const phIndex = value.indexOf('Ph:');
+                                                    
+                          const customerName = value.substring(0, dashIndex).trim();
+                          const address = value.substring(dashIndex + 3, phIndex).trim();
+                          const phone = value.substring(phIndex + 3).trim(); // +3 to skip "Ph:"
+                                                    
+                          parsed['customer'] = customerName;
+                          parsed['address'] = address;
+                          parsed['phone'] = phone;
+                          // Skip normal processing for this field
+                          key = '';
+                          value = '';
+                        }
+                        // Fallback: put everything in customer field
+                        else {
+                          parsed['customer'] = value;
+                          // Skip normal processing for this field
+                          key = '';
+                          value = '';
+                        }
+                      }
+                      // General colon-separated fields
+                      else {
+                        switch (key) {
+                          case 'reference':
+                          case 'quote nr':
+                            parsed['quoteRef'] = value;
+                            break;
+                          case 'vin':
+                            parsed['vin'] = value;
+                            break;
+                          case 'make':
+                            parsed['make'] = value;
+                            break;
+                          case 'model':
+                            parsed['model'] = value;
+                            break;
+                          case 'series':
+                            parsed['series'] = value;
+                            break;
+                          case 'trans':
+                            parsed['auto'] = value.toLowerCase().includes('auto') ? 'true' : 'false';
+                            break;
+                          case 'body':
+                            parsed['body'] = value;
+                            break;
+                          case 'mth/yr':
+                          case 'mthyr':
+                            parsed['mthyr'] = value;
+                            break;
+                          case 'veh reg':
+                          case 'veh reg.':
+                            parsed['rego'] = value;
+                            break;
+                          case 'colour':
+                            parsed['color'] = value;
+                            break;
+                          case 'phone':
+                          case 'ph':
+                            parsed['phone'] = value;
+                            break;
+                          case 'address':
+                            parsed['address'] = value;
+                            break;
+                          case 'estimator':
+                          case 'quote status':
+                          case 'claim nr':
+                          case 'est. delivery':
+                          case 'internal status':
+                          case 'sales rep':
+                          case 'settlement %':
+                            parsed['notes'] = (parsed['notes'] || '') + ` ${key.replace(/\b\w/g, l => l.toUpperCase())}: ${value}`;
+                            break;
+                        }
+                      }
                     }
                     // Pattern 5: Standalone "VIN" followed by value on next line
                     else if (trimmedLine === 'VIN' && i + 1 < lines.length) {
@@ -699,6 +801,7 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
                     }
                   }
 
+                  
                   // Update form fields
                   setFields({
                     quoteRef: parsed['quoteRef'] || '',
@@ -714,7 +817,9 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
                     customer: parsed['customer'] || '',
                     address: parsed['address'] || '',
                     phone: parsed['phone'] || '',
+                    notes: parsed['notes'] || '',
                   });
+
                 }}
                 placeholder="Paste Quote..."
                 className="w-full h-32 p-4 text-sm border-2 border-gray-300 rounded-lg shadow-sm focus:border-red-500 focus:ring-2 focus:ring-red-200 focus:outline-none transition-all duration-200 bg-gray-50 font-mono resize-none"

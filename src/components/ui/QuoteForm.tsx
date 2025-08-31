@@ -535,9 +535,7 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
                 onPaste={(e) => {
                   const pastedText = e.clipboardData.getData('text');
                   setRawText(pastedText);
-                  
-                  console.log('🔍 Starting paste processing with:', pastedText);
-                  
+                                    
                   // Process the pasted text directly
                   const lines = pastedText.split('\n');
                   const parsed: Record<string, string> = {};
@@ -611,35 +609,26 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
                       key = trimmedLine.substring(0, colonIndex).trim().toLowerCase();
                       value = trimmedLine.substring(colonIndex + 1).trim(); // +1 to skip the colon
 
-                      console.log('🔍 Processing colon-separated line:', { key, value });
-
                       // Special handling for purchaser field - split customer name, address, and phone
                       if (key === 'purchaser') {
-                        console.log('🔍 Processing purchaser field:', value);
                         // Format: "Customer Name - Address Ph: Phone"
                         if (value.includes(' - ') && value.includes('Ph:')) {
                           const dashIndex = value.indexOf(' - ');
                           const phIndex = value.indexOf('Ph:');
-                          
-                          console.log('🔍 Found delimiters - dashIndex:', dashIndex, 'phIndex:', phIndex);
-                          
+                                                    
                           const customerName = value.substring(0, dashIndex).trim();
                           const address = value.substring(dashIndex + 3, phIndex).trim();
                           const phone = value.substring(phIndex + 3).trim(); // +3 to skip "Ph:"
-                          
-                          console.log('🔍 Extracted values:', { customerName, address, phone });
-                          
+                                                    
                           parsed['customer'] = customerName;
                           parsed['address'] = address;
                           parsed['phone'] = phone;
-                          console.log('🔍 Purchaser parsed:', { customer: customerName, address, phone });
                           // Skip normal processing for this field
                           key = '';
                           value = '';
                         }
                         // Fallback: put everything in customer field
                         else {
-                          console.log('🔍 Purchaser fallback - no delimiters found');
                           parsed['customer'] = value;
                           // Skip normal processing for this field
                           key = '';
@@ -812,7 +801,6 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
                     }
                   }
 
-                  console.log('🔍 Final parsed object:', parsed);
                   
                   // Update form fields
                   setFields({
@@ -832,22 +820,6 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
                     notes: parsed['notes'] || '',
                   });
 
-                  console.log('🔍 Form fields set with values:', {
-                    quoteRef: parsed['quoteRef'] || '',
-                    vin: parsed['vin'] || '',
-                    make: parsed['make'] || '',
-                    model: parsed['model'] || '',
-                    series: parsed['series'] || '',
-                    auto: parsed['auto'] || 'true',
-                    body: parsed['body'] || '',
-                    mthyr: parsed['mthyr'] || '',
-                    rego: parsed['rego'] || '',
-                    requiredBy: parsed['requiredBy'] || '',
-                    customer: parsed['customer'] || '',
-                    address: parsed['address'] || '',
-                    phone: parsed['phone'] || '',
-                    notes: parsed['notes'] || '',
-                  });
                 }}
                 placeholder="Paste Quote..."
                 className="w-full h-32 p-4 text-sm border-2 border-gray-300 rounded-lg shadow-sm focus:border-red-500 focus:ring-2 focus:ring-red-200 focus:outline-none transition-all duration-200 bg-gray-50 font-mono resize-none"

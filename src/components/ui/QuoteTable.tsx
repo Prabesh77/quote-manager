@@ -14,6 +14,7 @@ import {
 import supabase from '@/utils/supabase';
 import { getQuotePartsFromJson } from '@/utils/quotePartsHelpers';
 import { QuoteEditModal } from './QuoteEditModal';
+import QuickFillInput from './QuickFillInput';
 
 
 interface QuoteTableProps {
@@ -1870,12 +1871,11 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                               <div className="flex items-center justify-between">
                                                 <div className="flex items-center space-x-1 flex-1">
                                                   {isPartEditing ? (
-                                                    <input
-                                                      type="text"
+                                                    <QuickFillInput
                                                       value={partEditData[part.id]?.[variant.id]?.note !== undefined ? partEditData[part.id][variant.id].note : variant.note || ''}
-                                                      onChange={(e) => handleVariantEditChange(part.id, variant.id, 'note', e.target.value)}
-                                                                                                        className={`w-full px-2 py-1 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 ${index === 0 ? 'bg-white' : 'bg-gray-50'}`}
-                                                  placeholder="Add notes..."
+                                                      onChange={(value) => handleVariantEditChange(part.id, variant.id, 'note', value)}
+                                                      placeholder="Add notes..."
+                                                      className={`w-full ${index === 0 ? 'bg-white' : 'bg-gray-50'}`}
                                                     />
                                                   ) : (
                                                     <>
@@ -2319,11 +2319,10 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                               <label className="block text-xs font-medium text-gray-500 mb-1">Notes</label>
                                               <div className="flex items-center space-x-1">
                                                 {isPartEditing ? (
-                                                  <input
-                                                    type="text"
-                                                                                                    value={partEditData[part.id]?.note || ''}
-                                                onChange={(e) => handlePartEditChange(part.id, 'note', e.target.value)}
-                                                className="flex-1 px-2 py-1 border border-gray-300 rounded-md text-sm focus:ring-1 focus:ring-red-500 focus:border-transparent"
+                                                  <QuickFillInput
+                                                    value={partEditData[part.id]?.note || ''}
+                                                    onChange={(value) => handlePartEditChange(part.id, 'note', value)}
+                                                    className="flex-1"
                                                   />
                                                 ) : (
                                                   <>

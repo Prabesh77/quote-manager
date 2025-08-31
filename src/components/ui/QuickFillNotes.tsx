@@ -185,20 +185,10 @@ const QuickFillNotes: React.FC<QuickFillNotesProps> = ({
   // Calculate position relative to viewport
   const getPopupPosition = () => {
     if (!triggerRef.current) {
-      console.log('❌ No triggerRef.current');
       return { top: 0, left: 0 };
     }
     
     const rect = triggerRef.current.getBoundingClientRect();
-    console.log('📍 Input element position:', {
-      top: rect.top,
-      left: rect.left,
-      bottom: rect.bottom,
-      right: rect.right,
-      width: rect.width,
-      height: rect.height
-    });
-    
     const popupWidth = 700; // Width of the popup
     const popupHeight = 320; // Approximate height of the popup
     
@@ -206,34 +196,27 @@ const QuickFillNotes: React.FC<QuickFillNotesProps> = ({
     let left = rect.left;
     let top = rect.bottom + 5;
     
-    console.log('📍 Initial popup position:', { top, left });
-    
     // Check if popup would go off the right edge
     if (left + popupWidth > window.innerWidth) {
       left = window.innerWidth - popupWidth - 10;
-      console.log('📍 Adjusted left for right edge:', left);
     }
     
     // Check if popup would go off the left edge
     if (left < 10) {
       left = 10;
-      console.log('📍 Adjusted left for left edge:', left);
     }
     
     // Check if popup would go off the bottom edge
     if (top + popupHeight > window.innerHeight) {
       // Show above the input instead
       top = rect.top - popupHeight - 5;
-      console.log('📍 Adjusted top to show above input:', top);
     }
     
     // Ensure popup doesn't go above the top of the viewport
     if (top < 10) {
       top = 10;
-      console.log('📍 Adjusted top for viewport top:', top);
     }
     
-    console.log('📍 Final popup position:', { top, left });
     return { top, left };
   };
 

@@ -1711,11 +1711,10 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                               <table className="w-full">
                                 <thead className="bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200">
                                   <tr>
-                                    <th className="px-4 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Part & Variants</th>
-                                    <th className="px-4 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Part Number</th>
-                                    <th className="px-4 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Price</th>
-                                    <th className="px-4 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Notes</th>
-
+                                    <th className="px-4 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider w-1/4">Part & Variants</th>
+                                    <th className="px-4 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider w-1/4">Part Number</th>
+                                    <th className="px-4 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider w-1/6">Price</th>
+                                    <th className="px-4 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider w-1/3">Notes</th>
                                   </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-200">
@@ -1867,15 +1866,15 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                                 )}
                                               </div>
                                             </td>
-                                            <td className="px-4 py-1">
+                                            <td className="px-4 py-1 min-w-0">
                                               <div className="flex items-center justify-between">
-                                                <div className="flex items-center space-x-1 flex-1">
+                                                <div className="flex items-center space-x-1 flex-1 min-w-0">
                                                   {isPartEditing ? (
                                                     <QuickFillInput
                                                       value={partEditData[part.id]?.[variant.id]?.note !== undefined ? partEditData[part.id][variant.id].note : variant.note || ''}
                                                       onChange={(value) => handleVariantEditChange(part.id, variant.id, 'note', value)}
                                                       placeholder="Add notes..."
-                                                      className={`w-full ${index === 0 ? 'bg-white' : 'bg-gray-50'}`}
+                                                      className={`flex-1 ${index === 0 ? 'bg-white' : 'bg-gray-50'}`}
                                                     />
                                                   ) : (
                                                     <>
@@ -2317,7 +2316,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                             
                                             <div>
                                               <label className="block text-xs font-medium text-gray-500 mb-1">Notes</label>
-                                              <div className="flex items-center space-x-1">
+                                              <div className="flex items-center space-x-1 min-w-0">
                                                 {isPartEditing ? (
                                                   <QuickFillInput
                                                     value={partEditData[part.id]?.note || ''}

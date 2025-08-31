@@ -142,8 +142,6 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
     // Only add to local state, don't save to database yet
     const newVariantId = generateVariantId();
     
-    // Debug logging removed - issue resolved
-    
     // Use functional updates to ensure state consistency and prevent race conditions
     setPartEditData(prev => {
       const existingPartData = prev[partId] || {};
@@ -162,47 +160,25 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
     
     // Add to local quote state for display - use functional update for consistency
     setLocalQuotes(prev => {
-      
       const updatedQuotes = prev.map(q => 
         q.id === quoteId 
           ? {
               ...q,
               partsRequested: q.partsRequested.map(p => 
                 p.part_id === partId 
-                  ? (() => {
-                      
-                      // Get the existing partEditData to ensure we have the default variant
-                      const existingEditData = partEditData[partId] || {};
-                      const hasDefaultVariant = existingEditData['default'];
-                      
-                      // Start with existing variants from localQuotes (if any)
-                      let variants = p.variants || [];
-                      
-                      // Only add default variant if it doesn't already exist in variants
-                      if (hasDefaultVariant && !variants.some(v => v.id === 'default')) {
-                        variants = [{
-                          id: 'default',
-                          note: existingEditData['default'].note || '',
-                          final_price: existingEditData['default'].final_price,
+                  ? {
+                      ...p,
+                      variants: [
+                        ...(p.variants || []),
+                        {
+                          id: newVariantId,
+                          note: '',
+                          final_price: null,
                           created_at: new Date().toISOString(),
-                          is_default: true
-                        }, ...variants];
-                      }
-                      
-                      // Add the new variant
-                      const newVariant = {
-                        id: newVariantId,
-                        note: '',
-                        final_price: null,
-                        created_at: new Date().toISOString(),
-                        is_default: false
-                      };
-                      
-                      return {
-                        ...p, 
-                        variants: [...variants, newVariant]
-                      };
-                    })()
+                          is_default: false
+                        }
+                      ]
+                    }
                   : p
               )
             }
@@ -1723,11 +1699,9 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                     const localQuote = localQuotes.find(q => q.id === quote.id);
                                     const quotePart = localQuote?.partsRequested?.find(qp => qp.part_id === part.id);
 
-                                    // Only create fallback variant if no variants exist AND we're not editing
-                                    // Use our transformed data with variants, fallback to part data if no variants
-                                    const partWithVariants = part as any; // Cast to access variants
-                                    const variants = partWithVariants.variants && partWithVariants.variants.length > 0 
-                                      ? partWithVariants.variants 
+                                    // Get variants from localQuotes if available, otherwise fallback to part data
+                                    const variants = quotePart?.variants && quotePart.variants.length > 0 
+                                      ? quotePart.variants 
                                       : [{ 
                                           id: 'default', 
                                           note: part.note, 

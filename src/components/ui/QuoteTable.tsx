@@ -15,6 +15,7 @@ import supabase from '@/utils/supabase';
 import { getQuotePartsFromJson } from '@/utils/quotePartsHelpers';
 import { QuoteEditModal } from './QuoteEditModal';
 import QuickFillInput from './QuickFillInput';
+import { QuoteActionsService } from '@/services/quoteActions/quoteActionsService';
 
 
 interface QuoteTableProps {
@@ -945,6 +946,14 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
         console.error('❌ Error verifying quote:', result.error);
         // You could show a snackbar or error message here
         return;
+      }
+      
+      // Track quote pricing action
+      try {
+        await QuoteActionsService.trackQuoteAction(quoteId, 'PRICED');
+      } catch (trackingError) {
+        console.warn('Failed to track quote pricing:', trackingError);
+        // Don't fail the operation if tracking fails
       }
       
       console.log('✅ Quote verified successfully, status updated to "priced"');

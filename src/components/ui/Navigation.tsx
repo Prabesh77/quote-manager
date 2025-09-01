@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Plus, DollarSign, CheckCircle, ShoppingCart, FileText, BarChart3, Menu, X } from 'lucide-react';
+import { Plus, DollarSign, CheckCircle, ShoppingCart, FileText, BarChart3, Menu, X, TrendingUp } from 'lucide-react';
 import { ConnectionStatus } from '@/components/common/ConnectionStatus';
 
 const Navigation = () => {
@@ -40,6 +40,12 @@ const Navigation = () => {
       href: '/orders',
       icon: ShoppingCart,
       description: 'Manage orders'
+    },
+    {
+      name: 'User Stats',
+      href: '/user-stats',
+      icon: TrendingUp,
+      description: 'View user performance'
     }
   ];
 
@@ -70,7 +76,8 @@ const Navigation = () => {
                 (item.href === '/pricing' && pathname.startsWith('/pricing')) ||
                 (item.href === '/priced' && pathname.startsWith('/priced')) ||
                 (item.href === '/completed-quotes' && pathname.startsWith('/completed-quotes')) ||
-                (item.href === '/orders' && pathname.startsWith('/orders'));
+                (item.href === '/orders' && pathname.startsWith('/orders')) ||
+                (item.href === '/user-stats' && pathname.startsWith('/user-stats'));
               
               const IconComponent = item.icon;
 

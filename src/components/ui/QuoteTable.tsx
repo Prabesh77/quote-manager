@@ -14,6 +14,7 @@ import {
 import supabase from '@/utils/supabase';
 import { getQuotePartsFromJson } from '@/utils/quotePartsHelpers';
 import { QuoteEditModal } from './QuoteEditModal';
+import QuickFillInput from './QuickFillInput';
 
 
 interface QuoteTableProps {
@@ -141,8 +142,6 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
     // Only add to local state, don't save to database yet
     const newVariantId = generateVariantId();
     
-    // Debug logging removed - issue resolved
-    
     // Use functional updates to ensure state consistency and prevent race conditions
     setPartEditData(prev => {
       const existingPartData = prev[partId] || {};
@@ -161,47 +160,25 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
     
     // Add to local quote state for display - use functional update for consistency
     setLocalQuotes(prev => {
-      
       const updatedQuotes = prev.map(q => 
         q.id === quoteId 
           ? {
               ...q,
               partsRequested: q.partsRequested.map(p => 
                 p.part_id === partId 
-                  ? (() => {
-                      
-                      // Get the existing partEditData to ensure we have the default variant
-                      const existingEditData = partEditData[partId] || {};
-                      const hasDefaultVariant = existingEditData['default'];
-                      
-                      // Start with existing variants from localQuotes (if any)
-                      let variants = p.variants || [];
-                      
-                      // Only add default variant if it doesn't already exist in variants
-                      if (hasDefaultVariant && !variants.some(v => v.id === 'default')) {
-                        variants = [{
-                          id: 'default',
-                          note: existingEditData['default'].note || '',
-                          final_price: existingEditData['default'].final_price,
+                  ? {
+                      ...p,
+                      variants: [
+                        ...(p.variants || []),
+                        {
+                          id: newVariantId,
+                          note: '',
+                          final_price: null,
                           created_at: new Date().toISOString(),
-                          is_default: true
-                        }, ...variants];
-                      }
-                      
-                      // Add the new variant
-                      const newVariant = {
-                        id: newVariantId,
-                        note: '',
-                        final_price: null,
-                        created_at: new Date().toISOString(),
-                        is_default: false
-                      };
-                      
-                      return {
-                        ...p, 
-                        variants: [...variants, newVariant]
-                      };
-                    })()
+                          is_default: false
+                        }
+                      ]
+                    }
                   : p
               )
             }
@@ -1710,11 +1687,10 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                               <table className="w-full">
                                 <thead className="bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200">
                                   <tr>
-                                    <th className="px-4 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Part & Variants</th>
-                                    <th className="px-4 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Part Number</th>
-                                    <th className="px-4 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Price</th>
-                                    <th className="px-4 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Notes</th>
-
+                                    <th className="px-4 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider w-1/4">Part & Variants</th>
+                                    <th className="px-4 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider w-1/4">Part Number</th>
+                                    <th className="px-4 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider w-1/6">Price</th>
+                                    <th className="px-4 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider w-1/3">Notes</th>
                                   </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-200">
@@ -1723,11 +1699,9 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                     const localQuote = localQuotes.find(q => q.id === quote.id);
                                     const quotePart = localQuote?.partsRequested?.find(qp => qp.part_id === part.id);
 
-                                    // Only create fallback variant if no variants exist AND we're not editing
-                                    // Use our transformed data with variants, fallback to part data if no variants
-                                    const partWithVariants = part as any; // Cast to access variants
-                                    const variants = partWithVariants.variants && partWithVariants.variants.length > 0 
-                                      ? partWithVariants.variants 
+                                    // Get variants from localQuotes if available, otherwise fallback to part data
+                                    const variants = quotePart?.variants && quotePart.variants.length > 0 
+                                      ? quotePart.variants 
                                       : [{ 
                                           id: 'default', 
                                           note: part.note, 
@@ -1866,16 +1840,15 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                                 )}
                                               </div>
                                             </td>
-                                            <td className="px-4 py-1">
+                                            <td className="px-4 py-1 min-w-0">
                                               <div className="flex items-center justify-between">
-                                                <div className="flex items-center space-x-1 flex-1">
+                                                <div className="flex items-center space-x-1 flex-1 min-w-0">
                                                   {isPartEditing ? (
-                                                    <input
-                                                      type="text"
+                                                    <QuickFillInput
                                                       value={partEditData[part.id]?.[variant.id]?.note !== undefined ? partEditData[part.id][variant.id].note : variant.note || ''}
-                                                      onChange={(e) => handleVariantEditChange(part.id, variant.id, 'note', e.target.value)}
-                                                                                                        className={`w-full px-2 py-1 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 ${index === 0 ? 'bg-white' : 'bg-gray-50'}`}
-                                                  placeholder="Add notes..."
+                                                      onChange={(value) => handleVariantEditChange(part.id, variant.id, 'note', value)}
+                                                      placeholder="Add notes..."
+                                                      className={`flex-1 ${index === 0 ? 'bg-white' : 'bg-gray-50'}`}
                                                     />
                                                   ) : (
                                                     <>
@@ -2317,13 +2290,12 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                             
                                             <div>
                                               <label className="block text-xs font-medium text-gray-500 mb-1">Notes</label>
-                                              <div className="flex items-center space-x-1">
+                                              <div className="flex items-center space-x-1 min-w-0">
                                                 {isPartEditing ? (
-                                                  <input
-                                                    type="text"
-                                                                                                    value={partEditData[part.id]?.note || ''}
-                                                onChange={(e) => handlePartEditChange(part.id, 'note', e.target.value)}
-                                                className="flex-1 px-2 py-1 border border-gray-300 rounded-md text-sm focus:ring-1 focus:ring-red-500 focus:border-transparent"
+                                                  <QuickFillInput
+                                                    value={partEditData[part.id]?.note || ''}
+                                                    onChange={(value) => handlePartEditChange(part.id, 'note', value)}
+                                                    className="flex-1"
                                                   />
                                                 ) : (
                                                   <>

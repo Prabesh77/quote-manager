@@ -71,8 +71,41 @@ export default function OrdersPage() {
   };
 
   const markQuoteCompleted = async (id: string) => {
-    // TODO: Implement with new API
-    return { error: new Error('Not implemented yet') };
+    try {
+      // Import supabase client
+      const supabase = (await import('@/utils/supabase')).default;
+      
+      // Update the quote status to completed
+      const { error } = await supabase
+        .from('quotes')
+        .update({ status: 'completed' })
+        .eq('id', id);
+      
+      if (error) {
+        console.error('Error marking quote as completed:', error);
+        return { error: new Error(error.message) };
+      }
+      
+      // Track quote completion action
+      try {
+        console.log('🎯 COMPLETED (Orders Page): Tracking completion action for quote:', id);
+        const { QuoteActionsService } = await import('@/services/quoteActions/quoteActionsService');
+        await QuoteActionsService.trackQuoteAction(id, 'COMPLETED');
+        console.log('✅ COMPLETED (Orders Page): Successfully tracked completion action for quote:', id);
+      } catch (trackingError) {
+        console.warn('Failed to track quote completion:', trackingError);
+        // Don't fail the operation if tracking fails
+      }
+      
+      // Invalidate queries to refresh the UI
+      queryClient.invalidateQueries({ queryKey: queryKeys.quotesBase });
+      
+      console.log('✅ Quote marked as completed successfully');
+      return { error: null };
+    } catch (error) {
+      console.error('Error marking quote as completed:', error);
+      return { error: error instanceof Error ? error : new Error('Unknown error') };
+    }
   };
 
   const markQuoteAsOrdered = async (id: string, taxInvoiceNumber: string) => {

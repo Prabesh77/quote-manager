@@ -41,6 +41,9 @@ export const useUserStatsQuery = (startDate?: string, endDate?: string) => {
     queryFn: () => QuoteActionsService.getUserStats(startDate, endDate),
     staleTime: 10 * 60 * 1000, // 10 minutes
     gcTime: 30 * 60 * 1000, // 30 minutes
+    enabled: true, // Always enabled, but with proper caching
+    refetchOnWindowFocus: false, // Prevent refetch on window focus
+    refetchOnMount: false, // Prevent refetch on component mount if data is fresh
   });
 };
 
@@ -61,6 +64,8 @@ export const useActivitySummaryQuery = () => {
     queryFn: () => QuoteActionsService.getActivitySummary(),
     staleTime: 5 * 60 * 1000, // 5 minutes
     gcTime: 15 * 60 * 1000, // 15 minutes
+    refetchOnWindowFocus: false, // Prevent refetch on window focus
+    refetchOnMount: false, // Prevent refetch on component mount if data is fresh
   });
 };
 

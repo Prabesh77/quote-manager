@@ -801,7 +801,7 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
                     }
                   }
 
-                  
+
                   // Update form fields
                   setFields({
                     quoteRef: parsed['quoteRef'] || '',
@@ -1240,12 +1240,12 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
                         <label className="block text-xs font-medium text-gray-600 mb-2">
                         Part Number *
                       </label>
-                        <Input
+                      <Input
                           value={partDetails[partName]?.number || ''}
-                          onChange={(e) => updatePartDetail(partName, 'number', e.target.value)}
-                          placeholder="Enter part number"
-                          className="w-full h-8 text-sm"
-                        />
+                        onChange={(e) => updatePartDetail(partName, 'number', e.target.value)}
+                        placeholder="Enter part number"
+                        className="w-full h-8 text-sm"
+                      />
                     </div>
 
                       {/* Price and Notes fields hidden in quote creation - will be added during pricing workflow */}

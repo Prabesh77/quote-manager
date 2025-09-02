@@ -5,6 +5,8 @@ import { QuoteForm } from "@/components/ui/QuoteForm";
 import QuoteTable from "@/components/ui/QuoteTable";
 import { ProtectedRoute } from "@/components/common/ProtectedRoute";
 import { useSnackbar } from '@/components/ui/Snackbar';
+import { QuoteActionsService } from '@/services/quoteActions/quoteActionsService';
+import supabase from '@/utils/supabase';
 import { useState } from 'react';
 
 export default function HomePage() {
@@ -98,6 +100,13 @@ export default function HomePage() {
       }
 
       const result = await updatePartMutation.mutateAsync({ quoteId: currentQuoteId, partId: id, updates });
+      
+      // Note: PRICED tracking is now handled in useUpdatePartInQuoteJsonMutation 
+      // when status changes to 'waiting_verification'
+      if (updates.price !== null && updates.price !== undefined) {
+        console.log('💾 INDIVIDUAL: Price updated, PRICED tracking handled by mutation');
+      }
+      
       return { data: result.data, error: null };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -152,6 +161,39 @@ export default function HomePage() {
     }
   };
 
+  const onMarkCompleted = async (id: string) => {
+    try {
+      // Update quote status to completed
+      const { error } = await supabase
+        .from('quotes')
+        .update({ status: 'completed' })
+        .eq('id', id);
+      
+      if (error) {
+        console.error('Mark completed error:', error);
+        showSnackbar(`Error marking quote as completed: ${error.message}`, 'error');
+        return { error: new Error(error.message) };
+      }
+      
+      // Track quote completion action
+      try {
+        console.log('🎯 COMPLETED: Tracking completion action for quote:', id);
+        await QuoteActionsService.trackQuoteAction(id, 'COMPLETED');
+        console.log('✅ COMPLETED: Successfully tracked completion action for quote:', id);
+      } catch (trackingError) {
+        console.warn('Failed to track quote completion:', trackingError);
+        // Don't fail the operation if tracking fails
+      }
+      
+      showSnackbar('Quote marked as completed successfully!', 'success');
+      return { error: null };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      showSnackbar(`Error marking quote as completed: ${errorMessage}`, 'error');
+      return { error: error instanceof Error ? error : new Error('Unknown error') };
+    }
+  };
+
   return (
     <ProtectedRoute allowedRoles={['quote_creator', 'admin']}>
       <div className="py-6">
@@ -169,6 +211,7 @@ export default function HomePage() {
             onDeleteQuote={onDeleteQuote}
             onUpdatePart={onUpdatePart}
             onUpdateMultipleParts={onUpdateMultipleParts}
+            onMarkCompleted={onMarkCompleted}
             onMarkAsOrdered={onMarkAsOrdered}
             onMarkAsOrderedWithParts={onMarkAsOrderedWithParts}
             showCompleted={false}

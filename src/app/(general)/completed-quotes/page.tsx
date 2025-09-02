@@ -109,6 +109,17 @@ export default function CompletedQuotesPage() {
         return { error: new Error(error.message) };
       }
       
+      // Track quote completion action
+      try {
+        console.log('🎯 COMPLETED (Completed Quotes Page): Tracking completion action for quote:', id);
+        const { QuoteActionsService } = await import('@/services/quoteActions/quoteActionsService');
+        await QuoteActionsService.trackQuoteAction(id, 'COMPLETED');
+        console.log('✅ COMPLETED (Completed Quotes Page): Successfully tracked completion action for quote:', id);
+      } catch (trackingError) {
+        console.warn('Failed to track quote completion:', trackingError);
+        // Don't fail the operation if tracking fails
+      }
+      
       // Invalidate queries to refresh the UI
       queryClient.invalidateQueries({ queryKey: queryKeys.quotesBase });
       

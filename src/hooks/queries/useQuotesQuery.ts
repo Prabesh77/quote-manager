@@ -800,6 +800,19 @@ export const useUpdatePartInQuoteJsonMutation = () => {
         return partItem;
       });
       
+      // Get current quote status before updating
+      const { data: currentQuoteData, error: currentQuoteError } = await supabase
+        .from('quotes')
+        .select('status')
+        .eq('id', quoteId)
+        .single();
+      
+      if (currentQuoteError) {
+        throw new Error(`Error fetching current quote status: ${currentQuoteError.message}`);
+      }
+      
+      const currentStatus = currentQuoteData?.status;
+
       // Check if all parts now have prices to determine if status should change
       const allPartsHavePrices = updatedPartsRequested.every((part: any) => {
         const defaultVariant = part.variants?.find((v: any) => v.is_default === true);
@@ -811,7 +824,8 @@ export const useUpdatePartInQuoteJsonMutation = () => {
       const updateData: any = { parts_requested: updatedPartsRequested };
       
       // If all parts now have prices, update status to 'waiting_verification'
-      if (allPartsHavePrices) {
+      const shouldChangeToWaitingVerification = allPartsHavePrices && currentStatus !== 'waiting_verification' && currentStatus !== 'priced';
+      if (shouldChangeToWaitingVerification) {
         updateData.status = 'waiting_verification';
       }
 
@@ -822,6 +836,19 @@ export const useUpdatePartInQuoteJsonMutation = () => {
 
       if (updateError) {
         throw new Error(`Error updating quote: ${updateError.message}`);
+      }
+
+      // Track PRICED action only when status changes from unpriced to waiting_verification
+      if (shouldChangeToWaitingVerification) {
+        try {
+          console.log('🎯 MUTATION: Status changed to waiting_verification, tracking PRICED action for quote:', quoteId);
+          const { QuoteActionsService } = await import('@/services/quoteActions/quoteActionsService');
+          await QuoteActionsService.trackQuoteAction(quoteId, 'PRICED');
+          console.log('✅ MUTATION: Successfully tracked PRICED action for quote:', quoteId);
+        } catch (trackingError) {
+          console.warn('Failed to track PRICED action:', trackingError);
+          // Don't fail the operation if tracking fails
+        }
       }
 
       // If updating name or number, also update the parts table

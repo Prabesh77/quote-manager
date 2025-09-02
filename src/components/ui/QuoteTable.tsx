@@ -555,6 +555,15 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
         if (updates.length > 0) {
           try {
             await onUpdateMultipleParts(updates);
+            
+            // Check if any prices were actually added/updated
+            const hasPriceUpdates = updates.some(update => 
+              update.updates.price !== null && update.updates.price !== undefined
+            );
+            
+            // Note: PRICED tracking is now handled in useUpdatePartInQuoteJsonMutation 
+            // when status changes to 'waiting_verification'
+            console.log('💾 BULK SAVE: Parts saved, PRICED tracking handled by mutation');
           } catch (error) {
             console.error('Error saving parts to backend:', error);
           }
@@ -940,6 +949,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
   // Function to handle quote verification confirmation
   const handleVerifyQuote = async (quoteId: string) => {
     try {
+      console.log('🔍 VERIFY: Starting quote verification for:', quoteId);
       const result = await onUpdateQuote(quoteId, { status: 'priced' });
       
       if (result.error) {
@@ -948,14 +958,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
         return;
       }
       
-      // Track quote pricing action
-      try {
-        await QuoteActionsService.trackQuoteAction(quoteId, 'PRICED');
-      } catch (trackingError) {
-        console.warn('Failed to track quote pricing:', trackingError);
-        // Don't fail the operation if tracking fails
-      }
-      
+      console.log('🔍 VERIFY: Quote status updated, NO PRICED tracking should happen here');
       console.log('✅ Quote verified successfully, status updated to "priced"');
       // The UI will automatically refresh due to query invalidation
     } catch (error) {

@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
-import { ChevronDown, ChevronRight, Edit, Trash2, Save, X, Search, Eye, Copy, Car, CheckCircle, AlertTriangle, ShoppingCart, Package, Edit3, Plus } from 'lucide-react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { ChevronDown, ChevronRight, Edit, Trash2, Save, X, Search, Eye, Copy, Car, CheckCircle, AlertTriangle, ShoppingCart, Package, Edit3, Plus, Info } from 'lucide-react';
 import { Quote, Part } from './useQuotes';
 
 import { SkeletonLoader } from './SkeletonLoader';
@@ -15,7 +15,7 @@ import supabase from '@/utils/supabase';
 import { getQuotePartsFromJson } from '@/utils/quotePartsHelpers';
 import { QuoteEditModal } from './QuoteEditModal';
 import QuickFillInput from './QuickFillInput';
-import { QuoteActionsService } from '@/services/quoteActions/quoteActionsService';
+import QuoteInfoPopup from '../QuoteInfoPopup';
 
 
 interface QuoteTableProps {
@@ -79,8 +79,17 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
   // Local quotes state for variant management
   const [localQuotes, setLocalQuotes] = useState<Quote[]>(quotes);
 
+  // Info popup state
+  const [infoPopupOpen, setInfoPopupOpen] = useState<string | null>(null);
+  const [infoTriggerElement, setInfoTriggerElement] = useState<HTMLElement | null>(null);
+
   // Pagination state (used only when server-driven props are not provided)
   const [currentPage, setCurrentPage] = useState(1);
+
+  // Stable ref callback for info popup trigger
+  const infoTriggerRefCallback = useCallback((element: HTMLElement | null) => {
+    setInfoTriggerElement(element);
+  }, []);
 
   // Helper functions for variant management
   const generateVariantId = () => `var_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -1334,6 +1343,19 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                     </>
                   );
                 })()}
+                
+                {/* Info Icon - Top Right Corner */}
+                <button
+                  ref={infoTriggerRefCallback}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setInfoPopupOpen(infoPopupOpen === quote.id ? null : quote.id);
+                  }}
+                  className="absolute top-0 right-0 p-1 text-green-600 hover:text-green-400 hover:bg-blue-50 rounded-full transition-colors cursor-pointer z-10"
+                  title="View quote history"
+                >
+                  <Info className="h-4 w-4" />
+                </button>
                 
                 <AccordionTrigger className="grid grid-cols-6 gap-4 w-full px-3 hover:bg-gray-50 transition-colors cursor-pointer" style={{ gridTemplateColumns: '1fr 1fr 2fr 1fr 0.5fr 0.5fr' }}>
                   {/* Quote Ref */}
@@ -2598,6 +2620,16 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
         onClose={handleCloseEditModal}
         onSave={handleSaveQuoteEdit}
       />
+      
+      {/* Quote Info Popup */}
+      {infoPopupOpen && infoTriggerElement && (
+        <QuoteInfoPopup
+          quoteId={infoPopupOpen}
+          isOpen={true}
+          onClose={() => setInfoPopupOpen(null)}
+          triggerRef={{ current: infoTriggerElement }}
+        />
+      )}
     </div>
   );
 } 

@@ -1,4 +1,5 @@
 import supabase from '@/utils/supabase';
+import { QuoteActionsService } from '@/services/quoteActions/quoteActionsService';
 
 // Helper function to convert Australian date format (DD/MM/YYYY) to correct format
 const convertAustralianDateToISO = (dateString: string | undefined): string | null => {
@@ -280,6 +281,16 @@ export const createNormalizedQuote = async (quoteData: QuoteData) => {
     if (updateQuoteError) {
       console.error('Error updating quote with parts:', updateQuoteError);
       throw updateQuoteError;
+    }
+
+    // Track quote creation action
+    try {
+      console.log('Tracking quote creation for quote ID:', quote.id);
+      const trackingResult = await QuoteActionsService.trackQuoteAction(quote.id.toString(), 'CREATED');
+      console.log('Quote creation tracked successfully:', trackingResult);
+    } catch (trackingError) {
+      console.error('Failed to track quote creation:', trackingError);
+      // Don't fail the quote creation if tracking fails, but log the error
     }
 
     return {

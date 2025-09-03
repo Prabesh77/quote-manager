@@ -1,13 +1,15 @@
 'use client';
 
-import { useQuotesQuery, useDeleteQuoteMutation, useQuotePartsFromJson, useUpdatePartInQuoteJsonMutation } from '@/hooks/queries/useQuotesQuery';
+import { useQuotesQuery, useDeleteQuoteMutation, useQuotePartsFromJson, useUpdatePartInQuoteJsonMutation, queryKeys } from '@/hooks/queries/useQuotesQuery';
 import QuoteTable from "@/components/ui/QuoteTable";
 import { ProtectedRoute } from "@/components/common/ProtectedRoute";
 import { useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 
 export default function DeliveryPage() {
   // Server-side pagination state
   const [currentPage, setCurrentPage] = useState(1);
+  const queryClient = useQueryClient();
 
   // Get quotes for delivery page with server-side pagination (10 per page)
   const { data: quotesData, isLoading: quotesLoading } = useQuotesQuery(currentPage, 10, { status: 'delivered' });
@@ -71,8 +73,41 @@ export default function DeliveryPage() {
   };
 
   const markQuoteCompleted = async (id: string) => {
-    // TODO: Implement with new API
-    return { error: new Error('Not implemented yet') };
+    try {
+      // Import supabase client
+      const supabase = (await import('@/utils/supabase')).default;
+      
+      // Update the quote status to completed
+      const { error } = await supabase
+        .from('quotes')
+        .update({ status: 'completed' })
+        .eq('id', id);
+      
+      if (error) {
+        console.error('Error marking quote as completed:', error);
+        return { error: new Error(error.message) };
+      }
+      
+      // Track quote completion action
+      try {
+        console.log('🎯 COMPLETED (Delivery Page): Tracking completion action for quote:', id);
+        const { QuoteActionsService } = await import('@/services/quoteActions/quoteActionsService');
+        await QuoteActionsService.trackQuoteAction(id, 'COMPLETED');
+        console.log('✅ COMPLETED (Delivery Page): Successfully tracked completion action for quote:', id);
+      } catch (trackingError) {
+        console.warn('Failed to track quote completion:', trackingError);
+        // Don't fail the operation if tracking fails
+      }
+      
+      // Invalidate queries to refresh the UI
+      queryClient.invalidateQueries({ queryKey: queryKeys.quotesBase });
+      
+      console.log('✅ Quote marked as completed successfully');
+      return { error: null };
+    } catch (error) {
+      console.error('Error marking quote as completed:', error);
+      return { error: error instanceof Error ? error : new Error('Unknown error') };
+    }
   };
 
   const markQuoteAsOrdered = async (id: string, taxInvoiceNumber: string) => {

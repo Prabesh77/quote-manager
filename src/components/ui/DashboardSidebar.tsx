@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { BarChart3, TrendingUp, DollarSign, Users, Package, Activity, Truck } from 'lucide-react';
+import { BarChart3, TrendingUp, DollarSign, Users, Package, Activity, Truck, UserCheck } from 'lucide-react';
 import { useUserProfile } from '@/hooks/useUserProfile';
 
 const DashboardSidebar = () => {
@@ -13,9 +13,11 @@ const DashboardSidebar = () => {
   const isDashboardActive = pathname === '/dashboard';
   const isDeliveryActive = pathname === '/delivery';
   const isUserManagementActive = pathname === '/user-management';
+  const isUserStatsActive = pathname === '/user-stats';
 
-  // Only show User Management for admin users
+  // Only show User Management and User Performance for admin users
   const showUserManagement = profile?.role === 'admin';
+  const showUserPerformance = profile?.role === 'admin';
 
   return (
     <div className="fixed left-0 top-1/2 h-full z-50">
@@ -88,6 +90,34 @@ const DashboardSidebar = () => {
             
             {/* Active Indicator */}
             {isUserManagementActive && (
+              <div className="absolute right-0 top-1/2 transform -translate-y-1/2 w-1 h-6 bg-white rounded-l-full"></div>
+            )}
+            
+            {/* Hover Effect */}
+            <div className="absolute inset-0 bg-white/10 rounded-r-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+          </Link>
+        </div>
+      )}
+
+      {/* User Performance Button - Only for admin users */}
+      {showUserPerformance && (
+        <div className="relative mt-2">
+          <Link
+            href="/user-stats"
+            className={`
+              group relative flex items-center justify-center w-8 h-10 bg-gradient-to-b from-emerald-600 to-teal-600 
+              hover:from-emerald-700 hover:to-teal-700 transition-all duration-300 ease-in-out
+              ${isUserStatsActive ? 'shadow-lg scale-105' : 'shadow-md'}
+              transform hover:scale-110 rounded-r-lg
+            `}
+          >
+            {/* Icon */}
+            <div className="relative z-10">
+              <UserCheck className={`h-4 w-4 text-white transition-all duration-300 ${isUserStatsActive ? 'scale-110' : ''}`} />
+            </div>
+            
+            {/* Active Indicator */}
+            {isUserStatsActive && (
               <div className="absolute right-0 top-1/2 transform -translate-y-1/2 w-1 h-6 bg-white rounded-l-full"></div>
             )}
             

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import supabase from '@/utils/supabase';
+import { QuoteActionsService } from '@/services/quoteActions/quoteActionsService';
 
 // Helper function to convert Australian date format (DD/MM/YYYY) to correct format
 const convertAustralianDateToISO = (dateString: string | undefined): string | null => {
@@ -623,6 +624,13 @@ export const useQuotes = () => {
     if (error) {
       console.error('Mark completed error:', error);
     } else {
+      // Track quote completion action
+      try {
+        await QuoteActionsService.trackQuoteAction(id, 'COMPLETED');
+      } catch (trackingError) {
+        console.warn('Failed to track quote completion:', trackingError);
+        // Don't fail the operation if tracking fails
+      }
       fetchQuotes();
     }
     return { error };

@@ -2,6 +2,7 @@ import supabase from '@/utils/supabase';
 import { Quote, QuoteFormData, QuoteUpdateData, QuoteWithParts } from '@/types/quote';
 import { Part } from '@/types/part';
 import { ApiResponse } from '@/types/common';
+import { QuoteActionsService } from '@/services/quoteActions/quoteActionsService';
 
 // Parse Australian-style dates like "19/08/2025" or "19/08/2025 12:00pm" into ISO8601
 function parseAustralianDateTime(input?: string): string | null {
@@ -463,6 +464,16 @@ export class QuoteService {
         status: 'unpriced',
         taxInvoiceNumber: undefined
       };
+
+      // Track quote creation action
+      try {
+        console.log('Tracking quote creation for quote ID:', quoteId);
+        const trackingResult = await QuoteActionsService.trackQuoteAction(quoteId.toString(), 'CREATED');
+        console.log('Quote creation tracked successfully:', trackingResult);
+      } catch (trackingError) {
+        console.error('Failed to track quote creation:', trackingError);
+        // Don't fail the quote creation if tracking fails, but log the error
+      }
 
       return { data: createdQuote, error: null };
     } catch (error) {

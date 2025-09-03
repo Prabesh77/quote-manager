@@ -1,15 +1,16 @@
 'use client';
 
-import { useQuotesQuery, useDeleteQuoteMutation, useQuotePartsFromJson, useUpdatePartInQuoteJsonMutation } from '@/hooks/queries/useQuotesQuery';
+import { useQuotesQuery, useDeleteQuoteMutation, useQuotePartsFromJson, useUpdatePartInQuoteJsonMutation, queryKeys } from '@/hooks/queries/useQuotesQuery';
 import QuoteTable from "@/components/ui/QuoteTable";
 import { ProtectedRoute } from "@/components/common/ProtectedRoute";
 import { useState } from 'react';
-import supabase from '@/utils/supabase';
+import { useQueryClient } from '@tanstack/react-query';
 import { PartWithVariants } from '@/types/part';
 
 export default function PricingPage() {
   // Server-side pagination state
   const [currentPage, setCurrentPage] = useState(1);
+  const queryClient = useQueryClient();
 
   // Get quotes for pricing page with server-side pagination (10 per page)
   const { data: quotesData, isLoading: quotesLoading } = useQuotesQuery(currentPage, 10, { status: 'unpriced' });

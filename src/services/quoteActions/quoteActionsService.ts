@@ -159,7 +159,7 @@ export class QuoteActionsService {
 
       (actions || []).forEach(action => {
         const userId = action.user_id;
-        const quoteValue = calculateQuoteValue(action.quotes?.parts_requested || []);
+        const quoteValue = calculateQuoteValue(action.quotes?.[0]?.parts_requested || []);
         
         if (!userStatsMap.has(userId)) {
           userStatsMap.set(userId, {

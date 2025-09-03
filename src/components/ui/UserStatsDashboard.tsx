@@ -266,7 +266,9 @@ export default function UserStatsDashboard({ className = '' }: UserStatsDashboar
                     ? `${new Date(effectiveStartDate).toLocaleDateString('en-AU')} - ${new Date(effectiveEndDate).toLocaleDateString('en-AU')}`
                     : effectiveStartDate
                     ? `From ${new Date(effectiveStartDate).toLocaleDateString('en-AU')}`
-                    : `Until ${new Date(effectiveEndDate).toLocaleDateString('en-AU')}`
+                    : effectiveEndDate
+                    ? `Until ${new Date(effectiveEndDate).toLocaleDateString('en-AU')}`
+                    : 'No date filter'
                   }
                 </span>
               </div>

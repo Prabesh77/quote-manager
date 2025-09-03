@@ -36,9 +36,9 @@ export interface UserStats {
   quotes_priced: number;
   quotes_completed: number;
   total_quotes: number;
-  total_value_created?: number;
-  total_value_priced?: number;
-  total_value_completed?: number;
+  total_value_created: number;
+  total_value_priced: number;
+  total_value_completed: number;
 }
 
 export interface QuoteActionFilters {

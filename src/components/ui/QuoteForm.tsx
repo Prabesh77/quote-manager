@@ -37,9 +37,13 @@ const getPartIcon = (partName: string): string | null => {
     'Radar Sensor': '/part-icons/sensor.png',
     'Fan Assembly': '/part-icons/fa.png',
     'Intercooler': '/part-icons/intercooler.png',
-    'Left DayLight': '/part-icons/lh.png', // Use left headlight icon
-    'Right DayLight': '/part-icons/rh.png', // Use right headlight icon
-    'Auxiliary Radiator': '/part-icons/aux.png'
+    'Left DayLight': '/part-icons/lh.png',
+    'Right DayLight': '/part-icons/rh.png',
+    'Auxiliary Radiator': '/part-icons/aux.png',
+    'Camera': '/part-icons/camera.png',
+    'Parking Sensor': '/part-icons/parking.png', // Reuse sensor icon
+    'Left Blindspot Sensor': '/part-icons/blindspot.png', // Reuse sensor icon
+    'Right Blindspot Sensor': '/part-icons/blindspot.png', // Reuse sensor icon
   };
 
   return iconMap[partName] || null;
@@ -53,10 +57,14 @@ const PART_OPTIONS = [
   { name: 'Radar Sensor', icon: getPartIcon('Radar Sensor') },
   { name: 'Fan Assembly', icon: getPartIcon('Fan Assembly') },
   { name: 'Intercooler', icon: getPartIcon('Intercooler') },
-  { name: 'Left DayLight', icon: getPartIcon('Left DayLight') }, // Reuse fan icon for now
-  { name: 'Right DayLight', icon: getPartIcon('Right DayLight') }, // Reuse fan icon for now
-  { name: 'Oil Cooler', icon: getPartIcon('Radiator') }, // Reuse radiator icon for now
-  { name: 'Auxiliary Radiator', icon: getPartIcon('Auxiliary Radiator') }, // Reuse radiator icon for now
+  { name: 'Left DayLight', icon: getPartIcon('Left DayLight') },
+  { name: 'Right DayLight', icon: getPartIcon('Right DayLight') },
+  { name: 'Oil Cooler', icon: getPartIcon('Radiator') },
+  { name: 'Auxiliary Radiator', icon: getPartIcon('Auxiliary Radiator') },
+  { name: 'Camera', icon: getPartIcon('Camera') },
+  { name: 'Parking Sensor', icon: getPartIcon('Parking Sensor') },
+  { name: 'Left Blindspot Sensor', icon: getPartIcon('Left Blindspot Sensor') },
+  { name: 'Right Blindspot Sensor', icon: getPartIcon('Right Blindspot Sensor') },
 ];
 
 interface PartDetails {

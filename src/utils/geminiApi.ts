@@ -84,10 +84,16 @@ INSTRUCTIONS:
 8. Keep part numbers clean — e.g., "8110560K40" not "8110560K40 UNIT ASSY".
 9. SINGLE LINE RULE: If multiple keywords appear in one line (e.g., "O FAN & MOTOR ASSY-CONDENSER"), select the LAST keyword as the part name with this priority: Condenser > Oil Cooler > Radiator > Fan > Motor > Assembly.
 10. DAYTIME HEADLAMP RULE: If a line contains 'headlamp' or 'headlight' WITH 'daytime' or 'combination' → classify as 'DayLight' (NOT 'Headlamp'). This takes priority over regular headlamp detection.
+11. CAMERA DETECTION: If text contains 'camera' keyword → classify as 'Camera'. This is definitive and takes priority over other sensor types.
+12. SENSOR DETECTION RULES:
+    - If text contains 'corner' keyword → classify as 'Blindspot Sensor' (Left or Right based on L/R context)
+    - If text contains 'sensor' AND NOT 'radar' AND NOT 'camera' → classify as 'Parking Sensor' (unless corner is mentioned)
+    - For blindspot sensors: Use L/R context to determine 'Left Blindspot Sensor' or 'Right Blindspot Sensor'
+    - For parking sensors: Use 'Parking Sensor' (no L/R distinction needed)
 
 IMPORTANT RULES:
 - Use these exact standardized part names:
-  'Left Headlamp', 'Right Headlamp', 'Left DayLight', 'Right DayLight', 'Radiator', 'Condenser', 'Fan Assembly', 'Intercooler', 'Radar Sensor', 'Headlight Left', 'Headlight Right', 'Oil Cooler', 'Auxiliary Radiator'
+  'Left Headlamp', 'Right Headlamp', 'Left DayLight', 'Right DayLight', 'Radiator', 'Condenser', 'Fan Assembly', 'Intercooler', 'Radar Sensor', 'Headlight Left', 'Headlight Right', 'Oil Cooler', 'Auxiliary Radiator', 'Camera', 'Parking Sensor', 'Left Blindspot Sensor', 'Right Blindspot Sensor'
 - Part naming priority:
   * RADIATOR: If "RADIATOR" is found, use "Radiator" instead of generic radiator terms
   * CONDENSER: If "CONDENSER" is found, use "Condenser" instead of "Refrigerant Condenser" or generic condenser terms

@@ -1,6 +1,7 @@
 'use client';
 
-import { useQuotesQuery, useDeleteQuoteMutation, useQuotePartsFromJson, useUpdatePartInQuoteJsonMutation, useCreateQuoteMutation } from '@/hooks/queries/useQuotesQuery';
+import { useQuotesQuery, useDeleteQuoteMutation, useUpdatePartInQuoteJsonMutation, useCreateQuoteMutation } from '@/hooks/queries/useQuotesQuery';
+import { useQuery } from '@tanstack/react-query';
 import { QuoteForm } from "@/components/ui/QuoteForm";
 import QuoteTable from "@/components/ui/QuoteTable";
 import { ProtectedRoute } from "@/components/common/ProtectedRoute";
@@ -16,11 +17,61 @@ export default function HomePage() {
   // Get quotes for display (server-side pagination: 10 per page) - only show unpriced quotes
   const { data: quotesData, isLoading: quotesLoading } = useQuotesQuery(currentPage, 10, { status: 'unpriced' });
   
-  // Get the current quote ID for fetching only related parts
-  const currentQuoteId = quotesData?.quotes?.[0]?.id;
+  // Get all quote IDs for fetching parts for all quotes
+  const allQuoteIds = quotesData?.quotes?.map(quote => quote.id) || [];
   
-  // Fetch only parts related to the current quote from parts_requested JSON column
-  const { data: parts, isLoading: partsLoading } = useQuotePartsFromJson(currentQuoteId || '');
+  // Fetch parts for all quotes - we'll use a different approach
+  // Since useQuotePartsFromJson only works for one quote, we'll fetch all parts at once
+  const { data: allParts, isLoading: partsLoading } = useQuery({
+    queryKey: ['all-parts-for-quotes', allQuoteIds],
+    queryFn: async () => {
+      if (allQuoteIds.length === 0) return [];
+      
+      // Get all quotes with their parts_requested JSON
+      const { data: quotes, error: quotesError } = await supabase
+        .from('quotes')
+        .select('id, parts_requested')
+        .in('id', allQuoteIds);
+      
+      if (quotesError) throw quotesError;
+      
+      // Extract all unique part IDs from all quotes
+      const allPartIds = new Set<string>();
+      quotes?.forEach(quote => {
+        if (quote.parts_requested && Array.isArray(quote.parts_requested)) {
+          quote.parts_requested.forEach((partItem: any) => {
+            if (partItem.part_id) {
+              allPartIds.add(partItem.part_id);
+            }
+          });
+        }
+      });
+      
+      if (allPartIds.size === 0) return [];
+      
+      // Fetch all parts data
+      const { data: partsData, error: partsError } = await supabase
+        .from('parts')
+        .select('*')
+        .in('id', Array.from(allPartIds));
+      
+      if (partsError) throw partsError;
+      
+      // Map database fields to UI fields
+      const mappedParts = partsData?.map(part => ({
+        id: part.id,
+        name: part.part_name, // Map part_name to name for UI compatibility
+        number: part.part_number || '',
+        price: part.price,
+        note: '', // Will be filled from quote-specific data
+        createdAt: part.created_at
+      })) || [];
+      
+      
+      return mappedParts;
+    },
+    enabled: allQuoteIds.length > 0,
+  });
   const { showSnackbar } = useSnackbar();
 
   // Use the actual mutations
@@ -94,12 +145,17 @@ export default function HomePage() {
 
   const onUpdatePart = async (id: string, updates: any) => {
     try {
-      if (!currentQuoteId) {
-        showSnackbar('No quote selected', 'error');
-        return { data: {} as any, error: new Error('No quote selected') };
+      // Find the quote that contains this part
+      const quote = quotesData?.quotes?.find(q => 
+        q.parts_requested?.some((partItem: any) => partItem.part_id === id)
+      );
+      
+      if (!quote) {
+        showSnackbar('Quote not found for this part', 'error');
+        return { data: {} as any, error: new Error('Quote not found') };
       }
 
-      const result = await updatePartMutation.mutateAsync({ quoteId: currentQuoteId, partId: id, updates });
+      const result = await updatePartMutation.mutateAsync({ quoteId: quote.id, partId: id, updates });
       
       // Note: PRICED tracking is now handled in useUpdatePartInQuoteJsonMutation 
       // when status changes to 'waiting_verification'
@@ -116,8 +172,15 @@ export default function HomePage() {
   };
 
   const onUpdateMultipleParts = async (updates: Array<{ id: string; updates: any }>) => {
-    if (!currentQuoteId) {
-      showSnackbar('No quote selected', 'error');
+    // Find the quote that contains these parts
+    const quote = quotesData?.quotes?.find(q => 
+      q.parts_requested?.some((partItem: any) => 
+        updates.some(update => update.id === partItem.part_id)
+      )
+    );
+    
+    if (!quote) {
+      showSnackbar('Quote not found for these parts', 'error');
       return;
     }
 
@@ -125,7 +188,7 @@ export default function HomePage() {
       // Update each part individually using the mutation
       for (const { id, updates: partUpdates } of updates) {
         try {
-          await updatePartMutation.mutateAsync({ quoteId: currentQuoteId, partId: id, updates: partUpdates });
+          await updatePartMutation.mutateAsync({ quoteId: quote.id, partId: id, updates: partUpdates });
         } catch (error) {
           console.error(`❌ Error updating part ${id}:`, error);
           showSnackbar(`Error updating part ${id}`, 'error');
@@ -206,7 +269,7 @@ export default function HomePage() {
           
           <QuoteTable
             quotes={quotesData?.quotes || []}
-            parts={parts || []}
+            parts={allParts || []}
             onUpdateQuote={onUpdateQuote}
             onDeleteQuote={onDeleteQuote}
             onUpdatePart={onUpdatePart}

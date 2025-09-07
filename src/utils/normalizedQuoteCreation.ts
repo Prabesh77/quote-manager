@@ -229,42 +229,28 @@ export const createNormalizedQuote = async (quoteData: QuoteData) => {
     
     for (let i = 0; i < quoteData.parts.length; i++) {
       const partData = quoteData.parts[i];
-      let partId: string;
       
-      // Check if part already exists for this vehicle
-      const { data: existingPart, error: partCheckError } = await supabase
+      // Always create new parts for each quote to avoid conflicts
+      // Each quote should have its own unique parts
+      const { data: part, error: partError } = await supabase
         .from('parts')
-        .select('id')
-        .eq('vehicle_id', vehicleId)
-        .eq('part_name', partData.name)
-        .maybeSingle();
+        .insert({
+          vehicle_id: vehicleId,
+          part_name: partData.name,
+          part_number: partData.number || null,
+          price: partData.price || null,
+        })
+        .select()
+        .single();
 
-      if (existingPart && !partCheckError) {
-        partId = existingPart.id;
-      } else {
-        // Create new part
-        const { data: part, error: partError } = await supabase
-          .from('parts')
-          .insert({
-            vehicle_id: vehicleId,
-            part_name: partData.name,
-            part_number: partData.number || null,
-            price: partData.price || null,
-          })
-          .select()
-          .single();
-
-        if (partError) {
-          console.error('Error creating part:', partError);
-          throw partError;
-        }
-
-        partId = part.id;
+      if (partError) {
+        console.error('Error creating part:', partError);
+        throw partError;
       }
 
       // Add to final JSON array
       finalPartsRequested.push({
-        part_id: partId,
+        part_id: part.id,
         note: partData.note || '',
         final_price: null // Initially null, will be set during pricing
       });

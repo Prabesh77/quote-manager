@@ -43,7 +43,7 @@ interface ExtractedPartInfo {
   confidence: number;
   rawText: string;
   context?: string;
-}
+} 
 
 interface QuoteFormProps {
   onSubmit: (fields: Record<string, string>, parts: PartDetails[]) => void;

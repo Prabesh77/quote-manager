@@ -17,25 +17,40 @@ export const getQuotePartsFromJson = (quote: Quote, allParts: Part[]): Part[] =>
     
     if (!basePart) {
       // Create a placeholder if part not found
-      const defaultVariant = quotePart.variants?.[0];
+      // Handle both old structure (direct note/final_price) and new structure (variants array)
+      const note = (quotePart as any).note || quotePart.variants?.[0]?.note || '';
+      const finalPrice = (quotePart as any).final_price ?? quotePart.variants?.[0]?.final_price ?? null;
+      
       return {
         id: quotePart.part_id,
         name: 'Unknown Part',
         number: '',
-        price: defaultVariant?.final_price ?? null,
-        note: defaultVariant?.note || '',
+        price: finalPrice,
+        note: note,
         createdAt: new Date().toISOString()
       };
     }
 
-    // Get the default variant or first variant
-    const defaultVariant = quotePart.variants?.find(v => v.is_default) || quotePart.variants?.[0];
+    // Handle both old structure (direct note/final_price) and new structure (variants array)
+    let note = '';
+    let finalPrice = basePart.price;
+    
+    if (quotePart.variants && Array.isArray(quotePart.variants)) {
+      // New structure with variants
+      const defaultVariant = quotePart.variants.find(v => v.is_default) || quotePart.variants[0];
+      note = defaultVariant?.note || '';
+      finalPrice = defaultVariant?.final_price ?? basePart.price;
+    } else {
+      // Old structure with direct properties
+      note = (quotePart as any).note || '';
+      finalPrice = (quotePart as any).final_price ?? basePart.price;
+    }
 
     // Merge base part data with quote-specific data
     return {
       ...basePart,
-      price: defaultVariant?.final_price ?? basePart.price, // Use variant price if available, otherwise fall back to base part price
-      note: defaultVariant?.note || ''
+      price: finalPrice,
+      note: note
     };
   });
 };

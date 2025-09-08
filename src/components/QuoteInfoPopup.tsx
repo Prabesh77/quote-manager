@@ -100,12 +100,15 @@ const QuoteInfoPopup: React.FC<QuoteInfoPopupProps> = ({ quoteId, isOpen, onClos
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-AU', {
+    const date = new Date(dateString);
+    return date.toLocaleString('en-AU', {
       day: '2-digit',
       month: '2-digit',
       year: 'numeric',
       hour: '2-digit',
-      minute: '2-digit'
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: true
     });
   };
 
@@ -160,7 +163,7 @@ const QuoteInfoPopup: React.FC<QuoteInfoPopupProps> = ({ quoteId, isOpen, onClos
                       {action.action_type.toLowerCase()}
                     </span>
                     <span className="text-xs text-gray-500">
-                      by {action.user?.raw_user_meta_data?.full_name || action.user?.email || 'User'}
+                      by {action.user?.raw_user_meta_data?.full_name || action.user?.email || 'Unknown User'}
                     </span>
                   </div>
                   <div className="flex items-center space-x-1 mt-1">

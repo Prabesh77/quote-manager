@@ -48,11 +48,30 @@ export class QuoteActionsService {
         return [];
       }
 
-      // For now, return actions with basic user info
-      // We can enhance this later with proper user data fetching
+      // Get unique user IDs
+      const userIds = [...new Set(actions.map(action => action.user_id))];
+      
+      // Fetch user data from user_profiles table
+      const { data: userProfiles, error: usersError } = await supabase
+        .from('user_profiles')
+        .select('id, username, full_name')
+        .in('id', userIds);
+      
+      // Create a map of user data for quick lookup
+      const userMap = new Map();
+      (userProfiles || []).forEach(profile => {
+        userMap.set(profile.id, {
+          id: profile.id,
+          email: profile.username,
+          raw_user_meta_data: {
+            full_name: profile.full_name
+          }
+        });
+      });
+
       return actions.map(action => ({
         ...action,
-        user: {
+        user: userMap.get(action.user_id) || {
           id: action.user_id,
           email: 'User',
           raw_user_meta_data: {}
@@ -94,9 +113,48 @@ export class QuoteActionsService {
         throw new Error(`Failed to fetch quote actions for quote ${quoteId}: ${error.message}`);
       }
 
-      return (data || []).map(action => ({
+      if (!data || data.length === 0) {
+        return [];
+      }
+
+      // Get unique user IDs
+      const userIds = [...new Set(data.map(action => action.user_id))];
+      
+      // Fetch user data from user_profiles table (accessible by authenticated users)
+      const { data: userProfiles, error: usersError } = await supabase
+        .from('user_profiles')
+        .select('id, username, full_name')
+        .in('id', userIds);
+      
+      if (usersError) {
+        console.error('Error fetching user profiles:', usersError);
+        // Fallback to basic data
+        return data.map(action => ({
+          ...action,
+          user: {
+            id: action.user_id,
+            email: 'User',
+            raw_user_meta_data: {}
+          }
+        }));
+      }
+
+      // Create a map of user data for quick lookup
+      const userMap = new Map();
+      (userProfiles || []).forEach(profile => {
+        userMap.set(profile.id, {
+          id: profile.id,
+          email: profile.username, // Use username as email fallback
+          raw_user_meta_data: {
+            full_name: profile.full_name
+          }
+        });
+      });
+
+      // Map actions with user data
+      return data.map(action => ({
         ...action,
-        user: {
+        user: userMap.get(action.user_id) || {
           id: action.user_id,
           email: 'User',
           raw_user_meta_data: {}
@@ -249,9 +307,34 @@ export class QuoteActionsService {
         throw new Error(`Failed to fetch recent activity: ${error.message}`);
       }
 
-      return (data || []).map(action => ({
+      if (!data || data.length === 0) {
+        return [];
+      }
+
+      // Get unique user IDs
+      const userIds = [...new Set(data.map(action => action.user_id))];
+      
+      // Fetch user data from user_profiles table
+      const { data: userProfiles, error: usersError } = await supabase
+        .from('user_profiles')
+        .select('id, username, full_name')
+        .in('id', userIds);
+      
+      // Create a map of user data for quick lookup
+      const userMap = new Map();
+      (userProfiles || []).forEach(profile => {
+        userMap.set(profile.id, {
+          id: profile.id,
+          email: profile.username,
+          raw_user_meta_data: {
+            full_name: profile.full_name
+          }
+        });
+      });
+
+      return data.map(action => ({
         ...action,
-        user: {
+        user: userMap.get(action.user_id) || {
           id: action.user_id,
           email: 'User',
           raw_user_meta_data: {}

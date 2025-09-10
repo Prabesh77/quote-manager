@@ -1,6 +1,7 @@
 'use client';
 
-import { useQuotesQuery, useDeleteQuoteMutation, useQuotePartsFromJson, useUpdatePartInQuoteJsonMutation, queryKeys } from '@/hooks/queries/useQuotesQuery';
+import { useQuotesQuery, useDeleteQuoteMutation, useUpdatePartInQuoteJsonMutation, queryKeys } from '@/hooks/queries/useQuotesQuery';
+import { useAllQuoteParts } from '@/hooks/useAllQuoteParts';
 import QuoteTable from "@/components/ui/QuoteTable";
 import { ProtectedRoute } from "@/components/common/ProtectedRoute";
 import { useState } from 'react';
@@ -15,11 +16,8 @@ export default function PricingPage() {
   // Get quotes for pricing page with server-side pagination (10 per page)
   const { data: quotesData, isLoading: quotesLoading } = useQuotesQuery(currentPage, 10, { status: 'unpriced' });
   
-  // Get the current quote ID for fetching only related parts
-  const currentQuoteId = quotesData?.quotes?.[0]?.id;
-  
-  // Fetch only parts related to the current quote from parts_requested JSON column
-  const { data: parts, isLoading: partsLoading } = useQuotePartsFromJson(currentQuoteId || '') as { data: PartWithVariants[] | undefined; isLoading: boolean };
+  // Fetch parts for all quotes
+  const { data: parts, isLoading: partsLoading } = useAllQuoteParts(quotesData?.quotes || []);
   
 
   
@@ -43,12 +41,17 @@ export default function PricingPage() {
   };
 
   const updatePart = async (id: string, updates: any) => {
-    if (!currentQuoteId) {
-      return { data: {} as any, error: new Error('No quote selected') };
+    // Find the quote that contains this part
+    const quote = quotesData?.quotes?.find(q => 
+      q.parts_requested?.some((partItem: any) => partItem.part_id === id)
+    );
+    
+    if (!quote) {
+      return { data: {} as any, error: new Error('Quote not found for this part') };
     }
 
     try {
-      const result = await updatePartMutation.mutateAsync({ quoteId: currentQuoteId, partId: id, updates });
+      const result = await updatePartMutation.mutateAsync({ quoteId: quote.id, partId: id, updates });
       return { data: result.data, error: null };
     } catch (error) {
       return { data: {} as any, error: error instanceof Error ? error : new Error('Unknown error') };
@@ -56,8 +59,15 @@ export default function PricingPage() {
   };
 
   const updateMultipleParts = async (updates: Array<{ id: string; updates: any }>) => {
-    if (!currentQuoteId) {
-      console.error('No quote selected for multiple parts update');
+    // Find the quote that contains these parts
+    const quote = quotesData?.quotes?.find(q => 
+      q.parts_requested?.some((partItem: any) => 
+        updates.some(update => update.id === partItem.part_id)
+      )
+    );
+    
+    if (!quote) {
+      console.error('Quote not found for these parts');
       return;
     }
 
@@ -65,7 +75,7 @@ export default function PricingPage() {
       // Update each part individually using the mutation
       for (const { id, updates: partUpdates } of updates) {
         try {
-          await updatePartMutation.mutateAsync({ quoteId: currentQuoteId, partId: id, updates: partUpdates });
+          await updatePartMutation.mutateAsync({ quoteId: quote.id, partId: id, updates: partUpdates });
         } catch (error) {
           console.error(`❌ Error updating part ${id}:`, error);
         }

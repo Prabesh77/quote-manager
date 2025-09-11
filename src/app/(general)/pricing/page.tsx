@@ -50,6 +50,9 @@ export default function PricingPage() {
       return { data: {} as any, error: new Error('Quote not found for this part') };
     }
 
+    // Debug logging for pricing page
+    console.log('🔍 Pricing Page - updatePart called:', { id, updates, quoteId: quote.id });
+
     try {
       const result = await updatePartMutation.mutateAsync({ quoteId: quote.id, partId: id, updates });
       return { data: result.data, error: null };
@@ -59,23 +62,50 @@ export default function PricingPage() {
   };
 
   const updateMultipleParts = async (updates: Array<{ id: string; updates: any }>) => {
+    // Debug logging for quote lookup
+    console.log('🔍 Pricing Page - Looking for quotes containing parts:', updates.map(u => u.id));
+    console.log('🔍 Pricing Page - Available quotes:', quotesData?.quotes?.map(q => ({ 
+      id: q.id, 
+      parts_requested: q.parts_requested?.map((p: any) => ({ part_id: p.part_id })) 
+    })));
+    
     // Find the quote that contains these parts
-    const quote = quotesData?.quotes?.find(q => 
+    // For pricing page, we need to find the quote by checking if any of the part IDs match
+    // Since we're on the pricing page, we should find the quote that contains these parts
+    let quote = quotesData?.quotes?.find(q => 
       q.parts_requested?.some((partItem: any) => 
         updates.some(update => update.id === partItem.part_id)
       )
     );
+
+    // If no quote found with parts_requested, try to find by checking if we're editing parts
+    // This handles the case where parts_requested might be empty but we're still editing
+    if (!quote && quotesData?.quotes?.length === 1) {
+      // If there's only one quote on the pricing page, it's likely the one we're editing
+      quote = quotesData.quotes[0];
+      console.log('🔍 Pricing Page - Using single quote fallback:', quote.id);
+    }
     
     if (!quote) {
-      console.error('Quote not found for these parts');
+      console.error('❌ Quote not found for these parts');
+      console.error('❌ Part IDs being searched:', updates.map(u => u.id));
+      console.error('❌ Available quotes and their parts:', quotesData?.quotes?.map(q => ({
+        quoteId: q.id,
+        parts: q.parts_requested?.map((p: any) => p.part_id) || []
+      })));
       return;
     }
+
+    // Debug logging for pricing page
+    console.log('🔍 Pricing Page - updateMultipleParts called:', { updates, quoteId: quote.id });
 
     try {
       // Update each part individually using the mutation
       for (const { id, updates: partUpdates } of updates) {
+        console.log(`🔍 Pricing Page - Updating part ${id}:`, partUpdates);
         try {
-          await updatePartMutation.mutateAsync({ quoteId: quote.id, partId: id, updates: partUpdates });
+          const result = await updatePartMutation.mutateAsync({ quoteId: quote.id, partId: id, updates: partUpdates });
+          console.log(`🔍 Pricing Page - Part ${id} update result:`, result);
         } catch (error) {
           console.error(`❌ Error updating part ${id}:`, error);
         }
@@ -143,10 +173,15 @@ export default function PricingPage() {
   };
 
   const handleUpdateMultipleParts = async (updates: Array<{ id: string; updates: any }>): Promise<void> => {
+    // Debug logging for pricing page wrapper
+    console.log('🔍 Pricing Page - handleUpdateMultipleParts wrapper called:', { updates });
+    
     try {
       await updateMultipleParts(updates);
+      console.log('🔍 Pricing Page - handleUpdateMultipleParts wrapper completed successfully');
     } catch (error) {
-      console.error('Error updating multiple parts:', error);
+      console.error('❌ Pricing Page - Error in handleUpdateMultipleParts wrapper:', error);
+      throw error; // Re-throw to maintain error handling
     }
   };
 

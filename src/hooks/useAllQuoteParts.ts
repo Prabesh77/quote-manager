@@ -7,6 +7,7 @@ export function useAllQuoteParts(quotes: any[]) {
     queryFn: async () => {
       if (!quotes || quotes.length === 0) return [];
       
+      
       // Get all quotes with their parts_requested JSON
       const { data: quotesWithParts, error: quotesError } = await supabase
         .from('quotes')
@@ -14,6 +15,7 @@ export function useAllQuoteParts(quotes: any[]) {
         .in('id', quotes.map(q => q.id));
 
       if (quotesError) throw quotesError;
+
 
       // Extract all unique part IDs from all quotes
       const allPartIds = new Set<string>();
@@ -27,7 +29,10 @@ export function useAllQuoteParts(quotes: any[]) {
         }
       });
 
-      if (allPartIds.size === 0) return [];
+
+      if (allPartIds.size === 0) {
+        return [];
+      }
 
       // Fetch all parts data
       const { data: partsData, error: partsError } = await supabase
@@ -36,6 +41,7 @@ export function useAllQuoteParts(quotes: any[]) {
         .in('id', Array.from(allPartIds));
 
       if (partsError) throw partsError;
+      
       
       // Map database fields to UI fields
       const mappedParts = partsData?.map(part => ({
@@ -47,9 +53,15 @@ export function useAllQuoteParts(quotes: any[]) {
         createdAt: part.created_at
       })) || [];
       
+      
       return mappedParts;
     },
     enabled: quotes && quotes.length > 0,
     staleTime: 5 * 60 * 1000, // 5 minutes
+    // Add retry logic and refetch on window focus to ensure data is fresh
+    retry: 3,
+    retryDelay: 1000,
+    refetchOnWindowFocus: true,
+    refetchOnMount: true,
   });
 }

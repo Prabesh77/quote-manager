@@ -11,6 +11,7 @@ export const getQuotePartsFromJson = (quote: Quote, allParts: Part[]): Part[] =>
     return getQuotePartsFromLegacy(quote.partRequested, allParts);
   }
 
+
   return quote.partsRequested.map(quotePart => {
     // Find the base part data
     const basePart = allParts.find(p => p.id === quotePart.part_id);

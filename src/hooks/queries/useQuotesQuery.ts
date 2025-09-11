@@ -431,10 +431,12 @@ export const useCreateQuoteMutation = () => {
     mutationFn: async (quoteData: any) => {
       return await createNormalizedQuote(quoteData);
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       // Invalidate and refetch quotes after successful creation
       queryClient.invalidateQueries({ queryKey: queryKeys.quotesBase });
       queryClient.invalidateQueries({ queryKey: queryKeys.parts });
+      // Also invalidate the specific all-parts-for-quotes queries to ensure fresh data
+      queryClient.invalidateQueries({ queryKey: ['all-parts-for-quotes'] });
     },
     onError: (error) => {
       console.error('Error creating quote:', error);
@@ -744,6 +746,7 @@ export const useUpdatePartInQuoteJsonMutation = () => {
   
   return useMutation({
     mutationFn: async ({ quoteId, partId, updates }: { quoteId: string; partId: string; updates: any }) => {
+      
       // Get the current quote's parts_requested JSON
       const { data: quote, error: quoteError } = await supabase
         .from('quotes')
@@ -759,6 +762,7 @@ export const useUpdatePartInQuoteJsonMutation = () => {
         throw new Error('No parts found in quote');
       }
 
+
       // Update the part in the JSON structure using variants
       const updatedPartsRequested = quote.parts_requested.map((partItem: any) => {
         if (partItem.part_id === partId) {
@@ -768,28 +772,56 @@ export const useUpdatePartInQuoteJsonMutation = () => {
           if (updates.price !== undefined || updates.note !== undefined) {
             const variants = partItem.variants || [];
             
-            // Find existing default variant or create new one
-            const defaultVariantIndex = variants.findIndex((v: any) => v.is_default === true);
-            
-            if (defaultVariantIndex === -1) {
-              // Create new default variant
-              const newVariant = {
-                id: `var_${partId}_${Date.now()}`,
-                note: updates.note || '',
-                final_price: updates.price || null,
-                created_at: new Date().toISOString(),
-                is_default: true
-              };
-              updatedPart.variants = [newVariant];
+            // Check if we have a specific variantId to update
+            if (updates.variantId) {
+              
+              // Find existing variant by ID
+              const variantIndex = variants.findIndex((v: any) => v.id === updates.variantId);
+              
+              if (variantIndex !== -1) {
+                // Update existing variant
+                const updatedVariants = [...variants];
+                updatedVariants[variantIndex] = {
+                  ...updatedVariants[variantIndex],
+                  ...(updates.note !== undefined && { note: updates.note }),
+                  ...(updates.price !== undefined && { final_price: updates.price }),
+                };
+                updatedPart.variants = updatedVariants;
+              } else {
+                // Create new variant with specific ID
+                const newVariant = {
+                  id: updates.variantId,
+                  note: updates.note || '',
+                  final_price: updates.price || null,
+                  created_at: new Date().toISOString(),
+                  is_default: false
+                };
+                updatedPart.variants = [...variants, newVariant];
+              }
             } else {
-              // Update existing default variant
-              const updatedVariants = [...variants];
-              updatedVariants[defaultVariantIndex] = {
-                ...updatedVariants[defaultVariantIndex],
-                ...(updates.note !== undefined && { note: updates.note }),
-                ...(updates.price !== undefined && { final_price: updates.price }),
-              };
-              updatedPart.variants = updatedVariants;
+              // Fallback: Find existing default variant or create new one (legacy behavior)
+              const defaultVariantIndex = variants.findIndex((v: any) => v.is_default === true);
+              
+              if (defaultVariantIndex === -1) {
+                // Create new default variant
+                const newVariant = {
+                  id: `var_${partId}_${Date.now()}`,
+                  note: updates.note || '',
+                  final_price: updates.price || null,
+                  created_at: new Date().toISOString(),
+                  is_default: true
+                };
+                updatedPart.variants = [newVariant];
+              } else {
+                // Update existing default variant
+                const updatedVariants = [...variants];
+                updatedVariants[defaultVariantIndex] = {
+                  ...updatedVariants[defaultVariantIndex],
+                  ...(updates.note !== undefined && { note: updates.note }),
+                  ...(updates.price !== undefined && { final_price: updates.price }),
+                };
+                updatedPart.variants = updatedVariants;
+              }
             }
             
             // Note: We don't update part-level final_price anymore - only variants contain pricing info
@@ -815,9 +847,11 @@ export const useUpdatePartInQuoteJsonMutation = () => {
 
       // Check if all parts now have prices to determine if status should change
       const allPartsHavePrices = updatedPartsRequested.every((part: any) => {
-        const defaultVariant = part.variants?.find((v: any) => v.is_default === true);
-        const hasPrice = defaultVariant?.final_price && defaultVariant.final_price > 0;
-        return hasPrice;
+        // Check if any variant has a price (not just default variant)
+        const hasAnyVariantWithPrice = part.variants?.some((variant: any) => 
+          variant.final_price && variant.final_price > 0
+        );
+        return hasAnyVariantWithPrice;
       });
 
       // Update the quote with the modified parts_requested JSON and potentially status
@@ -825,9 +859,11 @@ export const useUpdatePartInQuoteJsonMutation = () => {
       
       // If all parts now have prices, update status to 'waiting_verification'
       const shouldChangeToWaitingVerification = allPartsHavePrices && currentStatus !== 'waiting_verification' && currentStatus !== 'priced';
+      
       if (shouldChangeToWaitingVerification) {
         updateData.status = 'waiting_verification';
       }
+
 
       const { error: updateError } = await supabase
         .from('quotes')
@@ -838,13 +874,12 @@ export const useUpdatePartInQuoteJsonMutation = () => {
         throw new Error(`Error updating quote: ${updateError.message}`);
       }
 
+
       // Track PRICED action only when status changes from unpriced to waiting_verification
       if (shouldChangeToWaitingVerification) {
         try {
-          console.log('🎯 MUTATION: Status changed to waiting_verification, tracking PRICED action for quote:', quoteId);
           const { QuoteActionsService } = await import('@/services/quoteActions/quoteActionsService');
           await QuoteActionsService.trackQuoteAction(quoteId, 'PRICED');
-          console.log('✅ MUTATION: Successfully tracked PRICED action for quote:', quoteId);
         } catch (trackingError) {
           console.warn('Failed to track PRICED action:', trackingError);
           // Don't fail the operation if tracking fails

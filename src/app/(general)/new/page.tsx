@@ -1,6 +1,6 @@
 'use client';
 
-import { usePartsQuery } from '@/hooks/queries/useQuotesQuery';
+import { usePartsQuery, useCreateQuoteMutation } from '@/hooks/queries/useQuotesQuery';
 import { QuoteForm } from "@/components/ui/QuoteForm";
 import { ProtectedRoute } from "@/components/common/ProtectedRoute";
 import { useSnackbar } from '@/components/ui/Snackbar';
@@ -9,16 +9,13 @@ export default function NewQuotePage() {
   // Only need parts for the form, not quotes
   const { data: parts, isLoading: partsLoading } = usePartsQuery();
   const { showSnackbar } = useSnackbar();
-
-  // Placeholder function for now - this will need to be implemented with the new API
-  const createQuote = async (data: any) => {
-    // TODO: Implement with new API
-    return { error: new Error('Not implemented yet') };
-  };
+  
+  // Use the actual mutation for creating quotes
+  const createQuoteMutation = useCreateQuoteMutation();
 
   const handleSubmit = async (fields: Record<string, string>, parts: any[]) => {
     try {
-      const result = await createQuote({
+      await createQuoteMutation.mutateAsync({
         customer: {
           name: fields.customer,
           phone: fields.phone || '',
@@ -46,10 +43,6 @@ export default function NewQuotePage() {
         requiredBy: fields.requiredBy || '',
         quoteRef: fields.quoteRef
       });
-
-      if (result.error) {
-        throw result.error;
-      }
 
       showSnackbar('Quote created successfully!', 'success');
     } catch (error) {

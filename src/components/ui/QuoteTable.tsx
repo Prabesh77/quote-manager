@@ -523,8 +523,25 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
               }
             });
             
-            // Note: New variants are now handled by the JSON update below
-            // No need to process them separately here to avoid duplication
+            // IMPORTANT FIX: Also process new variants that don't exist yet
+            // This handles cases where parts have no existing variants but have edit data
+            Object.keys(partEditDataForPart).forEach(variantId => {
+              // Skip if we already processed this variant above
+              const alreadyProcessed = existingVariants.some(v => v.id === variantId);
+              if (!alreadyProcessed) {
+                const variantEditData = partEditDataForPart[variantId];
+                if (variantEditData && (variantEditData.note !== undefined || variantEditData.final_price !== undefined)) {
+                  updates.push({
+                    id: partId,
+                    updates: {
+                      variantId: variantId,
+                      note: variantEditData.note !== undefined ? variantEditData.note : '',
+                      price: variantEditData.final_price !== undefined ? variantEditData.final_price : null
+                    }
+                  });
+                }
+              }
+            });
           }
         });
         

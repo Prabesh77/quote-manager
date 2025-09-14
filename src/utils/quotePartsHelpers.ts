@@ -27,6 +27,8 @@ export const getQuotePartsFromJson = (quote: Quote, allParts: Part[]): Part[] =>
         name: 'Unknown Part',
         number: '',
         price: finalPrice,
+        list_price: null,
+        af: false,
         note: note,
         createdAt: new Date().toISOString()
       };
@@ -84,6 +86,8 @@ export const addPartToQuote = (quote: Quote, partId: string, note: string = '', 
       id: `var_${partId}_${Date.now()}`,
       note,
       final_price: finalPrice,
+      list_price: null,
+      af: false,
       created_at: new Date().toISOString(),
       is_default: false
     };
@@ -104,6 +108,8 @@ export const addPartToQuote = (quote: Quote, partId: string, note: string = '', 
           id: `var_${partId}_${Date.now()}`,
           note,
           final_price: finalPrice,
+          list_price: null,
+          af: false,
           created_at: new Date().toISOString(),
           is_default: true
         }]

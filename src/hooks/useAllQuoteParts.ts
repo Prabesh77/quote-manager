@@ -49,6 +49,8 @@ export function useAllQuoteParts(quotes: any[]) {
         name: part.part_name, // Map part_name to name for UI compatibility
         number: part.part_number || '',
         price: part.price,
+        list_price: part.list_price || null,
+        af: part.af || false,
         note: '', // Will be filled from quote-specific data
         createdAt: part.created_at
       })) || [];

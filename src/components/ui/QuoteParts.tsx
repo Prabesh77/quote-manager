@@ -27,6 +27,8 @@ export const QuoteParts = ({ quoteId, parts, onAddPart, onUpdatePart, onDeletePa
       name: newPart.name,
       number: newPart.number,
       price: newPart.price ? Number(newPart.price) : null,
+      list_price: null,
+      af: false,
       note: newPart.note,
     });
 
@@ -43,6 +45,8 @@ export const QuoteParts = ({ quoteId, parts, onAddPart, onUpdatePart, onDeletePa
       name: editingPart.name,
       number: editingPart.number,
       price: editingPart.price,
+      list_price: editingPart.list_price,
+      af: editingPart.af,
       note: editingPart.note,
     });
 

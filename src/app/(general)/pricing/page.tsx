@@ -50,8 +50,6 @@ export default function PricingPage() {
       return { data: {} as any, error: new Error('Quote not found for this part') };
     }
 
-    // Debug logging for pricing page
-    console.log('🔍 Pricing Page - updatePart called:', { id, updates, quoteId: quote.id });
 
     try {
       const result = await updatePartMutation.mutateAsync({ quoteId: quote.id, partId: id, updates });
@@ -62,12 +60,6 @@ export default function PricingPage() {
   };
 
   const updateMultipleParts = async (updates: Array<{ id: string; updates: any }>) => {
-    // Debug logging for quote lookup
-    console.log('🔍 Pricing Page - Looking for quotes containing parts:', updates.map(u => u.id));
-    console.log('🔍 Pricing Page - Available quotes:', quotesData?.quotes?.map(q => ({ 
-      id: q.id, 
-      parts_requested: q.parts_requested?.map((p: any) => ({ part_id: p.part_id })) 
-    })));
     
     // Find the quote that contains these parts
     // For pricing page, we need to find the quote by checking if any of the part IDs match
@@ -83,7 +75,6 @@ export default function PricingPage() {
     if (!quote && quotesData?.quotes?.length === 1) {
       // If there's only one quote on the pricing page, it's likely the one we're editing
       quote = quotesData.quotes[0];
-      console.log('🔍 Pricing Page - Using single quote fallback:', quote.id);
     }
     
     if (!quote) {
@@ -96,16 +87,11 @@ export default function PricingPage() {
       return;
     }
 
-    // Debug logging for pricing page
-    console.log('🔍 Pricing Page - updateMultipleParts called:', { updates, quoteId: quote.id });
-
     try {
       // Update each part individually using the mutation
       for (const { id, updates: partUpdates } of updates) {
-        console.log(`🔍 Pricing Page - Updating part ${id}:`, partUpdates);
         try {
-          const result = await updatePartMutation.mutateAsync({ quoteId: quote.id, partId: id, updates: partUpdates });
-          console.log(`🔍 Pricing Page - Part ${id} update result:`, result);
+          await updatePartMutation.mutateAsync({ quoteId: quote.id, partId: id, updates: partUpdates });
         } catch (error) {
           console.error(`❌ Error updating part ${id}:`, error);
         }
@@ -133,10 +119,8 @@ export default function PricingPage() {
       
       // Track quote completion action
       try {
-        console.log('🎯 COMPLETED (Pricing Page): Tracking completion action for quote:', id);
         const { QuoteActionsService } = await import('@/services/quoteActions/quoteActionsService');
         await QuoteActionsService.trackQuoteAction(id, 'COMPLETED');
-        console.log('✅ COMPLETED (Pricing Page): Successfully tracked completion action for quote:', id);
       } catch (trackingError) {
         console.warn('Failed to track quote completion:', trackingError);
         // Don't fail the operation if tracking fails
@@ -145,7 +129,6 @@ export default function PricingPage() {
       // Invalidate queries to refresh the UI
       queryClient.invalidateQueries({ queryKey: queryKeys.quotesBase });
       
-      console.log('✅ Quote marked as completed successfully');
       return { error: null };
     } catch (error) {
       console.error('Error marking quote as completed:', error);
@@ -173,12 +156,8 @@ export default function PricingPage() {
   };
 
   const handleUpdateMultipleParts = async (updates: Array<{ id: string; updates: any }>): Promise<void> => {
-    // Debug logging for pricing page wrapper
-    console.log('🔍 Pricing Page - handleUpdateMultipleParts wrapper called:', { updates });
-    
     try {
       await updateMultipleParts(updates);
-      console.log('🔍 Pricing Page - handleUpdateMultipleParts wrapper completed successfully');
     } catch (error) {
       console.error('❌ Pricing Page - Error in handleUpdateMultipleParts wrapper:', error);
       throw error; // Re-throw to maintain error handling

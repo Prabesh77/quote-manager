@@ -59,6 +59,8 @@ export interface QuotePartItem {
 export interface PartVariant {
   id: string;
   final_price: number | null;
+  list_price: number | null;
+  af: boolean;
   note: string;
   created_at: string;
   is_default?: boolean;
@@ -69,6 +71,8 @@ export interface Part {
   name: string;
   number: string;
   price: number | null;
+  list_price: number | null;
+  af: boolean;
   note: string;
   createdAt: string;
 }
@@ -79,6 +83,8 @@ export interface QuotePart {
   quoteId: string;
   partId: string;
   finalPrice: number | null;
+  listPrice: number | null;
+  af: boolean;
   note: string;  // Quote-specific note
   
   // Part table fields (for display)
@@ -219,6 +225,8 @@ export const useQuotes = () => {
             variants: [{
               id: `var_${qp.part_id}_${qp.quote_id}`,
               final_price: qp.final_price || null,
+              list_price: qp.list_price || null,
+              af: qp.af || false,
               note: qp.note || '',
               created_at: qp.created_at || new Date().toISOString(),
               is_default: true
@@ -272,6 +280,8 @@ export const useQuotes = () => {
         name: part.part_name,
         number: part.part_number || '',
         price: part.price,
+        list_price: part.list_price || null,
+        af: part.af || false,
         note: part.notes || part.note || '', // Handle both 'notes' and 'note' columns
         createdAt: part.created_at,
       }));

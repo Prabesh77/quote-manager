@@ -130,6 +130,8 @@ const fetchParts = async (): Promise<Part[]> => {
         name: part.part_name,
         number: part.part_number || '',
         price: part.price,
+        list_price: part.list_price || null,
+        af: part.af || false,
         note: '', // Notes are now stored in parts_requested JSON, not parts table
         createdAt: part.created_at,
       }));
@@ -184,6 +186,8 @@ export const quotePartToLegacyPart = (quotePart: QuotePart): Part => ({
   name: quotePart.partName,
   number: quotePart.partNumber,
   price: quotePart.finalPrice, // Only use manually set final price, no automatic fallback
+  list_price: quotePart.listPrice || null,
+  af: quotePart.af || false,
   note: quotePart.note,
   createdAt: quotePart.createdAt,
 });
@@ -591,6 +595,8 @@ export const useUpdatePartMutation = () => {
         name: updatedPart?.part_name || updates.name || '',
         number: updatedPart?.part_number || updates.number || '',
         price: updates.price ?? updatedPart?.price ?? null,
+        list_price: updates.list_price ?? updatedPart?.list_price ?? null,
+        af: updates.af ?? updatedPart?.af ?? false,
         note: updates.note || '',
         createdAt: updatedPart?.created_at || new Date().toISOString(),
       };
@@ -634,6 +640,8 @@ export const useAddPartMutation = () => {
         name: data.part_name,
         number: data.part_number || '',
         price: data.price,
+        list_price: data.list_price || null,
+        af: data.af || false,
         note: '', // Notes are now stored in quote_parts, not parts
         createdAt: data.created_at,
       };
@@ -785,6 +793,8 @@ export const useUpdatePartInQuoteJsonMutation = () => {
                   ...updatedVariants[variantIndex],
                   ...(updates.note !== undefined && { note: updates.note }),
                   ...(updates.price !== undefined && { final_price: updates.price }),
+                  ...(updates.list_price !== undefined && { list_price: updates.list_price }),
+                  ...(updates.af !== undefined && { af: updates.af }),
                 };
                 updatedPart.variants = updatedVariants;
               } else {
@@ -793,6 +803,8 @@ export const useUpdatePartInQuoteJsonMutation = () => {
                   id: updates.variantId,
                   note: updates.note || '',
                   final_price: updates.price || null,
+                  list_price: updates.list_price || null,
+                  af: updates.af || false,
                   created_at: new Date().toISOString(),
                   is_default: false
                 };
@@ -808,6 +820,8 @@ export const useUpdatePartInQuoteJsonMutation = () => {
                   id: `var_${partId}_${Date.now()}`,
                   note: updates.note || '',
                   final_price: updates.price || null,
+                  list_price: updates.list_price || null,
+                  af: updates.af || false,
                   created_at: new Date().toISOString(),
                   is_default: true
                 };
@@ -819,6 +833,8 @@ export const useUpdatePartInQuoteJsonMutation = () => {
                   ...updatedVariants[defaultVariantIndex],
                   ...(updates.note !== undefined && { note: updates.note }),
                   ...(updates.price !== undefined && { final_price: updates.price }),
+                  ...(updates.list_price !== undefined && { list_price: updates.list_price }),
+                  ...(updates.af !== undefined && { af: updates.af }),
                 };
                 updatedPart.variants = updatedVariants;
               }

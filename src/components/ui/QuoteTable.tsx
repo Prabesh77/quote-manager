@@ -161,7 +161,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
         ...prev,
         [partId]: {
           ...existingPartData, // Preserve existing variant data including primary variant
-          [newVariantId]: { note: '', final_price: null }
+          [newVariantId]: { note: '', final_price: null, list_price: null, af: false }
         }
       };
       
@@ -184,6 +184,8 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                           id: newVariantId,
                           note: '',
                           final_price: null,
+                          list_price: null,
+                          af: false,
                           created_at: new Date().toISOString(),
                           is_default: false
                         }
@@ -199,7 +201,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
     });
     
     // Always ensure editing state is set for this quote
-    setEditingParts(quoteId);
+      setEditingParts(quoteId);
   };
 
   const removeVariantFromPart = (quoteId: string, partId: string, variantId: string) => {
@@ -235,6 +237,8 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                       id: generateVariantId(),
                       note: '',
                       final_price: null,
+                      list_price: null,
+                      af: false,
                       created_at: new Date().toISOString(),
                       is_default: true
                     }] : p.variants
@@ -481,7 +485,9 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                         return {
                           ...variant,
                           note: variantEditData.note !== undefined ? variantEditData.note : variant.note,
-                          final_price: variantEditData.final_price !== undefined ? variantEditData.final_price : variant.final_price
+                          final_price: variantEditData.final_price !== undefined ? variantEditData.final_price : variant.final_price,
+                          list_price: variantEditData.list_price !== undefined ? variantEditData.list_price : variant.list_price,
+                          af: variantEditData.af !== undefined ? variantEditData.af : variant.af
                         };
                       }
                       return variant;
@@ -499,7 +505,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
         ));
         
         // Then, save the default variant to the backend (for compatibility with current schema)
-        const updates: Array<{ id: string; updates: Partial<Part> & { variantId?: string } }> = [];
+        const updates: Array<{ id: string; updates: Partial<Part> & { variantId?: string; list_price?: number | null; af?: boolean } }> = [];
         
         Object.keys(partEditData).forEach(partId => {
           const partEditDataForPart = partEditData[partId];
@@ -517,7 +523,9 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                   updates: {
                     variantId: variant.id,
                     note: variantEditData.note !== undefined ? variantEditData.note : variant.note,
-                    price: variantEditData.final_price !== undefined ? variantEditData.final_price : variant.final_price
+                    price: variantEditData.final_price !== undefined ? variantEditData.final_price : variant.final_price,
+                    list_price: variantEditData.list_price !== undefined ? variantEditData.list_price : variant.list_price,
+                    af: variantEditData.af !== undefined ? variantEditData.af : variant.af
                   }
                 });
               }
@@ -530,17 +538,19 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
               const alreadyProcessed = existingVariants.some(v => v.id === variantId);
               if (!alreadyProcessed) {
                 const variantEditData = partEditDataForPart[variantId];
-                if (variantEditData && (variantEditData.note !== undefined || variantEditData.final_price !== undefined)) {
-                  updates.push({
-                    id: partId,
-                    updates: {
+                if (variantEditData && (variantEditData.note !== undefined || variantEditData.final_price !== undefined || variantEditData.list_price !== undefined || variantEditData.af !== undefined)) {
+                updates.push({
+                  id: partId,
+                  updates: {
                       variantId: variantId,
                       note: variantEditData.note !== undefined ? variantEditData.note : '',
-                      price: variantEditData.final_price !== undefined ? variantEditData.final_price : null
-                    }
-                  });
-                }
+                      price: variantEditData.final_price !== undefined ? variantEditData.final_price : null,
+                      list_price: variantEditData.list_price !== undefined ? variantEditData.list_price : null,
+                      af: variantEditData.af !== undefined ? variantEditData.af : false
+                  }
+                });
               }
+            }
             });
           }
         });
@@ -561,7 +571,9 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                   return {
                     ...variant,
                     note: variantEditData.note !== undefined ? variantEditData.note : variant.note,
-                    final_price: variantEditData.final_price !== undefined ? variantEditData.final_price : variant.final_price
+                    final_price: variantEditData.final_price !== undefined ? variantEditData.final_price : variant.final_price,
+                    list_price: variantEditData.list_price !== undefined ? variantEditData.list_price : variant.list_price,
+                    af: variantEditData.af !== undefined ? variantEditData.af : variant.af
                   };
                 }
                 return variant;
@@ -578,6 +590,8 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                     id: variantId,
                     note: variantEditData.note !== undefined ? variantEditData.note : '',
                     final_price: variantEditData.final_price !== undefined ? variantEditData.final_price : null,
+                    list_price: variantEditData.list_price !== undefined ? variantEditData.list_price : null,
+                    af: variantEditData.af !== undefined ? variantEditData.af : false,
                     created_at: new Date().toISOString(),
                     is_default: false
                   });
@@ -653,7 +667,9 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
             }
             newPartEditData[part.id][variant.id] = {
               note: variant.note || '',
-              final_price: variant.final_price || null
+              final_price: variant.final_price || null,
+              list_price: variant.list_price || null,
+              af: variant.af || false
             };
           });
         } else {
@@ -662,7 +678,9 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
           newPartEditData[part.id] = {
             'default': {
               note: part.note || '',
-              final_price: part.price || null
+              final_price: part.price || null,
+              list_price: part.list_price || null,
+              af: part.af || false
             }
           };
         }
@@ -677,7 +695,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
     setEditData(prev => ({ ...prev, [field]: value }));
   };
 
-  const handlePartEditChange = (partId: string, field: string, value: string | number | null) => {
+  const handlePartEditChange = (partId: string, field: string, value: string | number | boolean | null) => {
     setPartEditData(prev => ({
       ...prev,
       [partId]: {
@@ -687,7 +705,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
     }));
   };
 
-  const handleVariantEditChange = (partId: string, variantId: string, field: string, value: string | number | null) => {
+  const handleVariantEditChange = (partId: string, variantId: string, field: string, value: string | number | boolean | null) => {
     setPartEditData(prev => ({
       ...prev,
       [partId]: {
@@ -1758,10 +1776,12 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                               <table className="w-full">
                                 <thead className="bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200">
                                   <tr>
-                                    <th className="px-4 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider w-1/4">Part & Variants</th>
-                                    <th className="px-4 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider w-1/4">Part Number</th>
+                                    <th className="px-4 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider w-1/5">Part & Variants</th>
+                                    <th className="px-4 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider w-1/5">Part Number</th>
                                     <th className="px-4 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider w-1/6">Price</th>
-                                    <th className="px-4 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider w-1/3">Notes</th>
+                                    <th className="px-4 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider w-1/6">List Price</th>
+                                    <th className="px-4 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider w-1/12">AF</th>
+                                    <th className="px-4 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider w-1/4">Notes</th>
                                   </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-200">
@@ -1922,6 +1942,55 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                                 )}
                                               </div>
                                             </td>
+                                            <td className="px-4 py-1">
+                                              <div className="flex items-center space-x-1">
+                                                {isPartEditing ? (
+                                                  <input
+                                                    type="number"
+                                                    value={partEditData[part.id]?.[variant.id]?.list_price ?? variant.list_price ?? ''}
+                                                    onChange={(e) => handleVariantEditChange(part.id, variant.id, 'list_price', e.target.value ? Number(e.target.value) : null)}
+                                                    className={`w-full px-2 py-1 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 ${index === 0 ? 'bg-white' : 'bg-gray-50'}`}
+                                                    placeholder="Enter list price"
+                                                  />
+                                                ) : (
+                                                  <>
+                                                    <span className={`text-sm font-medium ${variant.list_price ? 'text-gray-900' : 'text-gray-400'}`}>
+                                                      {variant.list_price ? `$${variant.list_price.toFixed(2)}` : 'Not set'}
+                                                    </span>
+                                                    {variant.list_price && (
+                                                    <button
+                                                        onClick={() => copyToClipboard(variant.list_price ? variant.list_price.toString() : '')}
+                                                        className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-md transition-all duration-200 cursor-pointer"
+                                                      title="Copy to clipboard"
+                                                    >
+                                                        {isRecentlyCopied(variant.list_price ? variant.list_price.toString() : '') ? (
+                                                          <CheckCircle className="h-3.5 w-3.5 text-green-500" />
+                                                        ) : (
+                                                          <Copy className="h-3.5 w-3.5" />
+                                                        )}
+                                                  </button>
+                                                    )}
+                                                  </>
+                                                )}
+                                              </div>
+                                            </td>
+                                            <td className="px-4 py-1">
+                                              <div className="flex items-start justify-start">
+                                                {isPartEditing ? (
+                                                  <input
+                                                    type="checkbox"
+                                                    checked={partEditData[part.id]?.[variant.id]?.af ?? variant.af ?? false}
+                                                    onChange={(e) => handleVariantEditChange(part.id, variant.id, 'af', e.target.checked)}
+                                                    className={`w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2 ${index === 0 ? 'bg-white' : 'bg-gray-50'}`}
+                                                    title="Aftermarket Flag"
+                                                  />
+                                                ) : (
+                                                  <span className={`text-sm ${variant.af ? 'text-green-600 font-medium' : 'text-gray-400'}`}>
+                                                    {variant.af ? '✓' : 'X'}
+                                                  </span>
+                                                )}
+                                              </div>
+                                            </td>
                                             <td className="px-4 py-1 min-w-0">
                                               <div className="flex items-center justify-between">
                                                 <div className="flex items-center space-x-1 flex-1 min-w-0">
@@ -1936,7 +2005,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                                   <>
                                                       <span className={`text-sm ${variant.note ? 'text-gray-700' : 'text-gray-400'}`}>
                                                         {variant.note || 'No notes'}
-                                                      </span>
+                                                    </span>
                                                       {variant.note && (
                                                     <button
                                                       onClick={() => copyToClipboard(variant.note || '')}
@@ -1952,40 +2021,40 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                                       )}
                                                   </>
                                                 )}
-                                              </div>
-                                                
+                                            </div>
+                                            
                                                 {/* Action Buttons */}
                                                 <div className="flex items-center space-x-1 ml-2">
-                                                  {isPartEditing ? (
+                                                {isPartEditing ? (
                                                     <>
                                                 {index === 0 ? (
-                                                  <button
+                                                    <button
                                                     onClick={() => addVariantToPart(quote.id, part.id)}
                                                           className="w-8 h-8 bg-gradient-to-r from-blue-50 to-blue-100 rounded-full flex items-center justify-center hover:from-blue-100 hover:to-blue-200 transition-all duration-200 cursor-pointer shadow-sm hover:shadow-md border border-blue-200"
                                                     title="Add variant"
                                                   >
                                                           <Plus className="h-4 w-4 text-blue-600" />
-                                                  </button>
+                                                    </button>
                                                 ) : (
-                                                    <button
+                                              <button
                                                       onClick={() => removeVariantFromPart(quote.id, part.id, variant.id)}
                                                           className="w-8 h-8 bg-gradient-to-r from-red-50 to-red-100 rounded-full flex items-center justify-center hover:from-red-100 hover:to-red-200 transition-all duration-200 cursor-pointer shadow-sm hover:shadow-md border border-red-200"
                                                       title="Remove variant"
                                                     >
                                                           <X className="h-4 w-4 text-red-600" />
-                                                    </button>
-                                                )}
+                                              </button>
+                                          )}
                                                     </>
                                                   ) : null}
-                                                </div>
-                                              </div>
+                                        </div>
+                                      </div>
                                             </td>
 
                                           </tr>
-                                        ))}
-                                      </>
-                                    );
-                                  })}
+                                  ))}
+                                </>
+                              );
+                            })}
                                 </tbody>
                               </table>
                             </div>
@@ -2371,6 +2440,58 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                             </div>
                                             
                                             <div>
+                                              <label className="block text-xs font-medium text-gray-500 mb-1">List Price</label>
+                                              <div className="flex items-center space-x-1">
+                                                {isPartEditing ? (
+                                                  <input
+                                                    type="number"
+                                                    value={partEditData[part.id]?.list_price || ''}
+                                                    onChange={(e) => handlePartEditChange(part.id, 'list_price', e.target.value ? Number(e.target.value) : null)}
+                                                    className="flex-1 px-2 py-1 border border-gray-300 rounded-md text-sm focus:ring-1 focus:ring-red-500 focus:border-transparent"
+                                                  />
+                                                ) : (
+                                                  <>
+                                                    <span className="text-sm font-medium text-gray-900">
+                                                      {part.list_price ? `$${part.list_price.toFixed(2)}` : '-'}
+                                                    </span>
+                                                    <button
+                                                      onClick={() => copyToClipboard(part.list_price ? part.list_price.toString() : '')}
+                                                      className="p-1 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
+                                                      title="Copy to clipboard"
+                                                    >
+                                                      {isRecentlyCopied(part.list_price ? part.list_price.toString() : '') ? (
+                                                        <CheckCircle className="h-3 w-3 text-green-500" />
+                                                      ) : (
+                                                        <Copy className="h-3 w-3" />
+                                                      )}
+                                                    </button>
+                                                  </>
+                                                )}
+                                              </div>
+                                            </div>
+                                          </div>
+                                          
+                                          <div className="grid grid-cols-2 gap-3">
+                                            <div>
+                                              <label className="block text-xs font-medium text-gray-500 mb-1">AF (Aftermarket)</label>
+                                              <div className="flex items-center space-x-1">
+                                                {isPartEditing ? (
+                                                  <input
+                                                    type="checkbox"
+                                                    checked={partEditData[part.id]?.af || false}
+                                                    onChange={(e) => handlePartEditChange(part.id, 'af', e.target.checked)}
+                                                    className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2"
+                                                    title="Aftermarket Flag"
+                                                  />
+                                                ) : (
+                                                  <span className={`text-sm ${part.af ? 'text-green-600 font-medium' : 'text-gray-400'}`}>
+                                                    {part.af ? '✓ Aftermarket' : '○ OEM'}
+                                                  </span>
+                                                )}
+                                              </div>
+                                            </div>
+                                            
+                                            <div>
                                               <label className="block text-xs font-medium text-gray-500 mb-1">Notes</label>
                                               <div className="flex items-center space-x-1 min-w-0">
                                                 {isPartEditing ? (
@@ -2387,11 +2508,11 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                                   className="p-1 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
                                                       title="Copy to clipboard"
                                                     >
-                                                          {isRecentlyCopied(part.note || '') ? (
-                                                            <CheckCircle className="h-3 w-3 text-green-500" />
-                                                          ) : (
+                                                      {isRecentlyCopied(part.note || '') ? (
+                                                        <CheckCircle className="h-3 w-3 text-green-500" />
+                                                      ) : (
                                                       <Copy className="h-3 w-3" />
-                                                          )}
+                                                      )}
                                                     </button>
                                                   </>
                                                 )}

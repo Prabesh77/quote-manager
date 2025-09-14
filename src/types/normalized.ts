@@ -50,6 +50,8 @@ export interface QuotePart {
   quote_id: string;
   part_id: string;
   final_price?: number;
+  list_price?: number;
+  af?: boolean;
   note?: string;
   status: 'WaitingForPrice' | 'Priced' | 'Ordered';
   created_at: string;

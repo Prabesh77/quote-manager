@@ -9,6 +9,7 @@ import { useSnackbar } from '@/components/ui/Snackbar';
 import { QuoteActionsService } from '@/services/quoteActions/quoteActionsService';
 import supabase from '@/utils/supabase';
 import { useState } from 'react';
+import { Part } from '@/components/ui/useQuotes';
 
 export default function HomePage() {
   // Server-side pagination state
@@ -63,6 +64,8 @@ export default function HomePage() {
         name: part.part_name, // Map part_name to name for UI compatibility
         number: part.part_number || '',
         price: part.price,
+        list_price: part.list_price || null,
+        af: part.af || false,
         note: '', // Will be filled from quote-specific data
         createdAt: part.created_at
       })) || [];
@@ -103,6 +106,8 @@ export default function HomePage() {
           name: part.name || '',
           number: part.number || '',
           price: part.price || null,
+          list_price: part.list_price || null,
+          af: part.af || false,
           note: part.note || ''
         })) || [],
         notes: '',
@@ -152,7 +157,7 @@ export default function HomePage() {
       
       if (!quote) {
         showSnackbar('Quote not found for this part', 'error');
-        return { data: {} as any, error: new Error('Quote not found') };
+        return { data: {} as Part, error: new Error('Quote not found') };
       }
 
       const result = await updatePartMutation.mutateAsync({ quoteId: quote.id, partId: id, updates });
@@ -163,11 +168,11 @@ export default function HomePage() {
         console.log('💾 INDIVIDUAL: Price updated, PRICED tracking handled by mutation');
       }
       
-      return { data: result.data, error: null };
+      return { data: result.data as Part, error: null };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       showSnackbar(`Error updating part: ${errorMessage}`, 'error');
-      return { data: {} as any, error: error instanceof Error ? error : new Error('Unknown error') };
+      return { data: {} as Part, error: error instanceof Error ? error : new Error('Unknown error') };
     }
   };
 

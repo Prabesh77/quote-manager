@@ -81,13 +81,13 @@ const Navigation = () => {
       description: 'View completed quotes',
       requiredRoles: ['price_manager', 'quality_controller', 'admin']
     },
-    {
-      name: 'Orders',
-      href: '/orders',
-      icon: ShoppingCart,
-      description: 'Manage orders',
-      requiredRoles: ['quality_controller', 'admin']
-    }
+    // {
+    //   name: 'Orders',
+    //   href: '/orders',
+    //   icon: ShoppingCart,
+    //   description: 'Manage orders',
+    //   requiredRoles: ['quality_controller', 'admin']
+    // }
   ];
 
   // Filter navigation items based on user role

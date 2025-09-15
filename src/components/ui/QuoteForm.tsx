@@ -175,8 +175,164 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
       let key = '';
       let value = '';
 
+      // Pattern 0: New format - "Received: 02/09/2025 12:00 PM" etc.
+      if (trimmedLine.includes(':')) {
+        const colonIndex = trimmedLine.indexOf(':');
+        const fieldName = trimmedLine.substring(0, colonIndex).trim().toLowerCase();
+        const fieldValue = trimmedLine.substring(colonIndex + 1).trim();
+        
+        switch (fieldName) {
+          case 'received':
+            // Skip received date for now, but could be used for notes
+            break;
+          case 'bodyshop':
+            parsed['customer'] = fieldValue;
+            break;
+          case 'repairer address':
+            parsed['address'] = fieldValue;
+            break;
+          case 'repairer contact':
+            // Could be used for additional contact info in notes
+            if (parsed['notes']) {
+              parsed['notes'] += ` | Contact: ${fieldValue}`;
+            } else {
+              parsed['notes'] = `Contact: ${fieldValue}`;
+            }
+            break;
+          case 'telephone':
+            parsed['phone'] = fieldValue;
+            break;
+          case 'email':
+            // Could be used for additional contact info in notes
+            if (parsed['notes']) {
+              parsed['notes'] += ` | Email: ${fieldValue}`;
+            } else {
+              parsed['notes'] = `Email: ${fieldValue}`;
+            }
+            break;
+          case 'estimate number':
+            parsed['quoteRef'] = fieldValue;
+            break;
+          case 'insurer':
+            // Could be used for additional info in notes
+            if (parsed['notes']) {
+              parsed['notes'] += ` | Insurer: ${fieldValue}`;
+            } else {
+              parsed['notes'] = `Insurer: ${fieldValue}`;
+            }
+            break;
+          case 'claim number':
+            // Could be used for additional info in notes
+            if (parsed['notes']) {
+              parsed['notes'] += ` | Claim: ${fieldValue}`;
+            } else {
+              parsed['notes'] = `Claim: ${fieldValue}`;
+            }
+            break;
+          case 'required':
+            // Parse required date/time - format: "02/09/2025 1:00 PM"
+            try {
+              // Split date and time
+              const [datePart, timePart] = fieldValue.split(' ');
+              if (datePart && timePart) {
+                const [day, month, year] = datePart.split('/');
+                const timeStr = timePart.toLowerCase();
+                
+                let hours = 0;
+                let minutes = 0;
+                
+                if (timeStr.includes('pm')) {
+                  const time = timeStr.replace('pm', '');
+                  if (time.includes(':')) {
+                    const [h, m] = time.split(':');
+                    const hour = parseInt(h);
+                    hours = hour === 12 ? 12 : hour + 12;
+                    minutes = parseInt(m || '0');
+                  } else {
+                    const timeNum = parseInt(time);
+                    const hour = Math.floor(timeNum / 100);
+                    hours = hour === 12 ? 12 : hour + 12;
+                    minutes = timeNum % 100;
+                  }
+                } else if (timeStr.includes('am')) {
+                  const time = timeStr.replace('am', '');
+                  if (time.includes(':')) {
+                    const [h, m] = time.split(':');
+                    hours = parseInt(h);
+                    minutes = parseInt(m || '0');
+                  } else {
+                    const timeNum = parseInt(time);
+                    hours = Math.floor(timeNum / 100);
+                    minutes = timeNum % 100;
+                  }
+                }
+                
+                const deadline = new Date(parseInt(year), parseInt(month) - 1, parseInt(day), hours, minutes);
+                if (!isNaN(deadline.getTime())) {
+                  parsed['requiredBy'] = deadline.toISOString();
+                }
+              }
+            } catch (error) {
+              parsed['requiredBy'] = fieldValue;
+            }
+            break;
+          case 'vehicle':
+            // Parse vehicle info - format: "TOYOTA LANDCRUISER  SAHARA LC300"
+            const vehicleParts = fieldValue.split('  ').map(part => part.trim()).filter(part => part);
+            if (vehicleParts.length >= 2) {
+              parsed['make'] = vehicleParts[0];
+              parsed['model'] = vehicleParts[1];
+              if (vehicleParts.length > 2) {
+                parsed['series'] = vehicleParts[2];
+              }
+            }
+            break;
+          case 'manufactured':
+            // Parse manufactured date - format: "06/2023"
+            try {
+              const [month, year] = fieldValue.split('/');
+              parsed['mthyr'] = `${year}-${month.padStart(2, '0')}`;
+            } catch (error) {
+              parsed['mthyr'] = fieldValue;
+            }
+            break;
+          case 'registration':
+            parsed['rego'] = fieldValue;
+            break;
+          case 'vin':
+            parsed['vin'] = fieldValue;
+            break;
+          case 'colour':
+            // Could be used for additional info in notes
+            if (parsed['notes']) {
+              parsed['notes'] += ` | Colour: ${fieldValue}`;
+            } else {
+              parsed['notes'] = `Colour: ${fieldValue}`;
+            }
+            break;
+          case 'paint':
+            // Could be used for additional info in notes
+            if (parsed['notes']) {
+              parsed['notes'] += ` | Paint: ${fieldValue}`;
+            } else {
+              parsed['notes'] = `Paint: ${fieldValue}`;
+            }
+            break;
+          default:
+            // Handle other fields that might appear
+            if (parsed['notes']) {
+              parsed['notes'] += ` | ${fieldName.replace(/\b\w/g, l => l.toUpperCase())}: ${fieldValue}`;
+            } else {
+              parsed['notes'] = `${fieldName.replace(/\b\w/g, l => l.toUpperCase())}: ${fieldValue}`;
+            }
+            break;
+        }
+        // Skip normal processing for new format
+        key = '';
+        value = '';
+      }
       // Pattern 1: "Reference28495#2" (no space)
-      if (trimmedLine.match(/^(Reference|Make|Model|Series|Trans|Body|Mth\/Yr|Veh Reg)(.+)$/i)) {
+      else if (trimmedLine.match(/^(Reference|Make|Model|Series|Trans|Body|Mth\/Yr|Veh Reg)(.+)$/i)) {
         const match = trimmedLine.match(/^(Reference|Make|Model|Series|Trans|Body|Mth\/Yr|Veh Reg)(.+)$/i);
         if (match) {
           key = match[1].toLowerCase();
@@ -536,14 +692,168 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
                     const trimmedLine = lines[i].trim();
                     if (!trimmedLine) continue;
 
-
-
                     // Handle different patterns in the data
                     let key = '';
                     let value = '';
 
+                    // Pattern 0: New format - "Received: 02/09/2025 12:00 PM" etc.
+                    if (trimmedLine.includes(':')) {
+                      const colonIndex = trimmedLine.indexOf(':');
+                      const fieldName = trimmedLine.substring(0, colonIndex).trim().toLowerCase();
+                      const fieldValue = trimmedLine.substring(colonIndex + 1).trim();
+                      
+                      switch (fieldName) {
+                        case 'received':
+                          // Skip received date for now, but could be used for notes
+                          break;
+                        case 'bodyshop':
+                          parsed['customer'] = fieldValue;
+                          break;
+                        case 'repairer address':
+                          parsed['address'] = fieldValue;
+                          break;
+                        case 'repairer contact':
+                          // Could be used for additional contact info in notes
+                          if (parsed['notes']) {
+                            parsed['notes'] += ` | Contact: ${fieldValue}`;
+                          } else {
+                            parsed['notes'] = `Contact: ${fieldValue}`;
+                          }
+                          break;
+                        case 'telephone':
+                          parsed['phone'] = fieldValue;
+                          break;
+                        case 'email':
+                          // Could be used for additional contact info in notes
+                          if (parsed['notes']) {
+                            parsed['notes'] += ` | Email: ${fieldValue}`;
+                          } else {
+                            parsed['notes'] = `Email: ${fieldValue}`;
+                          }
+                          break;
+                        case 'estimate number':
+                          parsed['quoteRef'] = fieldValue;
+                          break;
+                        case 'insurer':
+                          // Could be used for additional info in notes
+                          if (parsed['notes']) {
+                            parsed['notes'] += ` | Insurer: ${fieldValue}`;
+                          } else {
+                            parsed['notes'] = `Insurer: ${fieldValue}`;
+                          }
+                          break;
+                        case 'claim number':
+                          // Could be used for additional info in notes
+                          if (parsed['notes']) {
+                            parsed['notes'] += ` | Claim: ${fieldValue}`;
+                          } else {
+                            parsed['notes'] = `Claim: ${fieldValue}`;
+                          }
+                          break;
+                        case 'required':
+                          // Parse required date/time - format: "02/09/2025 1:00 PM"
+                          try {
+                            // Split date and time
+                            const [datePart, timePart] = fieldValue.split(' ');
+                            if (datePart && timePart) {
+                              const [day, month, year] = datePart.split('/');
+                              const timeStr = timePart.toLowerCase();
+                              
+                              let hours = 0;
+                              let minutes = 0;
+                              
+                              if (timeStr.includes('pm')) {
+                                const time = timeStr.replace('pm', '');
+                                if (time.includes(':')) {
+                                  const [h, m] = time.split(':');
+                                  const hour = parseInt(h);
+                                  hours = hour === 12 ? 12 : hour + 12;
+                                  minutes = parseInt(m || '0');
+                                } else {
+                                  const timeNum = parseInt(time);
+                                  const hour = Math.floor(timeNum / 100);
+                                  hours = hour === 12 ? 12 : hour + 12;
+                                  minutes = timeNum % 100;
+                                }
+                              } else if (timeStr.includes('am')) {
+                                const time = timeStr.replace('am', '');
+                                if (time.includes(':')) {
+                                  const [h, m] = time.split(':');
+                                  hours = parseInt(h);
+                                  minutes = parseInt(m || '0');
+                                } else {
+                                  const timeNum = parseInt(time);
+                                  hours = Math.floor(timeNum / 100);
+                                  minutes = timeNum % 100;
+                                }
+                              }
+                              
+                              const deadline = new Date(parseInt(year), parseInt(month) - 1, parseInt(day), hours, minutes);
+                              if (!isNaN(deadline.getTime())) {
+                                parsed['requiredBy'] = deadline.toISOString();
+                              }
+                            }
+                          } catch (error) {
+                            parsed['requiredBy'] = fieldValue;
+                          }
+                          break;
+                        case 'vehicle':
+                          // Parse vehicle info - format: "TOYOTA LANDCRUISER  SAHARA LC300"
+                          const vehicleParts = fieldValue.split('  ').map(part => part.trim()).filter(part => part);
+                          if (vehicleParts.length >= 2) {
+                            parsed['make'] = vehicleParts[0];
+                            parsed['model'] = vehicleParts[1];
+                            if (vehicleParts.length > 2) {
+                              parsed['series'] = vehicleParts[2];
+                            }
+                          }
+                          break;
+                        case 'manufactured':
+                          // Parse manufactured date - format: "06/2023"
+                          try {
+                            const [month, year] = fieldValue.split('/');
+                            parsed['mthyr'] = `${year}-${month.padStart(2, '0')}`;
+                          } catch (error) {
+                            parsed['mthyr'] = fieldValue;
+                          }
+                          break;
+                        case 'registration':
+                          parsed['rego'] = fieldValue;
+                          break;
+                        case 'vin':
+                          parsed['vin'] = fieldValue;
+                          break;
+                        case 'colour':
+                          // Could be used for additional info in notes
+                          if (parsed['notes']) {
+                            parsed['notes'] += ` | Colour: ${fieldValue}`;
+                          } else {
+                            parsed['notes'] = `Colour: ${fieldValue}`;
+                          }
+                          break;
+                        case 'paint':
+                          // Could be used for additional info in notes
+                          if (parsed['notes']) {
+                            parsed['notes'] += ` | Paint: ${fieldValue}`;
+                          } else {
+                            parsed['notes'] = `Paint: ${fieldValue}`;
+                          }
+                          break;
+                        default:
+                          // Handle other fields that might appear
+                          if (parsed['notes']) {
+                            parsed['notes'] += ` | ${fieldName.replace(/\b\w/g, l => l.toUpperCase())}: ${fieldValue}`;
+                          } else {
+                            parsed['notes'] = `${fieldName.replace(/\b\w/g, l => l.toUpperCase())}: ${fieldValue}`;
+                          }
+                          break;
+                      }
+                      // Skip normal processing for new format
+                      key = '';
+                      value = '';
+                    }
                     // Pattern 1: "Reference28495#2" (no space) - OLD FORMAT ONLY (no colons)
-                    if (!trimmedLine.includes(':') && trimmedLine.match(/^(Reference|Make|Series|Trans|Body|Mth\/Yr|Veh Reg)(.+)$/i)) {
+                    else if (!trimmedLine.includes(':') && trimmedLine.match(/^(Reference|Make|Series|Trans|Body|Mth\/Yr|Veh Reg)(.+)$/i)) {
                       const match = trimmedLine.match(/^(Reference|Make|Series|Trans|Body|Mth\/Yr|Veh Reg)(.+)$/i);
                       if (match) {
                         key = match[1].toLowerCase();

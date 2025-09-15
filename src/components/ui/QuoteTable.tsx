@@ -60,6 +60,18 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
   const [filter, setFilter] = useState<FilterType>(defaultFilter);
   const [searchTerm, setSearchTerm] = useState('');
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+
+  // Initialize expanded rows - only expand the first quote in the list
+  useEffect(() => {
+    const newExpandedRows = new Set<string>();
+    
+    // Only expand the first quote in the list to reduce clutter
+    if (quotes.length > 0) {
+      newExpandedRows.add(quotes[0].id);
+    }
+    
+    setExpandedRows(newExpandedRows);
+  }, [quotes]);
   const [editingQuote, setEditingQuote] = useState<string | null>(null);
   const [editingParts, setEditingParts] = useState<string | null>(null);
   const [editData, setEditData] = useState<Record<string, any>>({});
@@ -1353,7 +1365,12 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
       </div>
 
           {/* Quotes List */}
-          <Accordion type="multiple" className="w-full">
+          <Accordion 
+            type="multiple" 
+            className="w-full"
+            value={Array.from(expandedRows)}
+            onValueChange={(values) => setExpandedRows(new Set(values))}
+          >
               {paginatedQuotes.map((quote) => {
                 const quoteParts = getQuotePartsWithNotesSync(quote.id);
                 const status = getQuoteStatus(quoteParts, quote.status);
@@ -2094,7 +2111,12 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
             </div>
           </div>
         ) : (
-          <Accordion type="multiple" className="w-full">
+          <Accordion 
+            type="multiple" 
+            className="w-full"
+            value={Array.from(expandedRows)}
+            onValueChange={(values) => setExpandedRows(new Set(values))}
+          >
             {paginatedQuotes.map((quote) => {
               const quoteParts = getQuotePartsWithNotesSync(quote.id);
               const status = getQuoteStatus(quoteParts, quote.status);

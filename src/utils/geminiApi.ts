@@ -96,6 +96,7 @@ IMPORTANT RULES:
   'Left Headlamp', 'Right Headlamp', 'Left DayLight', 'Right DayLight', 'Radiator', 'Condenser', 'Fan Assembly', 'Intercooler', 'Radar Sensor', 'Headlight Left', 'Headlight Right', 'Oil Cooler', 'Auxiliary Radiator', 'Camera', 'Parking Sensor', 'Left Blindspot Sensor', 'Right Blindspot Sensor'
 - Part naming priority:
   * RADIATOR: If "RADIATOR" is found, use "Radiator" instead of generic radiator terms
+  * AUXILIARY RADIATOR: If text contains "auxiliary radiator", "additional radiator", "lowtemp radiator", "left radiator" OR part number starts with "G9" → classify as "Auxiliary Radiator" (NOT "Radiator")
   * CONDENSER: If "CONDENSER" is found, use "Condenser" instead of "Refrigerant Condenser" or generic condenser terms
   * Only use "Refrigerant Condenser" if no specific "Condenser" is found
   * Only use generic radiator terms if no specific "RADIATOR" is found

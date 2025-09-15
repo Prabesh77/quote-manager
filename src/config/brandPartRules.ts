@@ -9,7 +9,7 @@ export interface BrandPartRule {
 
 export const BRAND_PART_RULES: Record<string, BrandPartRule> = {
   'Fan Assembly': {
-    requiredFor: ['Kia', 'Hyundai', 'Mazda', 'Holden', 'Nissan', 'Subaru'],
+    requiredFor: ['Kia', 'Hyundai', 'Mazda', 'Holden', 'Nissan'],
     description: 'Required for Asian and Australian brands'
   },
   'Oil Cooler': {
@@ -41,7 +41,7 @@ export const BRAND_PART_RULES: Record<string, BrandPartRule> = {
     description: 'Required for European luxury brands'
   },
   'Daytime Headlamps': {
-    requiredFor: ['Kia', 'Hyundai', 'Mitsubishi'],
+    requiredFor: ['Kia', 'Hyundai', 'Mitsubishi', 'Nissan', 'Genesis'],
     description: 'Required for Korean and Japanese brands'
   }
 };

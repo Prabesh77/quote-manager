@@ -13,7 +13,7 @@ export default function PricedPage() {
   const queryClient = useQueryClient();
 
   // Get quotes for priced page with server-side pagination (1 per page)
-  const { data: quotesData, isLoading: quotesLoading } = useQuotesQuery(currentPage, 1, { status: 'priced' });
+  const { data: quotesData, isLoading: quotesLoading } = useQuotesQuery(currentPage, 10, { status: 'priced' });
   
   // Fetch parts for all quotes
   const { data: parts, isLoading: partsLoading } = useAllQuoteParts(quotesData?.quotes || []);

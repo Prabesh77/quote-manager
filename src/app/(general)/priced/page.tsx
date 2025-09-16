@@ -4,30 +4,19 @@ import { useQuotesQuery, useDeleteQuoteMutation, useUpdatePartInQuoteJsonMutatio
 import { useAllQuoteParts } from '@/hooks/useAllQuoteParts';
 import QuoteTable from "@/components/ui/QuoteTable";
 import { ProtectedRoute } from "@/components/common/ProtectedRoute";
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { useDebouncedSearchWithPageReset } from '@/hooks/useDebouncedSearch';
 
 export default function PricedPage() {
   // Server-side pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const queryClient = useQueryClient();
   
-  // Search state
-  const [searchTerm, setSearchTerm] = useState('');
-  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
-  
-  // Debounce search term
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedSearchTerm(searchTerm);
-      // Reset to page 1 when search changes
-      if (searchTerm !== debouncedSearchTerm) {
-        setCurrentPage(1);
-      }
-    }, 500); // 500ms debounce
-
-    return () => clearTimeout(timer);
-  }, [searchTerm, debouncedSearchTerm]);
+  // Search state with debouncing and page reset
+  const { searchTerm, debouncedSearchTerm, setSearchTerm } = useDebouncedSearchWithPageReset(
+    () => setCurrentPage(1)
+  );
 
   // Get quotes for priced page with server-side pagination (10 per page)
   const { data: quotesData, isLoading: quotesLoading } = useQuotesQuery(currentPage, 10, { 

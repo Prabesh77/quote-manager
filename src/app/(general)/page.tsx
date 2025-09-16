@@ -10,13 +10,22 @@ import { QuoteActionsService } from '@/services/quoteActions/quoteActionsService
 import supabase from '@/utils/supabase';
 import { useState } from 'react';
 import { Part } from '@/components/ui/useQuotes';
+import { useDebouncedSearchWithPageReset } from '@/hooks/useDebouncedSearch';
 
 export default function HomePage() {
   // Server-side pagination state
   const [currentPage, setCurrentPage] = useState(1);
+  
+  // Search state with debouncing and page reset
+  const { searchTerm, debouncedSearchTerm, setSearchTerm } = useDebouncedSearchWithPageReset(
+    () => setCurrentPage(1)
+  );
 
   // Get quotes for display (server-side pagination: 10 per page) - only show unpriced quotes
-  const { data: quotesData, isLoading: quotesLoading } = useQuotesQuery(currentPage, 10, { status: 'unpriced' });
+  const { data: quotesData, isLoading: quotesLoading } = useQuotesQuery(currentPage, 10, { 
+    status: 'unpriced',
+    search: debouncedSearchTerm 
+  });
   
   // Get all quote IDs for fetching parts for all quotes
   const allQuoteIds = quotesData?.quotes?.map(quote => quote.id) || [];
@@ -292,6 +301,10 @@ export default function HomePage() {
             total={quotesData?.total || 0}
             pageSize={10}
             onPageChange={setCurrentPage}
+            // Server-side search props
+            searchTerm={searchTerm}
+            onSearchChange={setSearchTerm}
+            useServerSideSearch={true}
           />
         </div>
       </div>

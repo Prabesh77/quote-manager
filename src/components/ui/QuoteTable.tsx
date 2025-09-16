@@ -39,13 +39,17 @@ interface QuoteTableProps {
   totalPages?: number;
   pageSize?: number;
   onPageChange?: (page: number) => void;
+  // Server-side search props
+  searchTerm?: string;
+  onSearchChange?: (searchTerm: string) => void;
+  useServerSideSearch?: boolean;
 }
 
 type FilterType = 'all' | 'unpriced' | 'priced';
 
 type QuoteStatus = 'unpriced' | 'priced' | 'completed' | 'ordered' | 'delivered' | 'waiting_verification';
 
-export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote, onUpdatePart, onUpdateMultipleParts, onMarkCompleted, onMarkAsOrdered, onMarkAsOrderedWithParts, showCompleted = false, defaultFilter = 'all', isLoading = false, itemsPerPage = 10, showPagination = true, currentPage: externalCurrentPage, total: externalTotal, totalPages: externalTotalPages, pageSize: externalPageSize, onPageChange }: QuoteTableProps) {
+export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote, onUpdatePart, onUpdateMultipleParts, onMarkCompleted, onMarkAsOrdered, onMarkAsOrderedWithParts, showCompleted = false, defaultFilter = 'all', isLoading = false, itemsPerPage = 10, showPagination = true, currentPage: externalCurrentPage, total: externalTotal, totalPages: externalTotalPages, pageSize: externalPageSize, onPageChange, searchTerm: externalSearchTerm, onSearchChange, useServerSideSearch = false }: QuoteTableProps) {
   // Safety checks for undefined props
   if (!quotes || !Array.isArray(quotes)) {
     console.warn('QuoteTable: quotes prop is undefined or not an array, using empty array');
@@ -60,6 +64,9 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
   const [filter, setFilter] = useState<FilterType>(defaultFilter);
   const [searchTerm, setSearchTerm] = useState('');
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+  
+  // Use external search term when server-side search is enabled
+  const effectiveSearchTerm = useServerSideSearch ? externalSearchTerm || '' : searchTerm;
 
   // Initialize expanded rows - only expand the first quote in the list
   useEffect(() => {
@@ -1132,11 +1139,16 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
       if (quote.status === 'completed' || quote.status === 'ordered' || quote.status === 'delivered') return false;
     }
     
-    // Apply search filter
+    // Apply search filter only for client-side search
+    if (useServerSideSearch) {
+      // Server-side search is handled by the query, so no client-side filtering needed
+      return true;
+    }
+    
     const matchesSearch = 
-      quote.quoteRef?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      quote.vin?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      quote.make?.toLowerCase().includes(searchTerm.toLowerCase());
+      quote.quoteRef?.toLowerCase().includes(effectiveSearchTerm.toLowerCase()) ||
+      quote.vin?.toLowerCase().includes(effectiveSearchTerm.toLowerCase()) ||
+      quote.make?.toLowerCase().includes(effectiveSearchTerm.toLowerCase());
     
     return matchesSearch;
   }).sort((a, b) => {
@@ -1303,8 +1315,14 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
               id="search-input"
               type="text"
               placeholder="Search quotes..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              value={effectiveSearchTerm}
+              onChange={(e) => {
+                if (useServerSideSearch && onSearchChange) {
+                  onSearchChange(e.target.value);
+                } else {
+                  setSearchTerm(e.target.value);
+                }
+              }}
               className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all duration-200"
             />
           </div>

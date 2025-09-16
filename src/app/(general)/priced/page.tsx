@@ -6,14 +6,23 @@ import QuoteTable from "@/components/ui/QuoteTable";
 import { ProtectedRoute } from "@/components/common/ProtectedRoute";
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { useDebouncedSearchWithPageReset } from '@/hooks/useDebouncedSearch';
 
 export default function PricedPage() {
   // Server-side pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const queryClient = useQueryClient();
+  
+  // Search state with debouncing and page reset
+  const { searchTerm, debouncedSearchTerm, setSearchTerm } = useDebouncedSearchWithPageReset(
+    () => setCurrentPage(1)
+  );
 
-  // Get quotes for priced page with server-side pagination (1 per page)
-  const { data: quotesData, isLoading: quotesLoading } = useQuotesQuery(currentPage, 10, { status: 'priced' });
+  // Get quotes for priced page with server-side pagination (10 per page)
+  const { data: quotesData, isLoading: quotesLoading } = useQuotesQuery(currentPage, 10, { 
+    status: 'priced',
+    search: debouncedSearchTerm 
+  });
   
   // Fetch parts for all quotes
   const { data: parts, isLoading: partsLoading } = useAllQuoteParts(quotesData?.quotes || []);
@@ -219,8 +228,12 @@ export default function PricedPage() {
           currentPage={currentPage}
           totalPages={quotesData?.totalPages || 1}
           total={quotesData?.total || 0}
-          pageSize={1}
+          pageSize={10}
           onPageChange={setCurrentPage}
+          // Server-side search props
+          searchTerm={searchTerm}
+          onSearchChange={setSearchTerm}
+          useServerSideSearch={true}
         />
       </div>
     </ProtectedRoute>

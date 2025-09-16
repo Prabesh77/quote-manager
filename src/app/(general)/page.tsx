@@ -8,15 +8,35 @@ import { ProtectedRoute } from "@/components/common/ProtectedRoute";
 import { useSnackbar } from '@/components/ui/Snackbar';
 import { QuoteActionsService } from '@/services/quoteActions/quoteActionsService';
 import supabase from '@/utils/supabase';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Part } from '@/components/ui/useQuotes';
 
 export default function HomePage() {
   // Server-side pagination state
   const [currentPage, setCurrentPage] = useState(1);
+  
+  // Search state
+  const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
+  
+  // Debounce search term
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm);
+      // Reset to page 1 when search changes
+      if (searchTerm !== debouncedSearchTerm) {
+        setCurrentPage(1);
+      }
+    }, 500); // 500ms debounce
+
+    return () => clearTimeout(timer);
+  }, [searchTerm, debouncedSearchTerm]);
 
   // Get quotes for display (server-side pagination: 10 per page) - only show unpriced quotes
-  const { data: quotesData, isLoading: quotesLoading } = useQuotesQuery(currentPage, 10, { status: 'unpriced' });
+  const { data: quotesData, isLoading: quotesLoading } = useQuotesQuery(currentPage, 10, { 
+    status: 'unpriced',
+    search: debouncedSearchTerm 
+  });
   
   // Get all quote IDs for fetching parts for all quotes
   const allQuoteIds = quotesData?.quotes?.map(quote => quote.id) || [];
@@ -292,6 +312,10 @@ export default function HomePage() {
             total={quotesData?.total || 0}
             pageSize={10}
             onPageChange={setCurrentPage}
+            // Server-side search props
+            searchTerm={searchTerm}
+            onSearchChange={setSearchTerm}
+            useServerSideSearch={true}
           />
         </div>
       </div>

@@ -4,16 +4,36 @@ import { useQuotesQuery, useDeleteQuoteMutation, useUpdatePartInQuoteJsonMutatio
 import { useAllQuoteParts } from '@/hooks/useAllQuoteParts';
 import QuoteTable from "@/components/ui/QuoteTable";
 import { ProtectedRoute } from "@/components/common/ProtectedRoute";
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 
 export default function VerifyPricePage() {
   // Server-side pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const queryClient = useQueryClient();
+  
+  // Search state
+  const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
+  
+  // Debounce search term
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm);
+      // Reset to page 1 when search changes
+      if (searchTerm !== debouncedSearchTerm) {
+        setCurrentPage(1);
+      }
+    }, 500); // 500ms debounce
+
+    return () => clearTimeout(timer);
+  }, [searchTerm, debouncedSearchTerm]);
 
   // Get quotes for verify price page with server-side pagination (10 per page)
-  const { data: quotesData, isLoading: quotesLoading } = useQuotesQuery(currentPage, 10, { status: 'waiting_verification' });
+  const { data: quotesData, isLoading: quotesLoading } = useQuotesQuery(currentPage, 10, { 
+    status: 'waiting_verification',
+    search: debouncedSearchTerm 
+  });
   
   // Fetch parts for all quotes
   const { data: parts, isLoading: partsLoading } = useAllQuoteParts(quotesData?.quotes || []);
@@ -190,8 +210,12 @@ export default function VerifyPricePage() {
           currentPage={currentPage}
           totalPages={quotesData?.totalPages || 1}
           total={quotesData?.total || 0}
-          pageSize={1}
+          pageSize={10}
           onPageChange={setCurrentPage}
+          // Server-side search props
+          searchTerm={searchTerm}
+          onSearchChange={setSearchTerm}
+          useServerSideSearch={true}
         />
       </div>
     </ProtectedRoute>

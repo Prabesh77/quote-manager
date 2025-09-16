@@ -10,7 +10,7 @@ import { createNormalizedQuote } from '@/utils/normalizedQuoteCreation';
 
 // Query Keys - centralized for consistency
 export const queryKeys = {
-  quotes: (page: number = 1, limit: number = 20, filters?: { status?: string; customer?: string; make?: string }) => ['quotes', page, limit, filters] as const,
+  quotes: (page: number = 1, limit: number = 20, filters?: { status?: string; customer?: string; make?: string; search?: string }) => ['quotes', page, limit, filters] as const,
   quotesBase: ['quotes'] as const, // Base key for invalidating all quote queries
   parts: ['parts'] as const,
   quote: (id: string) => ['quotes', id] as const,
@@ -19,7 +19,7 @@ export const queryKeys = {
 };
 
 // Fetch functions
-const fetchQuotes = async (page: number = 1, limit: number = 20, filters?: { status?: string; customer?: string; make?: string }): Promise<{ quotes: Quote[]; total: number; totalPages: number }> => {
+const fetchQuotes = async (page: number = 1, limit: number = 20, filters?: { status?: string; customer?: string; make?: string; search?: string }): Promise<{ quotes: Quote[]; total: number; totalPages: number }> => {
   try {
     // Build the base query
     let query = supabase
@@ -39,6 +39,29 @@ const fetchQuotes = async (page: number = 1, limit: number = 20, filters?: { sta
     }
     if (filters?.make) {
       query = query.ilike('vehicle.make', `%${filters.make}%`);
+    }
+    
+    // Apply search filter - smart search by quote_ref and vehicle make
+    if (filters?.search && filters.search.trim()) {
+      const searchTerm = filters.search.trim();
+      
+      // Check if the search term looks like a quote reference (primarily numeric)
+      const numericChars = (searchTerm.match(/\d/g) || []).length;
+      const totalChars = searchTerm.length;
+      const isNumericSearch = numericChars > totalChars / 2; // More than half are numbers
+      
+      if (isNumericSearch) {
+        // For numeric searches, focus primarily on quote_ref
+        // Only include vehicle make if it's a very short search term
+        if (searchTerm.length >= 4) {
+          query = query.ilike('quote_ref', `%${searchTerm}%`);
+        } else {
+          query = query.or(`quote_ref.ilike.*${searchTerm}*,vehicle.make.ilike.*${searchTerm}*`);
+        }
+      } else {
+        // For non-numeric searches (like brand names), search vehicle make
+        query = query.ilike('vehicle.make', `%${searchTerm}%`);
+      }
     }
 
     // Apply pagination using Supabase range
@@ -144,7 +167,7 @@ const fetchParts = async (): Promise<Part[]> => {
 };
 
 // Custom hooks using TanStack Query
-export const useQuotesQuery = (page: number = 1, limit: number = 20, filters?: { status?: string; customer?: string; make?: string }) => {
+export const useQuotesQuery = (page: number = 1, limit: number = 20, filters?: { status?: string; customer?: string; make?: string; search?: string }) => {
   return useQuery({
     queryKey: queryKeys.quotes(page, limit, filters),
     queryFn: () => fetchQuotes(page, limit, filters),

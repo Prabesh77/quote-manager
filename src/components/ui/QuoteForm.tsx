@@ -19,6 +19,7 @@ import {
   User
 } from 'lucide-react';
 import { getAvailablePartsForBrand, getPartDescriptionForBrand } from '@/config/brandPartRules';
+import { parseQuoteData } from '@/utils/quoteDataParser';
 import PartsSection from './PartsSection';
 
 // Function to clean part numbers by removing special characters and replacing O with 0
@@ -683,450 +684,35 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
                 onPaste={(e) => {
                   const pastedText = e.clipboardData.getData('text');
                   setRawText(pastedText);
-                                    
-                  // Process the pasted text directly
-                  const lines = pastedText.split('\n');
-                  const parsed: Record<string, string> = {};
+                  
+                  // Use our new parser to extract data
+                  const parsedData = parseQuoteData(pastedText);
+                  
+                  // Update form fields with parsed data
+                  setFields(prevFields => ({
+                    ...prevFields,
+                    ...parsedData,
+                    // Keep existing values if parsed data is empty for that field
+                    quoteRef: parsedData.quoteRef || prevFields.quoteRef,
+                    vin: parsedData.vin || prevFields.vin,
+                    make: parsedData.make || prevFields.make,
+                    model: parsedData.model || prevFields.model,
+                    series: parsedData.series || prevFields.series,
+                    auto: parsedData.auto || prevFields.auto,
+                    body: parsedData.body || prevFields.body,
+                    mthyr: parsedData.mthyr || prevFields.mthyr,
+                    rego: parsedData.rego || prevFields.rego,
+                    requiredBy: parsedData.requiredBy || prevFields.requiredBy,
+                    customer: parsedData.customer || prevFields.customer,
+                    address: parsedData.address || prevFields.address,
+                    phone: parsedData.phone || prevFields.phone,
+                    notes: parsedData.notes || prevFields.notes,
+                  }));
 
-                  for (let i = 0; i < lines.length; i++) {
-                    const trimmedLine = lines[i].trim();
-                    if (!trimmedLine) continue;
-
-                    // Handle different patterns in the data
-                    let key = '';
-                    let value = '';
-
-                    // Pattern 0: New format - "Received: 02/09/2025 12:00 PM" etc.
-                    if (trimmedLine.includes(':')) {
-                      const colonIndex = trimmedLine.indexOf(':');
-                      const fieldName = trimmedLine.substring(0, colonIndex).trim().toLowerCase();
-                      const fieldValue = trimmedLine.substring(colonIndex + 1).trim();
-                      
-                      switch (fieldName) {
-                        case 'received':
-                          // Skip received date for now, but could be used for notes
-                          break;
-                        case 'bodyshop':
-                          parsed['customer'] = fieldValue;
-                          break;
-                        case 'repairer address':
-                          parsed['address'] = fieldValue;
-                          break;
-                        case 'repairer contact':
-                          // Could be used for additional contact info in notes
-                          if (parsed['notes']) {
-                            parsed['notes'] += ` | Contact: ${fieldValue}`;
-                          } else {
-                            parsed['notes'] = `Contact: ${fieldValue}`;
-                          }
-                          break;
-                        case 'telephone':
-                          parsed['phone'] = fieldValue;
-                          break;
-                        case 'email':
-                          // Could be used for additional contact info in notes
-                          if (parsed['notes']) {
-                            parsed['notes'] += ` | Email: ${fieldValue}`;
-                          } else {
-                            parsed['notes'] = `Email: ${fieldValue}`;
-                          }
-                          break;
-                        case 'estimate number':
-                          parsed['quoteRef'] = fieldValue;
-                          break;
-                        case 'insurer':
-                          // Could be used for additional info in notes
-                          if (parsed['notes']) {
-                            parsed['notes'] += ` | Insurer: ${fieldValue}`;
-                          } else {
-                            parsed['notes'] = `Insurer: ${fieldValue}`;
-                          }
-                          break;
-                        case 'claim number':
-                          // Could be used for additional info in notes
-                          if (parsed['notes']) {
-                            parsed['notes'] += ` | Claim: ${fieldValue}`;
-                          } else {
-                            parsed['notes'] = `Claim: ${fieldValue}`;
-                          }
-                          break;
-                        case 'required':
-                          // Parse required date/time - format: "02/09/2025 1:00 PM"
-                          try {
-                            // Split date and time
-                            const [datePart, timePart] = fieldValue.split(' ');
-                            if (datePart && timePart) {
-                              const [day, month, year] = datePart.split('/');
-                              const timeStr = timePart.toLowerCase();
-                              
-                              let hours = 0;
-                              let minutes = 0;
-                              
-                              if (timeStr.includes('pm')) {
-                                const time = timeStr.replace('pm', '');
-                                if (time.includes(':')) {
-                                  const [h, m] = time.split(':');
-                                  const hour = parseInt(h);
-                                  hours = hour === 12 ? 12 : hour + 12;
-                                  minutes = parseInt(m || '0');
-                                } else {
-                                  const timeNum = parseInt(time);
-                                  const hour = Math.floor(timeNum / 100);
-                                  hours = hour === 12 ? 12 : hour + 12;
-                                  minutes = timeNum % 100;
-                                }
-                              } else if (timeStr.includes('am')) {
-                                const time = timeStr.replace('am', '');
-                                if (time.includes(':')) {
-                                  const [h, m] = time.split(':');
-                                  hours = parseInt(h);
-                                  minutes = parseInt(m || '0');
-                                } else {
-                                  const timeNum = parseInt(time);
-                                  hours = Math.floor(timeNum / 100);
-                                  minutes = timeNum % 100;
-                                }
-                              }
-                              
-                              const deadline = new Date(parseInt(year), parseInt(month) - 1, parseInt(day), hours, minutes);
-                              if (!isNaN(deadline.getTime())) {
-                                parsed['requiredBy'] = deadline.toISOString();
-                              }
-                            }
-                          } catch (error) {
-                            parsed['requiredBy'] = fieldValue;
-                          }
-                          break;
-                        case 'vehicle':
-                          // Parse vehicle info - format: "TOYOTA LANDCRUISER  SAHARA LC300"
-                          const vehicleParts = fieldValue.split('  ').map(part => part.trim()).filter(part => part);
-                          if (vehicleParts.length >= 2) {
-                            parsed['make'] = vehicleParts[0];
-                            parsed['model'] = vehicleParts[1];
-                            if (vehicleParts.length > 2) {
-                              parsed['series'] = vehicleParts[2];
-                            }
-                          }
-                          break;
-                        case 'manufactured':
-                          // Parse manufactured date - format: "06/2023"
-                          try {
-                            const [month, year] = fieldValue.split('/');
-                            parsed['mthyr'] = `${year}-${month.padStart(2, '0')}`;
-                          } catch (error) {
-                            parsed['mthyr'] = fieldValue;
-                          }
-                          break;
-                        case 'registration':
-                          parsed['rego'] = fieldValue;
-                          break;
-                        case 'vin':
-                          parsed['vin'] = fieldValue;
-                          break;
-                        case 'colour':
-                          // Could be used for additional info in notes
-                          if (parsed['notes']) {
-                            parsed['notes'] += ` | Colour: ${fieldValue}`;
-                          } else {
-                            parsed['notes'] = `Colour: ${fieldValue}`;
-                          }
-                          break;
-                        case 'paint':
-                          // Could be used for additional info in notes
-                          if (parsed['notes']) {
-                            parsed['notes'] += ` | Paint: ${fieldValue}`;
-                          } else {
-                            parsed['notes'] = `Paint: ${fieldValue}`;
-                          }
-                          break;
-                        default:
-                          // Handle other fields that might appear
-                          if (parsed['notes']) {
-                            parsed['notes'] += ` | ${fieldName.replace(/\b\w/g, l => l.toUpperCase())}: ${fieldValue}`;
-                          } else {
-                            parsed['notes'] = `${fieldName.replace(/\b\w/g, l => l.toUpperCase())}: ${fieldValue}`;
-                          }
-                          break;
-                      }
-                      // Skip normal processing for new format
-                      key = '';
-                      value = '';
-                    }
-                    // Pattern 1: "Reference28495#2" (no space) - OLD FORMAT ONLY (no colons)
-                    else if (!trimmedLine.includes(':') && trimmedLine.match(/^(Reference|Make|Series|Trans|Body|Mth\/Yr|Veh Reg)(.+)$/i)) {
-                      const match = trimmedLine.match(/^(Reference|Make|Series|Trans|Body|Mth\/Yr|Veh Reg)(.+)$/i);
-                      if (match) {
-                        key = match[1].toLowerCase();
-                        value = match[2].trim();
-                        switch (key) {
-                          case 'reference': parsed['quoteRef'] = value; break;
-                          case 'make': parsed['make'] = value; break;
-                          case 'series': parsed['series'] = value; break;
-                          case 'trans': parsed['auto'] = value.toLowerCase().includes('auto') ? 'true' : 'false'; break;
-                          case 'body': parsed['body'] = value; break;
-                          case 'mth/yr': parsed['mthyr'] = value; break;
-                          case 'veh reg': parsed['rego'] = value; break;
-                        }
-                      }
-                    }
-                    // Pattern 1.5: "ModelAccent" (Model without space) - OLD FORMAT ONLY (no colons)
-                    else if (!trimmedLine.includes(':') && trimmedLine.match(/^Model(.+)$/i)) {
-                      const match = trimmedLine.match(/^Model(.+)$/i);
-                      if (match) {
-                        const modelValue = match[1].trim();
-                        // If the value is "Nr", ignore it (it's not a model value)
-                        if (modelValue !== 'Nr') {
-                          key = 'model';
-                          value = modelValue;
-                          parsed['model'] = modelValue;
-                        }
-                      }
-                    }
-                    // Pattern 2: "Reference 28495#2" (with space) - OLD FORMAT ONLY (no colons)
-                    else if (!trimmedLine.includes(':') && trimmedLine.match(/^(Reference|Make|Series|Trans|Body|Mth\/Yr|Veh Reg)\s+(.+)$/i)) {
-                      const match = trimmedLine.match(/^(Reference|Make|Series|Trans|Body|Mth\/Yr|Veh Reg)\s+(.+)$/i);
-                      if (match) {
-                        key = match[1].toLowerCase();
-                        value = match[2].trim();
-                        switch (key) {
-                          case 'reference': parsed['quoteRef'] = value; break;
-                          case 'make': parsed['make'] = value; break;
-                          case 'series': parsed['series'] = value; break;
-                          case 'trans': parsed['auto'] = value.toLowerCase().includes('auto') ? 'true' : 'false'; break;
-                          case 'body': parsed['body'] = value; break;
-                          case 'mth/yr': parsed['mthyr'] = value; break;
-                          case 'veh reg': parsed['rego'] = value; break;
-                        }
-                      }
-                    }
-                    // Pattern 3: "Ph:" followed by phone number (check before general colon pattern)
-                    else if (trimmedLine.startsWith('Ph:')) {
-                      key = 'phone';
-                      value = trimmedLine.replace('Ph:', '').trim();
-
-                    }
-                    // Pattern 4: "Reference: 28495#2" (with colon)
-                    else if (trimmedLine.includes(':')) {
-                      const colonIndex = trimmedLine.indexOf(':');
-                      key = trimmedLine.substring(0, colonIndex).trim().toLowerCase();
-                      value = trimmedLine.substring(colonIndex + 1).trim(); // +1 to skip the colon
-
-                      // Special handling for purchaser field - split customer name, address, and phone
-                      if (key === 'purchaser') {
-                        // Format: "Customer Name - Address Ph: Phone"
-                        if (value.includes(' - ') && value.includes('Ph:')) {
-                          const dashIndex = value.indexOf(' - ');
-                          const phIndex = value.indexOf('Ph:');
-                                                    
-                          const customerName = value.substring(0, dashIndex).trim();
-                          const address = value.substring(dashIndex + 3, phIndex).trim();
-                          const phone = value.substring(phIndex + 3).trim(); // +3 to skip "Ph:"
-                                                    
-                          parsed['customer'] = customerName;
-                          parsed['address'] = address;
-                          parsed['phone'] = phone;
-                          // Skip normal processing for this field
-                          key = '';
-                          value = '';
-                        }
-                        // Fallback: put everything in customer field
-                        else {
-                          parsed['customer'] = value;
-                          // Skip normal processing for this field
-                          key = '';
-                          value = '';
-                        }
-                      }
-                      // General colon-separated fields
-                      else {
-                        switch (key) {
-                          case 'reference':
-                          case 'quote nr':
-                            parsed['quoteRef'] = value;
-                            break;
-                          case 'vin':
-                            parsed['vin'] = value;
-                            break;
-                          case 'make':
-                            parsed['make'] = value;
-                            break;
-                          case 'model':
-                            parsed['model'] = value;
-                            break;
-                          case 'series':
-                            parsed['series'] = value;
-                            break;
-                          case 'trans':
-                            parsed['auto'] = value.toLowerCase().includes('auto') ? 'true' : 'false';
-                            break;
-                          case 'body':
-                            parsed['body'] = value;
-                            break;
-                          case 'mth/yr':
-                          case 'mthyr':
-                            parsed['mthyr'] = value;
-                            break;
-                          case 'veh reg':
-                          case 'veh reg.':
-                            parsed['rego'] = value;
-                            break;
-                          case 'colour':
-                            parsed['color'] = value;
-                            break;
-                          case 'phone':
-                          case 'ph':
-                            parsed['phone'] = value;
-                            break;
-                          case 'address':
-                            parsed['address'] = value;
-                            break;
-                          case 'estimator':
-                          case 'quote status':
-                          case 'claim nr':
-                          case 'est. delivery':
-                          case 'internal status':
-                          case 'sales rep':
-                          case 'settlement %':
-                            parsed['notes'] = (parsed['notes'] || '') + ` ${key.replace(/\b\w/g, l => l.toUpperCase())}: ${value}`;
-                            break;
-                        }
-                      }
-                    }
-                    // Pattern 5: Standalone "VIN" followed by value on next line
-                    else if (trimmedLine === 'VIN' && i + 1 < lines.length) {
-                      key = 'vin';
-                      value = lines[i + 1].trim();
-                      i++; // Skip the next line since we've processed it
-                    }
-                    // Pattern 6: "Purchaser" followed by customer name
-                    else if (trimmedLine.startsWith('Purchaser')) {
-                      key = 'customer';
-                      value = trimmedLine.replace('Purchaser', '').trim();
-
-                    }
-                    // Pattern 7: Address lines (after Purchaser, before Ph:)
-                    else if (trimmedLine && !trimmedLine.includes(':') && !trimmedLine.match(/^(Reference|Make|Model|Series|Trans|Body|Mth\/Yr|Veh Reg|Required By|Purchaser|Ph:|General Info|Vehicle Info|Quote Status|Estimator)/i)) {
-                      // Check if this might be an address line
-                      if (i > 0) {
-                        const prevLine = lines[i - 1]?.trim();
-                        // If we haven't found an address yet and this line looks like an address
-                        if (!parsed['address'] && prevLine && prevLine.startsWith('Purchaser')) {
-                          key = 'address';
-                          value = trimmedLine;
-                          // Look ahead for additional address lines
-                          let fullAddress = trimmedLine;
-                          let nextIndex = i + 1;
-                          while (nextIndex < lines.length) {
-                            const nextLine = lines[nextIndex]?.trim();
-                            if (nextLine && !nextLine.includes(':') && !nextLine.match(/^(Reference|Make|Model|Series|Trans|Body|Mth\/Yr|Veh Reg|Required By|Purchaser|Ph:|General Info|Vehicle Info|Quote Status|Estimator)/i)) {
-                              fullAddress += ', ' + nextLine;
-                              nextIndex++;
-                            } else {
-                              break;
-                            }
-                          }
-                          value = fullAddress;
-                          i = nextIndex - 1; // Skip the processed lines
-                          // Don't continue - let it reach the switch statement
-                        }
-                      }
-                    }
-                    // Pattern 8: "Required By" followed by value on next line
-                    else if (trimmedLine === 'Required By' && i + 1 < lines.length) {
-                      key = 'required by';
-                      // Get the next two lines for date and time, skipping empty lines
-                      let dateTimeValue = '';
-                      let nextIndex = i + 1;
-                      let linesCollected = 0;
-
-                      while (nextIndex < lines.length && linesCollected < 2) {
-                        const nextLine = lines[nextIndex]?.trim();
-                        if (nextLine && !nextLine.match(/^(Reference|Make|Model|Series|Trans|Body|Mth\/Yr|Veh Reg|Purchaser|Ph:|General Info|Vehicle Info|Quote Status|Estimator)/i)) {
-                          if (dateTimeValue) {
-                            dateTimeValue += ' ' + nextLine;
-                          } else {
-                            dateTimeValue = nextLine;
-                          }
-                          linesCollected++;
-                        }
-                        nextIndex++;
-                        if (linesCollected >= 2) break;
-                      }
-
-                      value = dateTimeValue;
-                      i = nextIndex - 1; // Skip the processed lines
-                    }
-
-                    // Map the keys to our field names
-                    switch (key) {
-                      case 'reference':
-                        parsed['quoteRef'] = value;
-                        break;
-                      case 'vin':
-                        parsed['vin'] = value;
-                        break;
-                      case 'make':
-                        parsed['make'] = value;
-                        break;
-                      case 'model':
-                        parsed['model'] = value;
-                        break;
-                      case 'series':
-                        parsed['series'] = value;
-                        break;
-                      case 'trans':
-                        parsed['auto'] = value.toLowerCase().includes('auto') ? 'true' : 'false';
-                        break;
-                      case 'body':
-                        parsed['body'] = value;
-                        break;
-                      case 'mth/yr':
-                      case 'mthyr':
-                        parsed['mthyr'] = value;
-                        break;
-                      case 'veh reg':
-                        parsed['rego'] = value;
-                        break;
-                      case 'required by':
-                        parsed['requiredBy'] = value;
-                        break;
-                      case 'customer':
-                        parsed['customer'] = value;
-
-                        break;
-                      case 'address':
-                        parsed['address'] = value;
-                        break;
-                      case 'phone':
-                        parsed['phone'] = value;
-                        break;
-                    }
-                  }
-
-
-                  // Update form fields
-                  setFields({
-                    quoteRef: parsed['quoteRef'] || '',
-                    vin: parsed['vin'] || '',
-                    make: parsed['make'] || '',
-                    model: parsed['model'] || '',
-                    series: parsed['series'] || '',
-                    auto: parsed['auto'] || 'true',
-                    body: parsed['body'] || '',
-                    mthyr: parsed['mthyr'] || '',
-                    rego: parsed['rego'] || '',
-                    requiredBy: parsed['requiredBy'] || '',
-                    customer: parsed['customer'] || '',
-                    address: parsed['address'] || '',
-                    phone: parsed['phone'] || '',
-                    notes: parsed['notes'] || '',
-                  });
-
-                  // Show parts section when data is populated (but don't auto-open accordion)
-                  if (Object.values(parsed).some(value => value)) {
+                  // Show parts section when data is populated
+                  if (Object.values(parsedData).some(value => value)) {
                     setShowPartsSection(true);
                   }
-
                 }}
                 placeholder="Paste Quote..."
                 className="w-full h-32 p-4 text-sm border-2 border-gray-300 rounded-lg shadow-sm focus:border-red-500 focus:ring-2 focus:ring-red-200 focus:outline-none transition-all duration-200 bg-gray-50 font-mono resize-none"
@@ -1207,99 +793,73 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
               </div>
               
               {/* Second Row - VIN & Registration with Copy Buttons */}
-              {(fields.vin || fields.rego) && (
-                <div className="flex items-center space-x-4 text-xs text-gray-600">
-                  {fields.vin && (
-                    <div className="flex items-center space-x-2">
-                      <span className="font-medium">VIN:</span>
-                      <span className="font-mono text-gray-700">{fields.vin}</span>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          navigator.clipboard.writeText(fields.vin);
-                          // Visual confirmation
-                          const button = e.currentTarget;
-                          const originalIcon = button.innerHTML;
-                          button.innerHTML = `
-                            <svg class="h-4 w-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-                            </svg>
-                          `;
-                          setTimeout(() => {
-                            button.innerHTML = originalIcon;
-                          }, 1500);
-                        }}
-                        className="p-1.5 text-gray-400 hover:text-blue-600 transition-colors cursor-pointer"
-                        title="Copy VIN"
-                      >
-                        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                        </svg>
-                      </button>
-                    </div>
-                  )}
-                  {fields.rego && (
-                    <div className="flex items-center space-x-2">
-                      <span className="font-medium">Rego:</span>
-                      <span className="font-mono text-gray-700">{fields.rego}</span>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          navigator.clipboard.writeText(fields.rego);
-                          // Visual confirmation
-                          const button = e.currentTarget;
-                          const originalIcon = button.innerHTML;
-                          button.innerHTML = `
-                            <svg class="h-4 w-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-                            </svg>
-                          `;
-                          setTimeout(() => {
-                            button.innerHTML = originalIcon;
-                          }, 1500);
-                        }}
-                        className="p-1.5 text-gray-400 hover:text-blue-600 transition-colors cursor-pointer"
-                        title="Copy Registration"
-                      >
-                        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                        </svg>
-                      </button>
-                    </div>
-                  )}
-                </div>
-              )}
+              <div className="flex items-center space-x-4">
+                {fields.vin && (
+                  <div className="flex items-center space-x-2">
+                    <span className="text-xs text-gray-500 font-medium">VIN:</span>
+                    <span className="text-xs font-mono text-gray-700">{fields.vin}</span>
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(fields.vin);
+                      }}
+                      className="p-1.5 text-gray-400 hover:text-blue-600 transition-colors cursor-pointer"
+                      title="Copy VIN"
+                    >
+                      <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                      </svg>
+                    </button>
+                  </div>
+                )}
+                {fields.rego && (
+                  <div className="flex items-center space-x-2">
+                    <span className="text-xs text-gray-500 font-medium">Rego:</span>
+                    <span className="text-xs font-mono text-gray-700">{fields.rego}</span>
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(fields.rego);
+                      }}
+                      className="p-1.5 text-gray-400 hover:text-blue-600 transition-colors cursor-pointer"
+                      title="Copy Registration"
+                    >
+                      <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                      </svg>
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           </AccordionTrigger>
+          <AccordionContent className="p-6 bg-gray-50">
+            {/* Quote Reference */}
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Quote Reference
+              </label>
+              <Input
+                type="text"
+                name="quoteRef"
+                value={fields.quoteRef}
+                onChange={handleChange}
+                className="w-full h-8 text-sm"
+                placeholder="Enter quote reference number"
+              />
+            </div>
 
-          <AccordionContent className="px-4 pb-4">
-            <div className="space-y-6">
-              {/* Quote Reference */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Quote Reference
-                </label>
-                <Input
-                  name="quoteRef"
-                  value={fields.quoteRef}
-                  onChange={handleChange}
-                  className="w-full h-8 text-sm"
-                  placeholder="Enter quote reference number"
-                />
-              </div>
-
-              {/* Vehicle Details */}
-              <div className="mt-6">
-                <h3 className="text-md font-semibold text-gray-800 mb-3 flex items-center space-x-2">
-                  <Car className="h-4 w-4" />
-                  <span>Vehicle Details</span>
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {/* Vehicle Details */}
+            <div className="mt-6">
+              <h3 className="text-md font-semibold text-gray-800 mb-3 flex items-center space-x-2">
+                <Car className="h-4 w-4" />
+                <span>Vehicle Details</span>
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
             VIN
           </label>
           <Input
+            type="text"
             name="vin"
             value={fields.vin}
             onChange={handleChange}
@@ -1313,6 +873,7 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
             Registration (Rego)
           </label>
           <Input
+            type="text"
             name="rego"
             value={fields.rego}
             onChange={handleChange}
@@ -1326,6 +887,7 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
                       Make
                     </label>
                     <Input
+                      type="text"
                       name="make"
                       value={fields.make}
                       onChange={handleChange}
@@ -1339,6 +901,7 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
                       Model
                     </label>
                     <Input
+                      type="text"
                       name="model"
                       value={fields.model}
                       onChange={handleChange}
@@ -1350,8 +913,9 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Series
-        </label>
+                    </label>
                     <Input
+                      type="text"
                       name="series"
                       value={fields.series}
                       onChange={handleChange}
@@ -1365,6 +929,7 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
                       Body Type
                     </label>
                     <Input
+                      type="text"
                       name="body"
                       value={fields.body}
                       onChange={handleChange}
@@ -1378,6 +943,7 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
                       Month/Year
                     </label>
                     <Input
+                      type="text"
                       name="mthyr"
                       value={fields.mthyr}
                       onChange={handleChange}
@@ -1413,8 +979,9 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
                     <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Customer Name
-                      </label>
-                      <Input
+                    </label>
+                    <Input
+                      type="text"
                       name="customer"
                       value={fields.customer}
                       onChange={handleChange}
@@ -1426,8 +993,9 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
                     <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Phone Number
-                      </label>
-                      <Input
+                    </label>
+                    <Input
+                      type="text"
                       name="phone"
                       value={fields.phone}
                       onChange={handleChange}
@@ -1441,6 +1009,7 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
                       Address
                     </label>
                     <Input
+                      type="text"
                       name="address"
                       value={fields.address}
                       onChange={handleChange}
@@ -1457,25 +1026,25 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
                   <AlertCircle className="h-4 w-4" />
                   <span>Additional Details</span>
                 </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    <div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Required By
-                      </label>
-                      <Input
+                    </label>
+                    <Input
+                      type="text"
                       name="requiredBy"
                       value={fields.requiredBy}
                       onChange={handleChange}
-                        className="w-full h-8 text-sm"
-                      placeholder="Enter deadline (optional)"
-                      />
-                    </div>
+                      className="w-full h-8 text-sm"
+                      placeholder="Enter required date"
+                    />
                   </div>
                 </div>
-          </div>
-          </AccordionContent>
+              </div>
+            </AccordionContent>
         </AccordionItem>
-      </Accordion>
+        </Accordion>
 
       {/* Parts Section */}
       <div className="mt-6">
@@ -1496,58 +1065,27 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
           type="submit"
           size="sm"
           disabled={isLoading}
-          className="cursor-pointer bg-red-600 hover:bg-red-700 w-full max-w-64 disabled:opacity-50"
+          className="bg-red-600 hover:bg-red-700 text-white font-medium py-3 px-6 rounded-lg transition-colors duration-200 disabled:bg-gray-400 disabled:cursor-not-allowed"
         >
-          {isLoading ? (
-            <div className="flex items-center space-x-2">
-              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-              <span>Creating Quote...</span>
-            </div>
-          ) : (
-            'Create Quote'
-          )}
+          {isLoading ? 'Creating Quote...' : 'Create Quote'}
         </Button>
       </div>
 
-      {/* Beautiful Validation Popup */}
+      {/* Validation Popup */}
       {showValidationPopup && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 transform transition-all border border-gray-200">
-            <div className="flex items-center space-x-3 p-6 border-b border-gray-200">
-              <div className="flex-shrink-0">
-                <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
-                  <AlertCircle className="h-6 w-6 text-red-600" />
-                </div>
-              </div>
-              <div className="flex-1">
-                <h3 className="text-lg font-semibold text-gray-900">Validation Required</h3>
-                <p className="text-sm text-gray-600 mt-1">Please fix the following issues:</p>
-              </div>
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+            <div className="flex items-center space-x-3 mb-4">
+              <AlertCircle className="h-6 w-6 text-red-500" />
+              <h3 className="text-lg font-semibold text-gray-900">Validation Error</h3>
             </div>
-
-            <div className="p-6">
-              <p className="text-gray-700 leading-relaxed mb-3">{validationMessage.split(':')[0]}:</p>
-              {validationMessage.includes('Please add part numbers for the following parts:') && (
-                <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-                  <p className="text-sm font-medium text-gray-700 mb-2">Missing part numbers:</p>
-                  <div className="space-y-2">
-                    {validationMessage.split('Please add part numbers for the following parts: ')[1]?.split(', ').map((part, index) => (
-                      <div key={index} className="flex items-center space-x-2 p-2 bg-white rounded border border-gray-200 shadow-sm">
-                        <div className="w-2 h-2 bg-red-500 rounded-full"></div>
-                        <span className="text-sm font-medium text-gray-900">{part}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <div className="flex justify-end p-6 border-t border-gray-200">
+            <p className="text-gray-700 mb-6">{validationMessage}</p>
+            <div className="flex justify-end">
               <Button
                 onClick={() => setShowValidationPopup(false)}
-                className="bg-red-600 hover:bg-red-700 text-white px-6 py-2 rounded-lg transition-colors"
+                className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-md transition-colors duration-200"
               >
-                Got it
+                OK
               </Button>
             </div>
           </div>
@@ -1555,4 +1093,4 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
       )}
     </div>
   );
-}; 
+};

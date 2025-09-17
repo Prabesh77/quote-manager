@@ -122,7 +122,7 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
             name: matchedPartName,
           number: part.partNumber !== 'Not found' ? cleanPartNumber(part.partNumber) : '',
           price: null,
-          note: `AI-detected - Context: ${part.context || 'None'}`
+          note: ''
           }
         }));
     });

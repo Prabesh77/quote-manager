@@ -16,6 +16,7 @@ export interface AIPartExtraction {
   confidence: number; // Keep for compatibility but set to 1.0
   rawText: string;
   context: string | undefined;
+  listPrice?: number;
 }
 
 export interface MultiPartExtraction {
@@ -72,12 +73,13 @@ ${ocrText}
 INSTRUCTIONS:
 1. Identify ONLY MAIN automotive parts. Exclude brackets, mounting hardware, bolts, nuts, clips, and other supporting components.
 2. Extract part numbers for each MAIN part. A valid part number must contain ≥ 8 letters/digits combined (ignore hyphens, spaces, and special characters when counting). Ignore any shorter numbers.
-3. Determine Left/Right context:
+3. Extract prices when available. Look for prices with $ signs (e.g., $125.50, $89.99, A$855.86). These are likely list prices for the parts. Handle various currency formats including A$ (Australian dollars).
+4. Determine Left/Right context:
    - If text contains "LH", "L", or "Left" → Left
    - If text contains "RH", "R", or "Right" → Right
-4. Focus on returning 2–9 MAIN parts maximum, but output no more than the first 5 valid parts found in text order.
-5. Extract part numbers that are clearly associated with each part.
-6. PART NUMBER PATTERNS: Look for these formats as they are most likely part numbers:
+5. Focus on returning 2–9 MAIN parts maximum, but output no more than the first 8 valid parts found in text order.
+6. Extract part numbers that are clearly associated with each part.
+7. PART NUMBER PATTERNS: Look for these formats as they are most likely part numbers:
    - Hyphenated format: "21606-EB405", "26060-5X00B", "92120-EB400" (these are almost always part numbers)
    - Alphanumeric codes: "21460EB31B", "8110560K40" (8+ characters)
 7. Ignore irrelevant short codes like "10", "50", "110", "001" (these are quantities or prices, not part numbers).
@@ -94,6 +96,8 @@ INSTRUCTIONS:
 IMPORTANT RULES:
 - Use these exact standardized part names:
   'Left Headlamp', 'Right Headlamp', 'Left DayLight', 'Right DayLight', 'Radiator', 'Condenser', 'Fan Assembly', 'Intercooler', 'Radar Sensor', 'Headlight Left', 'Headlight Right', 'Oil Cooler', 'Auxiliary Radiator', 'Camera', 'Parking Sensor', 'Left Blindspot Sensor', 'Right Blindspot Sensor'
+- COMBINATION LAMP DETECTION: If text contains "LAMP ASSY,COMBINATION" or "combination lamp" → classify as 'DayLight' (NOT 'Headlamp')
+- For combination lamps: If text contains RH/R/Right → 'Right DayLight', if LH/L/Left → 'Left DayLight'
 - Part naming priority:
   * RADIATOR: If "RADIATOR" is found, use "Radiator" instead of generic radiator terms
   * AUXILIARY RADIATOR: If text contains "auxiliary radiator", "additional radiator", "lowtemp radiator", "left radiator" OR part number starts with "G9" → classify as "Auxiliary Radiator" (NOT "Radiator")
@@ -104,8 +108,10 @@ IMPORTANT RULES:
 - For headlamps: If text contains RH/R/Right → 'Right Headlamp', if LH/L/Left → 'Left Headlamp'
 - For daylights: If text contains RH/R/Right → 'Right DayLight', if LH/L/Left → 'Left DayLight'
 - DAYTIME HEADLAMP DETECTION: If text contains 'headlamp' or 'headlight' WITH 'daytime' or 'combination' → classify as 'DayLight' (NOT 'Headlamp')
+- COMBINATION LAMP ASSEMBLY: If text contains "LAMP ASSY,COMBINATION" or "combination lamp assembly" → always classify as 'DayLight' regardless of other keywords
+- EXAMPLE: "LAMP ASSY,COMBINATION, FR RH" with price "A$855.86" → 'Right DayLight' with listPrice: 855.86
 - PART NUMBER LENGTH: Only extract part numbers with ≥ 8 REAL alphanumeric characters (ignore special chars like hyphens)
-- MAXIMUM 5 MAIN PARTS per response
+- MAXIMUM 8 MAIN PARTS per response
 - IGNORE: brackets, mounting hardware, bolts, nuts, clips, supporting components
 - DUPLICATE HANDLING: If multiple instances of the same part type exist (e.g., multiple "Radiator" entries), extract each one separately - the system will automatically group them
 
@@ -115,7 +121,8 @@ RESPONSE FORMAT (JSON only):
     {
       "partName": "Standardized part name",
       "partNumber": "Clean part number only",
-      "context": "L/R context if applicable"
+      "context": "L/R context if applicable",
+      "listPrice": 125.50
     }
   ],
   "totalPartsFound": "Number of parts found",
@@ -146,7 +153,8 @@ RESPONSE FORMAT (JSON only):
       partNumber: part.partNumber,
       confidence: 1.0,
       rawText: ocrText,
-      context: part.context || undefined
+      context: part.context || undefined,
+      listPrice: part.listPrice
     }));
     
     // Post-process AI results to handle duplicates like Nissan variants

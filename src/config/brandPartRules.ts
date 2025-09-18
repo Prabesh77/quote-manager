@@ -40,10 +40,6 @@ export const BRAND_PART_RULES: Record<string, BrandPartRule> = {
     requiredFor: ['Land Rover', 'Mercedes', 'Audi', 'BMW', 'Volkswagen', 'Porsche', 'Volvo', 'Jaguar'],
     description: 'Required for European luxury brands'
   },
-  'Daytime Headlamps': {
-    requiredFor: ['Kia', 'Hyundai', 'Mitsubishi', 'Nissan', 'Genesis'],
-    description: 'Required for Korean and Japanese brands'
-  }
 };
 
 // Helper function to check if a part is available for a specific brand

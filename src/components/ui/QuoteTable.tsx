@@ -1953,7 +1953,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                                     onChange={(e) => handleVariantEditChange(part.id, variant.id, 'final_price', e.target.value ? Number(e.target.value) : null)}
                                                     className={`w-full px-2 py-1 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 ${index === 0 ? 'bg-white' : 'bg-gray-50'}`}
                                                     placeholder="Enter price"
-                                                    autoFocus={index === 0}
+                                                    autoFocus={index === 0 && quoteParts.indexOf(part) === 0}
                                                   />
                                                 ) : (
                                                   <>

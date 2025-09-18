@@ -67,22 +67,26 @@ export default function PricingPage() {
     }
   };
 
-  const updateMultipleParts = async (updates: Array<{ id: string; updates: any }>) => {
+  const updateMultipleParts = async (updates: Array<{ id: string; updates: any }>, quoteId?: string) => {
+    let quote;
     
-    // Find the quote that contains these parts
-    // For pricing page, we need to find the quote by checking if any of the part IDs match
-    // Since we're on the pricing page, we should find the quote that contains these parts
-    let quote = quotesData?.quotes?.find(q => 
-      q.parts_requested?.some((partItem: any) => 
-        updates.some(update => update.id === partItem.part_id)
-      )
-    );
+    if (quoteId) {
+      // If quoteId is provided, use it directly (more reliable)
+      quote = quotesData?.quotes?.find(q => q.id === quoteId);
+    } else {
+      // Fallback: Find the quote that contains these parts
+      quote = quotesData?.quotes?.find(q => 
+        q.parts_requested?.some((partItem: any) => 
+          updates.some(update => update.id === partItem.part_id)
+        )
+      );
 
-    // If no quote found with parts_requested, try to find by checking if we're editing parts
-    // This handles the case where parts_requested might be empty but we're still editing
-    if (!quote && quotesData?.quotes?.length === 1) {
-      // If there's only one quote on the pricing page, it's likely the one we're editing
-      quote = quotesData.quotes[0];
+      // If no quote found with parts_requested, try to find by checking if we're editing parts
+      // This handles the case where parts_requested might be empty but we're still editing
+      if (!quote && quotesData?.quotes?.length === 1) {
+        // If there's only one quote on the pricing page, it's likely the one we're editing
+        quote = quotesData.quotes[0];
+      }
     }
     
     if (!quote) {
@@ -163,9 +167,9 @@ export default function PricingPage() {
     return { data: result.data || null, error: null };
   };
 
-  const handleUpdateMultipleParts = async (updates: Array<{ id: string; updates: any }>): Promise<void> => {
+  const handleUpdateMultipleParts = async (updates: Array<{ id: string; updates: any }>, quoteId?: string): Promise<void> => {
     try {
-      await updateMultipleParts(updates);
+      await updateMultipleParts(updates, quoteId);
     } catch (error) {
       console.error('❌ Pricing Page - Error in handleUpdateMultipleParts wrapper:', error);
       throw error; // Re-throw to maintain error handling

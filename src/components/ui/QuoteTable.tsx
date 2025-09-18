@@ -24,7 +24,7 @@ interface QuoteTableProps {
   onUpdateQuote: (id: string, fields: Record<string, any>) => Promise<{ error: Error | null }>;
   onDeleteQuote: (id: string) => Promise<{ error: Error | null }>;
   onUpdatePart: (id: string, updates: Partial<Part>) => Promise<{ data: Part; error: Error | null }>;
-  onUpdateMultipleParts: (updates: Array<{ id: string; updates: Partial<Part> }>) => Promise<void>;
+  onUpdateMultipleParts: (updates: Array<{ id: string; updates: Partial<Part> }>, quoteId?: string) => Promise<void>;
   onMarkCompleted?: (id: string) => Promise<{ error: Error | null }>;
   onMarkAsOrdered?: (id: string, taxInvoiceNumber: string) => Promise<{ error: Error | null }>;
   onMarkAsOrderedWithParts?: (id: string, taxInvoiceNumber: string, partIds: string[]) => Promise<{ error: Error | null }>;
@@ -489,39 +489,57 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
       const quote = localQuotes.find(q => q.id === editingParts);
       if (quote) {
         
-        // First, update the local state with all variant changes
-        setLocalQuotes(prev => prev.map(q => 
-          q.id === editingParts 
-            ? {
-                ...q,
-                partsRequested: (q.partsRequested ?? []).map(p => {
-                  const partEditDataForPart = partEditData[p.part_id];
-                  if (partEditDataForPart) {
-                    // Update all variants for this part
-                    const updatedVariants = (Array.isArray(p.variants) ? p.variants : []).map(variant => {
-                      const variantEditData = partEditDataForPart[variant.id];
-                      if (variantEditData) {
-                        return {
-                          ...variant,
-                          note: variantEditData.note !== undefined ? variantEditData.note : variant.note,
-                          final_price: variantEditData.final_price !== undefined ? variantEditData.final_price : variant.final_price,
-                          list_price: variantEditData.list_price !== undefined ? variantEditData.list_price : variant.list_price,
-                          af: variantEditData.af !== undefined ? variantEditData.af : variant.af
-                        };
-                      }
-                      return variant;
+        // Prepare the local state update function for after successful backend save
+        const updateLocalState = () => {
+          setLocalQuotes(prev => prev.map(q => 
+            q.id === editingParts 
+              ? {
+                  ...q,
+                  // Update quote status if any part has a price
+                  status: (() => {
+                    const hasAnyPrice = Object.keys(partEditData).some(partId => {
+                      const partEditDataForPart = partEditData[partId];
+                      return Object.keys(partEditDataForPart).some(variantId => {
+                        const variantEditData = partEditDataForPart[variantId];
+                        return variantEditData.final_price && variantEditData.final_price > 0;
+                      });
                     });
                     
-                    return {
-                      ...p,
-                      variants: updatedVariants
-                    };
-                  }
-                  return p;
-                })
-              }
-            : q
-        ));
+                    // If any part has a price and current status is unpriced, change to waiting_verification
+                    if (hasAnyPrice && q.status === 'unpriced') {
+                      return 'waiting_verification';
+                    }
+                    return q.status;
+                  })(),
+                  partsRequested: (q.partsRequested ?? []).map(p => {
+                    const partEditDataForPart = partEditData[p.part_id];
+                    if (partEditDataForPart) {
+                      // Update all variants for this part
+                      const updatedVariants = (Array.isArray(p.variants) ? p.variants : []).map(variant => {
+                        const variantEditData = partEditDataForPart[variant.id];
+                        if (variantEditData) {
+                          return {
+                            ...variant,
+                            note: variantEditData.note !== undefined ? variantEditData.note : variant.note,
+                            final_price: variantEditData.final_price !== undefined ? variantEditData.final_price : variant.final_price,
+                            list_price: variantEditData.list_price !== undefined ? variantEditData.list_price : variant.list_price,
+                            af: variantEditData.af !== undefined ? variantEditData.af : variant.af
+                          };
+                        }
+                        return variant;
+                      });
+                      
+                      return {
+                        ...p,
+                        variants: updatedVariants
+                      };
+                    }
+                    return p;
+                  })
+                }
+              : q
+          ));
+        };
         
         // Then, save the default variant to the backend (for compatibility with current schema)
         const updates: Array<{ id: string; updates: Partial<Part> & { variantId?: string; list_price?: number | null; af?: boolean } }> = [];
@@ -636,17 +654,22 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
         
         if (updates.length > 0) {
           try {
-            await onUpdateMultipleParts(updates);
+            // Pass the quote ID to onUpdateMultipleParts for more reliable lookup
+            await onUpdateMultipleParts(updates, editingParts);
+            
+            // Update local state after successful backend save
+            updateLocalState();
             
             // Check if any prices were actually added/updated
             const hasPriceUpdates = updates.some(update => 
               update.updates.price !== null && update.updates.price !== undefined
             );
             
-            // Note: PRICED tracking is now handled in useUpdatePartInQuoteJsonMutation 
+            // Note: PRICED tracking and status changes are now handled in useUpdatePartInQuoteJsonMutation 
             // when status changes to 'waiting_verification'
           } catch (error) {
             console.error('Error saving parts to backend:', error);
+            // Don't update local state if backend save failed
           }
         }
       }
@@ -1857,7 +1880,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                     // Debug logging removed - issue resolved
                                     
                                     return (
-                                      <>
+                                      <React.Fragment key={`part_${part.id}`}>
                                         {/* Primary Variant Row */}
                                         {variants.map((variant: any, index: number) => (
                                           <tr key={`${part.id}_${variant.id}`} className={`${index === 0 ? 'bg-white border-b border-gray-100' : 'bg-gray-50/50 border-b border-gray-100/50'}`}>
@@ -2090,7 +2113,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
 
                                           </tr>
                                   ))}
-                                </>
+                                </React.Fragment>
                               );
                             })}
                                 </tbody>
@@ -2140,7 +2163,6 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
           >
             {paginatedQuotes.map((quote) => {
               const quoteParts = getQuotePartsWithNotesSync(quote.id);
-              console.log(quoteParts, 'quoteParts');
               const status = getQuoteStatus(quoteParts, quote.status);
               
               return (

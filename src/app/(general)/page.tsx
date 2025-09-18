@@ -185,13 +185,20 @@ export default function HomePage() {
     }
   };
 
-  const onUpdateMultipleParts = async (updates: Array<{ id: string; updates: any }>) => {
-    // Find the quote that contains these parts
-    const quote = quotesData?.quotes?.find(q => 
-      q.parts_requested?.some((partItem: any) => 
-        updates.some(update => update.id === partItem.part_id)
-      )
-    );
+  const onUpdateMultipleParts = async (updates: Array<{ id: string; updates: any }>, quoteId?: string) => {
+    let quote;
+    
+    if (quoteId) {
+      // If quoteId is provided, use it directly (more reliable)
+      quote = quotesData?.quotes?.find(q => q.id === quoteId);
+    } else {
+      // Fallback: Find the quote that contains these parts
+      quote = quotesData?.quotes?.find(q => 
+        q.parts_requested?.some((partItem: any) => 
+          updates.some(update => update.id === partItem.part_id)
+        )
+      );
+    }
     
     if (!quote) {
       showSnackbar('Quote not found for these parts', 'error');

@@ -16,7 +16,7 @@ export interface AIPartExtraction {
   confidence: number; // Keep for compatibility but set to 1.0
   rawText: string;
   context: string | undefined;
-  listPrice?: number;
+  list_price?: number;
 }
 
 export interface MultiPartExtraction {
@@ -109,7 +109,7 @@ IMPORTANT RULES:
 - For daylights: If text contains RH/R/Right → 'Right DayLight', if LH/L/Left → 'Left DayLight'
 - DAYTIME HEADLAMP DETECTION: If text contains 'headlamp' or 'headlight' WITH 'daytime' or 'combination' → classify as 'DayLight' (NOT 'Headlamp')
 - COMBINATION LAMP ASSEMBLY: If text contains "LAMP ASSY,COMBINATION" or "combination lamp assembly" → always classify as 'DayLight' regardless of other keywords
-- EXAMPLE: "LAMP ASSY,COMBINATION, FR RH" with price "A$855.86" → 'Right DayLight' with listPrice: 855.86
+- EXAMPLE: "LAMP ASSY,COMBINATION, FR RH" with price "A$855.86" → 'Right DayLight' with list_price: 855.86
 - PART NUMBER LENGTH: Only extract part numbers with ≥ 8 REAL alphanumeric characters (ignore special chars like hyphens)
 - MAXIMUM 8 MAIN PARTS per response
 - IGNORE: brackets, mounting hardware, bolts, nuts, clips, supporting components
@@ -122,7 +122,7 @@ RESPONSE FORMAT (JSON only):
       "partName": "Standardized part name",
       "partNumber": "Clean part number only",
       "context": "L/R context if applicable",
-      "listPrice": 125.50
+      "list_price": 125.50
     }
   ],
   "totalPartsFound": "Number of parts found",
@@ -154,7 +154,7 @@ RESPONSE FORMAT (JSON only):
       confidence: 1.0,
       rawText: ocrText,
       context: part.context || undefined,
-      listPrice: part.listPrice
+      list_price: part.list_price
     }));
     
     // Post-process AI results to handle duplicates like Nissan variants
@@ -421,7 +421,8 @@ function fallbackExtraction(ocrText: string): AIPartExtraction[] {
           partNumber: finalPartNumber,
           confidence: 0.9,
           context: groupData.context || undefined,
-          rawText: ocrText
+          rawText: ocrText,
+          list_price: undefined // Fallback doesn't extract prices
         });
       }
       
@@ -482,7 +483,8 @@ function fallbackExtraction(ocrText: string): AIPartExtraction[] {
           partNumber: closestPartNumber,
           confidence: 0.8,
           context: partName.context || undefined,
-          rawText: ocrText
+          rawText: ocrText,
+          list_price: undefined // Fallback doesn't extract prices
         });
         
         usedPartNumbers.add(closestPartNumber);

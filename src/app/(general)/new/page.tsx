@@ -15,6 +15,7 @@ export default function NewQuotePage() {
 
   const handleSubmit = async (fields: Record<string, string>, parts: any[]) => {
     try {
+      
       await createQuoteMutation.mutateAsync({
         customer: {
           name: fields.customer,
@@ -37,6 +38,8 @@ export default function NewQuotePage() {
           name: part.name || '',
           number: part.number || '',
           price: part.price || null,
+          list_price: part.list_price !== undefined ? part.list_price : null,
+          af: part.af || false,
           note: part.note || ''
         })) || [],
         notes: '',

@@ -21,14 +21,16 @@ export const getQuotePartsFromJson = (quote: Quote, allParts: Part[]): Part[] =>
       // Handle both old structure (direct note/final_price) and new structure (variants array)
       const note = (quotePart as any).note || quotePart.variants?.[0]?.note || '';
       const finalPrice = (quotePart as any).final_price ?? quotePart.variants?.[0]?.final_price ?? null;
+      const listPrice = (quotePart as any).list_price ?? quotePart.variants?.[0]?.list_price ?? null;
+      const af = (quotePart as any).af ?? quotePart.variants?.[0]?.af ?? false;
       
       return {
         id: quotePart.part_id,
         name: 'Unknown Part',
         number: '',
         price: finalPrice,
-        list_price: null,
-        af: false,
+        list_price: listPrice,
+        af: af,
         note: note,
         createdAt: new Date().toISOString()
       };
@@ -37,22 +39,30 @@ export const getQuotePartsFromJson = (quote: Quote, allParts: Part[]): Part[] =>
     // Handle both old structure (direct note/final_price) and new structure (variants array)
     let note = '';
     let finalPrice = basePart.price;
+    let listPrice = basePart.list_price;
+    let af = basePart.af;
     
     if (quotePart.variants && Array.isArray(quotePart.variants)) {
       // New structure with variants
       const defaultVariant = quotePart.variants.find(v => v.is_default) || quotePart.variants[0];
       note = defaultVariant?.note || '';
       finalPrice = defaultVariant?.final_price ?? basePart.price;
+      listPrice = defaultVariant?.list_price ?? basePart.list_price;
+      af = defaultVariant?.af ?? basePart.af;
     } else {
       // Old structure with direct properties
       note = (quotePart as any).note || '';
       finalPrice = (quotePart as any).final_price ?? basePart.price;
+      listPrice = (quotePart as any).list_price ?? basePart.list_price;
+      af = (quotePart as any).af ?? basePart.af;
     }
 
     // Merge base part data with quote-specific data
     return {
       ...basePart,
       price: finalPrice,
+      list_price: listPrice,
+      af: af,
       note: note
     };
   });
@@ -132,7 +142,7 @@ export const removePartFromQuote = (quote: Quote, partId: string): QuotePartItem
 export const updatePartInQuote = (
   quote: Quote, 
   partId: string, 
-  updates: { note?: string; final_price?: number | null }
+  updates: { note?: string; final_price?: number | null; list_price?: number | null; af?: boolean }
 ): QuotePartItem[] => {
   const currentParts = quote.partsRequested || [];
   
@@ -145,7 +155,9 @@ export const updatePartInQuote = (
               ? { 
                   ...v, 
                   ...(updates.note !== undefined && { note: updates.note }),
-                  ...(updates.final_price !== undefined && { final_price: updates.final_price })
+                  ...(updates.final_price !== undefined && { final_price: updates.final_price }),
+                  ...(updates.list_price !== undefined && { list_price: updates.list_price }),
+                  ...(updates.af !== undefined && { af: updates.af })
                 }
               : v
           )

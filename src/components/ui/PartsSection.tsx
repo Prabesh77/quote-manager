@@ -8,7 +8,7 @@ interface PartDetails {
   name: string;
   number: string;
   price: number | null;
-  listPrice: number | null;
+  list_price: number | null;
   note: string;
 }
 
@@ -223,22 +223,20 @@ export default function PartsSection({
                       />
                     </div>
 
-                    {/* Show List Price field only if listPrice exists */}
-                    {partDetails[partName]?.listPrice && (
-                      <div>
-                        <label className="block text-xs font-medium text-gray-600 mb-2">
-                          List Price
-                        </label>
-                        <input
-                          type="number"
-                          step="0.01"
-                          value={partDetails[partName]?.listPrice || ''}
-                          onChange={(e) => onUpdatePartDetails(partName, 'listPrice', parseFloat(e.target.value) || 0)}
-                          placeholder="List price"
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        />
-                      </div>
-                    )}
+                    {/* List Price field - always visible for selected parts */}
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-2">
+                        List Price
+                      </label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={partDetails[partName]?.list_price || ''}
+                        onChange={(e) => onUpdatePartDetails(partName, 'list_price', parseFloat(e.target.value) || 0)}
+                        placeholder="Enter list price"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
 
                     {/* Price and Notes fields hidden in quote creation - will be added during pricing workflow */}
                   </div>

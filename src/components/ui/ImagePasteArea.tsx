@@ -88,7 +88,8 @@ export const ImagePasteArea = ({ onPartsExtracted, onPartRemoved, onClearAll }: 
         rawText: part.rawText,
         context: undefined,
         isSupersession: false,
-        manufacturer: undefined
+        manufacturer: undefined,
+        list_price: part.list_price // Add the missing list_price field!
       }));
       
       const processingTime = performance.now() - startTime;

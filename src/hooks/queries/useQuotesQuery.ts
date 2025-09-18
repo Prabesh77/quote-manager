@@ -209,7 +209,7 @@ export const quotePartToLegacyPart = (quotePart: QuotePart): Part => ({
   name: quotePart.partName,
   number: quotePart.partNumber,
   price: quotePart.finalPrice, // Only use manually set final price, no automatic fallback
-  list_price: quotePart.listPrice || null,
+  list_price: quotePart.list_price || null,
   af: quotePart.af || false,
   note: quotePart.note,
   createdAt: quotePart.createdAt,

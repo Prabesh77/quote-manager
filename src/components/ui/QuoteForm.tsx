@@ -35,7 +35,7 @@ interface PartDetails {
   name: string;
   number: string;
   price: number | null;
-  listPrice: number | null;
+  list_price: number | null;
   note: string;
 }
 
@@ -45,7 +45,7 @@ interface ExtractedPartInfo {
   confidence: number;
   rawText: string;
   context?: string;
-  listPrice?: number;
+  list_price?: number;
 }
 
 interface QuoteFormProps {
@@ -199,16 +199,16 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
       }
 
       // Populate part details with confidence information
-        setPartDetails(prev => ({
-          ...prev,
-          [matchedPartName]: {
-            name: matchedPartName,
+      setPartDetails(prev => ({
+        ...prev,
+        [matchedPartName]: {
+          name: matchedPartName,
           number: part.partNumber !== 'Not found' ? cleanPartNumber(part.partNumber) : '',
           price: null,
-          listPrice: part.listPrice || null,
+          list_price: part.list_price || null,
           note: ''
-          }
-        }));
+        }
+      }));
     });
 
 
@@ -662,7 +662,7 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
             name: partName,
             number: '',
             price: null,
-            listPrice: null,
+            list_price: null,
             note: ''
           }
         }));
@@ -789,6 +789,7 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
     try {
       // Convert part details to array
       const partsArray = selectedParts.map(partName => partDetails[partName]);
+      
 
       await onSubmit({
         quoteRef,

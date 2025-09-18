@@ -70,6 +70,8 @@ interface PartData {
   name: string;
   number?: string;
   price?: number;
+  list_price?: number;
+  af?: boolean;
   note?: string;
 }
 
@@ -84,6 +86,7 @@ interface QuoteData {
 
 export const createNormalizedQuote = async (quoteData: QuoteData) => {
   try {
+    
     // Step 1: Create or find customer
     let customerId: string;
     
@@ -202,7 +205,8 @@ export const createNormalizedQuote = async (quoteData: QuoteData) => {
     const partsRequestedJson = quoteData.parts.map(partData => ({
       part_id: '', // Will be filled after creating parts
       note: partData.note || '',
-      final_price: null // Initially null, will be set during pricing
+      final_price: null, // Initially null, will be set during pricing
+      list_price: partData.list_price || null
     }));
 
     const { data: quote, error: quoteError } = await supabase
@@ -252,7 +256,8 @@ export const createNormalizedQuote = async (quoteData: QuoteData) => {
       finalPartsRequested.push({
         part_id: part.id,
         note: partData.note || '',
-        final_price: null // Initially null, will be set during pricing
+        final_price: null, // Initially null, will be set during pricing
+        list_price: partData.list_price || null
       });
     }
 

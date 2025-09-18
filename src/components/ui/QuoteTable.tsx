@@ -1824,7 +1824,6 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                     const isPartEditing = editingParts === quote.id;
                                     const localQuote = localQuotes.find(q => q.id === quote.id);
                                     const quotePart = localQuote?.partsRequested?.find(qp => qp.part_id === part.id);
-
                                     // Get variants from localQuotes if available, otherwise fallback to part data
                                     // Also consider variants from partEditData for immediate UI updates
                                     let variants = quotePart?.variants && quotePart.variants.length > 0 
@@ -1833,7 +1832,9 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                           id: 'default', 
                                           note: part.note, 
                                           final_price: part.price, // Use part.price as fallback
-                                          is_default: true 
+                                          list_price: part.list_price, // Include list_price from part
+                                          af: part.af, // Include af from part
+                                          is_default: true,
                                         }];
 
                                     // If we're editing and have partEditData, merge any new variants
@@ -1844,6 +1845,8 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                           id: variantId,
                                           note: partEditData[part.id][variantId]?.note || '',
                                           final_price: partEditData[part.id][variantId]?.final_price || null,
+                                          list_price: partEditData[part.id][variantId]?.list_price || null,
+                                          af: partEditData[part.id][variantId]?.af || false,
                                           created_at: new Date().toISOString(),
                                           is_default: false
                                         })) as any[];
@@ -2137,6 +2140,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
           >
             {paginatedQuotes.map((quote) => {
               const quoteParts = getQuotePartsWithNotesSync(quote.id);
+              console.log(quoteParts, 'quoteParts');
               const status = getQuoteStatus(quoteParts, quote.status);
               
               return (
@@ -2373,7 +2377,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                               {quoteParts.length > 0 && (
                           <div className="space-y-3">
                                   {quoteParts.map((part) => {
-                              const isPartEditing = editingParts === quote.id;
+                                  const isPartEditing = editingParts === quote.id;
                                     
                                     return (
                                 <div key={part.id} className="bg-white rounded-lg border border-gray-200 p-3 shadow-sm">

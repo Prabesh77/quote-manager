@@ -209,7 +209,7 @@ export const quotePartToLegacyPart = (quotePart: QuotePart): Part => ({
   name: quotePart.partName,
   number: quotePart.partNumber,
   price: quotePart.finalPrice, // Only use manually set final price, no automatic fallback
-  list_price: quotePart.listPrice || null,
+  list_price: quotePart.list_price || null,
   af: quotePart.af || false,
   note: quotePart.note,
   createdAt: quotePart.createdAt,
@@ -884,8 +884,8 @@ export const useUpdatePartInQuoteJsonMutation = () => {
       
       const currentStatus = currentQuoteData?.status;
 
-      // Check if all parts now have prices to determine if status should change
-      const allPartsHavePrices = updatedPartsRequested.every((part: any) => {
+      // Check if ANY part now has a price to determine if status should change
+      const anyPartHasPrice = updatedPartsRequested.some((part: any) => {
         // Check if any variant has a price (not just default variant)
         const hasAnyVariantWithPrice = part.variants?.some((variant: any) => 
           variant.final_price && variant.final_price > 0
@@ -896,8 +896,9 @@ export const useUpdatePartInQuoteJsonMutation = () => {
       // Update the quote with the modified parts_requested JSON and potentially status
       const updateData: any = { parts_requested: updatedPartsRequested };
       
-      // If all parts now have prices, update status to 'waiting_verification'
-      const shouldChangeToWaitingVerification = allPartsHavePrices && currentStatus !== 'waiting_verification' && currentStatus !== 'priced';
+      // If any part now has a price, update status to 'waiting_verification' (unless already in a higher status)
+      const shouldChangeToWaitingVerification = anyPartHasPrice && 
+        currentStatus === 'unpriced';
       
       if (shouldChangeToWaitingVerification) {
         updateData.status = 'waiting_verification';

@@ -1,13 +1,14 @@
 'use client';
 
 import React from 'react';
-import { X, Plus } from 'lucide-react';
+import { X, Plus, ArrowLeftRight } from 'lucide-react';
 import { getAvailablePartsForBrand } from '@/config/brandPartRules';
 
 interface PartDetails {
   name: string;
   number: string;
   price: number | null;
+  list_price: number | null;
   note: string;
 }
 
@@ -16,9 +17,32 @@ interface PartsSectionProps {
   onTogglePart: (partName: string) => void;
   partDetails: Record<string, PartDetails>;
   onUpdatePartDetails: (partName: string, field: keyof PartDetails, value: string | number) => void;
+  onTogglePartSide: (partName: string) => void;
   vehicleMake: string;
   isVisible: boolean;
 }
+
+// Helper functions for left/right part handling
+const hasLeftRightVariants = (partName: string): boolean => {
+  const leftRightParts = [
+    'Left Headlamp', 'Right Headlamp',
+    'Left DayLight', 'Right DayLight', 
+    'Left Blindspot Sensor', 'Right Blindspot Sensor'
+  ];
+  return leftRightParts.includes(partName);
+};
+
+const getOppositeSidePart = (partName: string): string => {
+  const partMappings: Record<string, string> = {
+    'Left Headlamp': 'Right Headlamp',
+    'Right Headlamp': 'Left Headlamp',
+    'Left DayLight': 'Right DayLight',
+    'Right DayLight': 'Left DayLight',
+    'Left Blindspot Sensor': 'Right Blindspot Sensor',
+    'Right Blindspot Sensor': 'Left Blindspot Sensor'
+  };
+  return partMappings[partName] || partName;
+};
 
 const getPartIcon = (partName: string): string | null => {
   const iconMap: Record<string, string> = {
@@ -36,7 +60,6 @@ const getPartIcon = (partName: string): string | null => {
     'Parking Sensor': '/part-icons/parking.png',
     'Left Blindspot Sensor': '/part-icons/blindspot.png',
     'Right Blindspot Sensor': '/part-icons/blindspot.png',
-    'Daytime Headlamps': '/part-icons/lh.png',
   };
 
   return iconMap[partName] || null;
@@ -58,7 +81,6 @@ const PART_OPTIONS = [
   { name: 'Parking Sensor', icon: getPartIcon('Parking Sensor') },
   { name: 'Left Blindspot Sensor', icon: getPartIcon('Left Blindspot Sensor') },
   { name: 'Right Blindspot Sensor', icon: getPartIcon('Right Blindspot Sensor') },
-  { name: 'Daytime Headlamps', icon: getPartIcon('Daytime Headlamps') },
 ];
 
 export default function PartsSection({
@@ -66,6 +88,7 @@ export default function PartsSection({
   onTogglePart,
   partDetails,
   onUpdatePartDetails,
+  onTogglePartSide,
   vehicleMake,
   isVisible
 }: PartsSectionProps) {
@@ -163,14 +186,27 @@ export default function PartsSection({
                       )}
                       <span className="font-medium text-gray-900">{partName}</span>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => onTogglePart(partName)}
-                      className="p-1 text-gray-400 hover:text-red-600 transition-colors cursor-pointer"
-                      title="Remove part"
-                    >
-                      <X className="h-4 w-4" />
-                    </button>
+                    <div className="flex items-center space-x-1">
+                      {/* Toggle button for left/right parts */}
+                      {hasLeftRightVariants(partName) && (
+                        <button
+                          type="button"
+                          onClick={() => onTogglePartSide(partName)}
+                          className="p-1 text-gray-400 hover:text-blue-600 transition-colors cursor-pointer"
+                          title={`Toggle to ${getOppositeSidePart(partName)}`}
+                        >
+                          <ArrowLeftRight className="h-4 w-4" />
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => onTogglePart(partName)}
+                        className="p-1 text-gray-400 hover:text-red-600 transition-colors cursor-pointer"
+                        title="Remove part"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
                   </div>
 
                   <div className="space-y-3">
@@ -183,6 +219,21 @@ export default function PartsSection({
                         value={partDetails[partName]?.number || ''}
                         onChange={(e) => onUpdatePartDetails(partName, 'number', e.target.value)}
                         placeholder="Enter part number"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+
+                    {/* List Price field - always visible for selected parts */}
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-2">
+                        List Price
+                      </label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={partDetails[partName]?.list_price || ''}
+                        onChange={(e) => onUpdatePartDetails(partName, 'list_price', parseFloat(e.target.value) || 0)}
+                        placeholder="Enter list price"
                         className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                       />
                     </div>

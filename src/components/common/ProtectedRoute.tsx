@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/components/providers/AuthProvider';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { SkeletonLoader } from '@/components/ui/SkeletonLoader';
+import { PageLoader } from '@/components/ui/PageLoader';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -69,14 +70,14 @@ export function ProtectedRoute({
     }
   };
 
-  // Show loading until everything is fully loaded
+  // Show loading until everything is fully loaded (initial app load)
   if (!isFullyLoaded) {
-    return <SkeletonLoader />;
+    return <PageLoader message="Loading..." subMessage="Please wait" />;
   }
 
-  // Show loading if no user
+  // Show loading if no user (redirecting to login)
   if (!user) {
-    return <SkeletonLoader />;
+    return <PageLoader message="Redirecting..." subMessage="Please wait" />;
   }
 
   // Show loading if profile is still loading or not available
@@ -86,7 +87,7 @@ export function ProtectedRoute({
 
   // Show loading if user doesn't have required role
   if (allowedRoles.length > 0 && !allowedRoles.includes(profile.role)) {
-    return <SkeletonLoader />;
+    return <PageLoader message="Redirecting..." subMessage="Please wait" />;
   }
 
   // User is authorized, render children

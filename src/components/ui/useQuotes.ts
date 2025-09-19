@@ -83,7 +83,7 @@ export interface QuotePart {
   quoteId: string;
   partId: string;
   finalPrice: number | null;
-  listPrice: number | null;
+  list_price: number | null;
   af: boolean;
   note: string;  // Quote-specific note
   
@@ -211,27 +211,28 @@ export const useQuotes = () => {
 
       // Convert normalized quotes to legacy format for QuoteTable compatibility
       const legacyQuotes: Quote[] = (normalizedQuotes || []).map(normalizedQuote => {
-        // Get parts for this quote
-        const quotePartsForThisQuote = (quoteParts || []).filter(qp => qp.quote_id === normalizedQuote.id);
-        const partIds = quotePartsForThisQuote.map(qp => qp.part_id).join(',');
-
+        // Use parts_requested JSON data directly instead of separate quoteParts query
+        const partsRequested = normalizedQuote.parts_requested || [];
+        const partIds = partsRequested.map((p: any) => p.part_id).join(',');
 
         const legacyQuote = {
           id: normalizedQuote.id,
           vin: normalizedQuote.vehicle?.vin || '',
           partRequested: partIds,
-          partsRequested: (quotePartsForThisQuote || []).map(qp => ({
-            part_id: qp.part_id,
-            variants: [{
-              id: `var_${qp.part_id}_${qp.quote_id}`,
-              final_price: qp.final_price || null,
-              list_price: qp.list_price || null,
-              af: qp.af || false,
-              note: qp.note || '',
-              created_at: qp.created_at || new Date().toISOString(),
-              is_default: true
-            }]
-          })),
+          partsRequested: (partsRequested || []).map((qp: any) => {
+            return {
+              part_id: qp.part_id,
+              variants: [{
+                id: `var_${qp.part_id}_${normalizedQuote.id}`,
+                final_price: qp.final_price || null,
+                list_price: qp.list_price || null,
+                af: qp.af || false,
+                note: qp.note || '',
+                created_at: qp.created_at || new Date().toISOString(),
+                is_default: true
+              }]
+            };
+          }),
           quoteRef: normalizedQuote.quote_ref || `Q${normalizedQuote.id.slice(0, 8)}`, // Use stored quote_ref or fallback to generated
           createdAt: normalizedQuote.created_at,
           make: normalizedQuote.vehicle?.make || '',

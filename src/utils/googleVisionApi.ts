@@ -21,6 +21,7 @@ interface ExtractedPartInfo {
   confidence: number;
   rawText: string;
   context?: string;
+  list_price?: number;
 }
 
 export const extractTextFromImage = async (base64Image: string): Promise<string> => {
@@ -85,7 +86,8 @@ export const extractPartsFromText = async (text: string): Promise<ExtractedPartI
       partNumber: aiPart.partNumber,
       confidence: aiPart.confidence,
       rawText: aiPart.rawText,
-      context: aiPart.context
+      context: aiPart.context,
+      list_price: aiPart.list_price
     }));
     
     return parts;
@@ -145,7 +147,8 @@ function fallbackExtraction(text: string): ExtractedPartInfo[] {
       partNumber,
       confidence: 0.7,
       rawText: text,
-      context
+      context,
+      list_price: undefined
     };
     
     parts.push(extractedPart);

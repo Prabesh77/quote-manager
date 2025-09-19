@@ -35,6 +35,7 @@ interface PartDetails {
   name: string;
   number: string;
   price: number | null;
+  list_price: number | null;
   note: string;
 }
 
@@ -44,7 +45,8 @@ interface ExtractedPartInfo {
   confidence: number;
   rawText: string;
   context?: string;
-} 
+  list_price?: number;
+}
 
 interface QuoteFormProps {
   onSubmit: (fields: Record<string, string>, parts: PartDetails[]) => void;
@@ -107,24 +109,106 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
         }
       }
 
-      // Add to selected parts if not already present
+      // Auto-assignment logic for left/right parts
+      const leftRightParts = [
+        'Left Headlamp', 'Right Headlamp',
+        'Left DayLight', 'Right DayLight', 
+        'Left Blindspot Sensor', 'Right Blindspot Sensor'
+      ];
+      
+      const getOppositeSidePart = (name: string): string => {
+        const partMappings: Record<string, string> = {
+          'Left Headlamp': 'Right Headlamp',
+          'Right Headlamp': 'Left Headlamp',
+          'Left DayLight': 'Right DayLight',
+          'Right DayLight': 'Left DayLight',
+          'Left Blindspot Sensor': 'Right Blindspot Sensor',
+          'Right Blindspot Sensor': 'Left Blindspot Sensor'
+        };
+        return partMappings[name] || name;
+      };
+
+      // Check if this is an unidentified left/right part (e.g., "Headlamp", "Headlight", "DayLight", "Blindspot Sensor")
+      const isUnidentifiedLeftRightPart = (
+        matchedPartName === 'Headlamp' || matchedPartName === 'Headlight' ||
+        matchedPartName === 'DayLight' || matchedPartName === 'Daylight' ||
+        matchedPartName === 'Blindspot Sensor' || matchedPartName === 'Blindspot'
+      );
+
+      // Apply auto-assignment rules for left/right parts
+      if (leftRightParts.includes(matchedPartName) || isUnidentifiedLeftRightPart) {
+        setSelectedParts(prev => {
+          let partType: string;
+          
+          // Determine the part type based on the matched part name
+          if (isUnidentifiedLeftRightPart) {
+            // Handle unidentified parts
+            if (matchedPartName === 'Headlamp' || matchedPartName === 'Headlight') {
+              partType = 'Headlamp';
+            } else if (matchedPartName === 'DayLight' || matchedPartName === 'Daylight') {
+              partType = 'DayLight';
+            } else if (matchedPartName === 'Blindspot Sensor' || matchedPartName === 'Blindspot') {
+              partType = 'Blindspot Sensor';
+            } else {
+              partType = matchedPartName;
+            }
+          } else {
+            // Handle identified parts (already have Left/Right)
+            partType = matchedPartName.split(' ')[1]; // Get "Headlamp", "DayLight", or "Blindspot Sensor"
+          }
+          
+          // Count existing parts of this type (both left and right)
+          const leftPartName = `Left ${partType}`;
+          const rightPartName = `Right ${partType}`;
+          const leftExists = prev.includes(leftPartName);
+          const rightExists = prev.includes(rightPartName);
+          
+          if (leftExists && rightExists) {
+            // Both parts exist - keep current assignment if it's not already present
+            if (!prev.includes(matchedPartName)) {
+              return [...prev, matchedPartName];
+            }
+          } else if (leftExists && !rightExists) {
+            // Left exists, right doesn't - assign as right
+            if (!prev.includes(rightPartName)) {
+              matchedPartName = rightPartName;
+            }
+          } else if (!leftExists && rightExists) {
+            // Right exists, left doesn't - assign as left
+            if (!prev.includes(leftPartName)) {
+              matchedPartName = leftPartName;
+            }
+          } else {
+            // Neither exists - assign as left by default (first part)
+            matchedPartName = leftPartName;
+          }
+          
+          if (!prev.includes(matchedPartName)) {
+            return [...prev, matchedPartName];
+          }
+          return prev;
+        });
+      } else {
+        // Add to selected parts if not already present (non left/right parts)
         setSelectedParts(prev => {
           if (!prev.includes(matchedPartName)) {
             return [...prev, matchedPartName];
           }
           return prev;
         });
+      }
 
       // Populate part details with confidence information
-        setPartDetails(prev => ({
-          ...prev,
-          [matchedPartName]: {
-            name: matchedPartName,
+      setPartDetails(prev => ({
+        ...prev,
+        [matchedPartName]: {
+          name: matchedPartName,
           number: part.partNumber !== 'Not found' ? cleanPartNumber(part.partNumber) : '',
           price: null,
+          list_price: part.list_price || null,
           note: ''
-          }
-        }));
+        }
+      }));
     });
 
 
@@ -578,6 +662,7 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
             name: partName,
             number: '',
             price: null,
+            list_price: null,
             note: ''
           }
         }));
@@ -594,6 +679,75 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
         [field]: value
       }
     }));
+  };
+
+  const togglePartSide = (partName: string) => {
+    // Helper function to get opposite side part name
+    const getOppositeSidePart = (name: string): string => {
+      const partMappings: Record<string, string> = {
+        'Left Headlamp': 'Right Headlamp',
+        'Right Headlamp': 'Left Headlamp',
+        'Left DayLight': 'Right DayLight',
+        'Right DayLight': 'Left DayLight',
+        'Left Blindspot Sensor': 'Right Blindspot Sensor',
+        'Right Blindspot Sensor': 'Left Blindspot Sensor'
+      };
+      return partMappings[name] || name;
+    };
+
+    const oppositePartName = getOppositeSidePart(partName);
+    
+    // Get current part details
+    const currentPartDetails = partDetails[partName];
+    if (!currentPartDetails) return;
+
+    // Check if opposite part already exists
+    const oppositePartExists = selectedParts.includes(oppositePartName);
+    const oppositePartDetails = partDetails[oppositePartName];
+
+    setSelectedParts(prev => {
+      let newSelectedParts = [...prev];
+      
+      if (oppositePartExists) {
+        // Both parts exist - swap them
+        // Remove both parts from selection
+        newSelectedParts = newSelectedParts.filter(p => p !== partName && p !== oppositePartName);
+        
+        // Add them back with swapped names
+        newSelectedParts.push(partName);
+        newSelectedParts.push(oppositePartName);
+      } else {
+        // Only current part exists - just rename it
+        newSelectedParts = newSelectedParts.map(p => p === partName ? oppositePartName : p);
+      }
+      
+      return newSelectedParts;
+    });
+
+    setPartDetails(prev => {
+      const newDetails = { ...prev };
+      
+      if (oppositePartExists && oppositePartDetails) {
+        // Both parts exist - swap their details
+        newDetails[partName] = {
+          ...oppositePartDetails,
+          name: partName
+        };
+        newDetails[oppositePartName] = {
+          ...currentPartDetails,
+          name: oppositePartName
+        };
+      } else {
+        // Only current part exists - rename it
+        delete newDetails[partName];
+        newDetails[oppositePartName] = {
+          ...currentPartDetails,
+          name: oppositePartName
+        };
+      }
+      
+      return newDetails;
+    });
   };
 
   const updatePartDetail = (partName: string, field: keyof PartDetails, value: string | number | null) => {
@@ -635,6 +789,7 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
     try {
       // Convert part details to array
       const partsArray = selectedParts.map(partName => partDetails[partName]);
+      
 
       await onSubmit({
         quoteRef,
@@ -913,7 +1068,7 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Series
-                    </label>
+        </label>
                     <Input
                       type="text"
                       name="series"
@@ -979,8 +1134,8 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
                     <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Customer Name
-                    </label>
-                    <Input
+                      </label>
+                      <Input
                       type="text"
                       name="customer"
                       value={fields.customer}
@@ -993,8 +1148,8 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
                     <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Phone Number
-                    </label>
-                    <Input
+                      </label>
+                      <Input
                       type="text"
                       name="phone"
                       value={fields.phone}
@@ -1007,18 +1162,18 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
                   <div className="md:col-span-2 lg:col-span-3">
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Address
-                    </label>
-                    <Input
+                      </label>
+                      <Input
                       type="text"
                       name="address"
                       value={fields.address}
                       onChange={handleChange}
-                      className="w-full h-8 text-sm"
+                        className="w-full h-8 text-sm"
                       placeholder="Enter customer address"
-                    />
+                      />
+                    </div>
                   </div>
                 </div>
-              </div>
 
               {/* Additional Details */}
               <div className="mt-6">
@@ -1039,7 +1194,7 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
                       className="w-full h-8 text-sm"
                       placeholder="Enter required date"
                     />
-                  </div>
+          </div>
                 </div>
               </div>
             </AccordionContent>
@@ -1053,6 +1208,7 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
           onTogglePart={togglePart}
           partDetails={partDetails}
           onUpdatePartDetails={updatePartDetails}
+          onTogglePartSide={togglePartSide}
           vehicleMake={fields.make}
           isVisible={showPartsSection}
         />
@@ -1078,7 +1234,7 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
             <div className="flex items-center space-x-3 mb-4">
               <AlertCircle className="h-6 w-6 text-red-500" />
               <h3 className="text-lg font-semibold text-gray-900">Validation Error</h3>
-            </div>
+                </div>
             <p className="text-gray-700 mb-6">{validationMessage}</p>
             <div className="flex justify-end">
               <Button
@@ -1093,4 +1249,4 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
       )}
     </div>
   );
-};
+}; 

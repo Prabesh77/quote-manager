@@ -788,6 +788,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
 
   const getVehicleLogo = (make: string) => {
     const logos: Record<string, string> = {
+      'default': '/car-logos/default.png',
       'toyota': '/car-logos/toyota.png',
       'honda': '/car-logos/honda.png',
       'ford': '/car-logos/ford.png',
@@ -814,8 +815,10 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
       'jeep': '/car-logos/jeep.png',
       'mg': '/car-logos/mg.png',
       'mitsubishi': '/car-logos/mitsubisi.png',
+      'isuzu': '/car-logos/isuzu.png',
+      'haval': '/car-logos/haval.png',
     };
-    return logos[make.toLowerCase()] || '/car-logos/toyota.png'; // Default to Toyota if make not found
+    return logos[make.toLowerCase()] || '/car-logos/default.png'; // Default to Toyota if make not found
   };
 
   const getPartIcon = (partName: string): string | null => {

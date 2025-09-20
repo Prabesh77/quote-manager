@@ -13,49 +13,81 @@ export interface BrandPartRule {
 
 // Legacy hardcoded rules for fallback (can be removed once fully migrated)
 export const BRAND_PART_RULES_LEGACY: Record<string, BrandPartRule> = {
+  // Fan Assembly Requirements
   'Fan Assembly': {
-    requiredFor: ['Kia', 'Hyundai', 'Mazda', 'Holden', 'Nissan'],
-    description: 'Required for Asian and Australian brands'
+    requiredFor: ['Holden', 'Nissan', 'Kia', 'Hyundai', 'Mazda'],
+    description: 'Required for Holden (Captiva), Nissan (X-Trail, Navara), Kia, Hyundai, Mazda'
   },
+
+  // Oil Cooler / Intercooler Info
   'Oil Cooler': {
     notRequiredFor: ['Subaru'],
-    description: 'Not required for Subaru'
+    description: 'Subaru models do not require an oil cooler'
   },
-  'Intercooler': {
-    notRequiredFor: ['Subaru'],
-    description: 'Not required for Subaru'
+
+  // Headlamp Requirements
+  'Left Headlamp': {
+    notRequiredFor: [],
+    description: 'All Brands and Holden (Colorado, Trailblazer, Astra) and Ford (Everest, Ranger, Fiesta) only'
   },
+  'Right Headlamp': {
+     notRequiredFor: [],
+    description: 'All Brands and Holden (Colorado, Trailblazer, Astra) and Ford (Everest, Ranger, Fiesta) only'
+  },
+
+  // Front Grille Camera Requirements
+  'Camera': {
+    requiredFor: ['Volkswagen', 'Skoda', 'Seat', 'Cupra', 'Audi', 'BMW', 'MG', 'LDV', 'Ssang Yong'],
+    description: 'Front Grille Camera required (not windscreen-mounted camera)'
+  },
+
+  // Parking Sensor Requirements
   'Parking Sensor': {
-    requiredFor: ['Nissan', 'Mitsubishi'],
-    description: 'Only required for Nissan and Mitsubishi'
+    requiredFor: ['Mitsubishi', 'Nissan'],
+    description: 'Required for Mitsubishi and Nissan'
   },
+
+  // Blind Spot Sensors Requirements
   'Left Blindspot Sensor': {
-    requiredFor: ['Kia', 'Hyundai', 'BMW', 'Audi', 'Volkswagen', 'Mercedes', 'Porsche', 'Volvo', 'Jaguar', 'Land Rover'],
-    description: 'Required for Korean, European, and premium brands'
+    requiredFor: ['Hyundai', 'Kia', 'Volkswagen', 'Skoda', 'Seat', 'Cupra', 'Audi', 'BMW'],
+    description: 'Front & Rear Blind Spot Sensors required'
   },
   'Right Blindspot Sensor': {
-    requiredFor: ['Kia', 'Hyundai', 'BMW', 'Audi', 'Volkswagen', 'Mercedes', 'Porsche', 'Volvo', 'Jaguar', 'Land Rover'],
-    description: 'Required for Korean, European, and premium brands'
+    requiredFor: ['Hyundai', 'Kia', 'Volkswagen', 'Skoda', 'Seat', 'Cupra', 'Audi', 'BMW'],
+    description: 'Front & Rear Blind Spot Sensors required'
   },
-  'Camera': {
-    requiredFor: ['Volkswagen', 'BMW', 'Haval', 'Chery', 'BYD', 'MG', 'Great Wall', 'Geely', 'Audi', 'Mercedes'],
-    description: 'Required for European and Chinese brands'
+
+  // Daytime Headlamp Requirements
+  'Left DayLight': {
+    requiredFor: ['Nissan', 'Hyundai', 'Kia', 'Genesis', 'Mitsubishi'],
+    description: 'Daytime Headlamp required'
   },
+  'Right DayLight': {
+    requiredFor: ['Nissan', 'Hyundai', 'Kia', 'Genesis', 'Mitsubishi'],
+    description: 'Daytime Headlamp required'
+  },
+
+  // Add cooler, left intercooler, right intercooler for specific brands
+  'Add Cooler': {
+    requiredFor: ['Mercedes', 'BMW', 'Volkswagen', 'Land Rover', 'Audi'],
+    notRequiredFor: ['Subaru'],
+    description: 'Required for Mercedes, BMW, Volkswagen, Land Rover, Audi. Not required for Subaru'
+  },
+  'Left Intercooler': {
+    requiredFor: ['Mercedes', 'BMW', 'Volkswagen', 'Land Rover', 'Audi'],
+    notRequiredFor: ['Subaru'],
+    description: 'Required for Mercedes, BMW, Volkswagen, Land Rover, Audi. Not required for Subaru'
+  },
+  'Right Intercooler': {
+    requiredFor: ['Mercedes', 'BMW', 'Volkswagen', 'Land Rover', 'Audi'],
+    notRequiredFor: ['Subaru'],
+    description: 'Required for Mercedes, BMW, Volkswagen, Land Rover, Audi. Not required for Subaru'
+  },
+
+  // Auxiliary Radiator (keeping existing rule)
   'Auxiliary Radiator': {
     requiredFor: ['Land Rover', 'Mercedes', 'Audi', 'BMW', 'Volkswagen', 'Porsche', 'Volvo', 'Jaguar'],
     description: 'Required for European luxury brands'
-  },
-  'Left Intercooler': {
-    requiredFor: ['Mercedes', 'Land Rover', 'BMW'],
-    description: 'Required for Mercedes, Land Rover, and BMW'
-  },
-  'Right Intercooler': {
-    requiredFor: ['Mercedes', 'Land Rover', 'BMW'],
-    description: 'Required for Mercedes, Land Rover, and BMW'
-  },
-  'Add Cooler': {
-    requiredFor: ['Mercedes', 'Land Rover', 'BMW'],
-    description: 'Required for Mercedes, Land Rover, and BMW'
   },
 };
 

@@ -3,7 +3,8 @@
 import { useQuotesQuery } from '@/hooks/queries/useQuotesQuery';
 import { usePartsQuery } from '@/hooks/queries/useQuotesQuery';
 import { ProtectedRoute } from "@/components/common/ProtectedRoute";
-import { FileText, CheckCircle, Clock, DollarSign, Package, TrendingUp } from 'lucide-react';
+import { FileText, CheckCircle, Clock, DollarSign, Package, TrendingUp, Settings } from 'lucide-react';
+import Link from 'next/link';
 
 export default function DashboardPage() {
   // Get all quotes for dashboard (no pagination needed here)
@@ -160,6 +161,56 @@ export default function DashboardPage() {
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-600">Avg Quote Value</p>
                 <p className="text-2xl font-bold text-gray-900">{formatCurrency(averageQuoteValue)}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Quick Actions */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900 mb-2">Settings</h2>
+                <p className="text-sm text-gray-600 mb-4">Configure brand-part availability rules</p>
+                <Link 
+                  href="/settings"
+                  className="inline-flex items-center px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                  <Settings className="h-4 w-4 mr-2" />
+                  Manage Settings
+                </Link>
+              </div>
+              <div className="p-3 bg-blue-100 rounded-lg">
+                <Settings className="h-8 w-8 text-blue-600" />
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900 mb-2">Quick Actions</h2>
+                <p className="text-sm text-gray-600 mb-4">Common tasks and shortcuts</p>
+                <div className="flex space-x-3">
+                  <Link 
+                    href="/new"
+                    className="inline-flex items-center px-3 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 transition-colors"
+                  >
+                    <FileText className="h-4 w-4 mr-1" />
+                    New Quote
+                  </Link>
+                  <Link 
+                    href="/pricing"
+                    className="inline-flex items-center px-3 py-2 bg-purple-600 text-white text-sm font-medium rounded-lg hover:bg-purple-700 transition-colors"
+                  >
+                    <DollarSign className="h-4 w-4 mr-1" />
+                    Add Price
+                  </Link>
+                </div>
+              </div>
+              <div className="p-3 bg-green-100 rounded-lg">
+                <TrendingUp className="h-8 w-8 text-green-600" />
               </div>
             </div>
           </div>

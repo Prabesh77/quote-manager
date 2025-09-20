@@ -40,6 +40,18 @@ export const BRAND_PART_RULES: Record<string, BrandPartRule> = {
     requiredFor: ['Land Rover', 'Mercedes', 'Audi', 'BMW', 'Volkswagen', 'Porsche', 'Volvo', 'Jaguar'],
     description: 'Required for European luxury brands'
   },
+  'Left Intercooler': {
+    requiredFor: ['Mercedes', 'Land Rover', 'BMW'],
+    description: 'Required for Mercedes, Land Rover, and BMW'
+  },
+  'Right Intercooler': {
+    requiredFor: ['Mercedes', 'Land Rover', 'BMW'],
+    description: 'Required for Mercedes, Land Rover, and BMW'
+  },
+  'Add Cooler': {
+    requiredFor: ['Mercedes', 'Land Rover', 'BMW'],
+    description: 'Required for Mercedes, Land Rover, and BMW'
+  },
 };
 
 // Helper function to check if a part is available for a specific brand

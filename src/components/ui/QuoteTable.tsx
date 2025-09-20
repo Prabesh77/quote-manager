@@ -675,21 +675,6 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
     }
   };
 
-  const startEditingQuote = (quote: Quote) => {
-    setEditingQuote(quote.id);
-    setEditData({
-      quoteRef: quote.quoteRef,
-      vin: quote.vin,
-      make: quote.make,
-      model: quote.model,
-      series: quote.series,
-      auto: quote.auto,
-      body: quote.body,
-      mthyr: quote.mthyr,
-      rego: quote.rego,
-    });
-  };
-
   const startEditingParts = (quoteParts: Part[], quoteId: string) => {
     const newPartEditData: Record<string, Record<string, any>> = {};
     const localQuote = localQuotes.find(q => q.id === quoteId);
@@ -803,6 +788,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
 
   const getVehicleLogo = (make: string) => {
     const logos: Record<string, string> = {
+      'default': '/car-logos/default.png',
       'toyota': '/car-logos/toyota.png',
       'honda': '/car-logos/honda.png',
       'ford': '/car-logos/ford.png',
@@ -829,8 +815,10 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
       'jeep': '/car-logos/jeep.png',
       'mg': '/car-logos/mg.png',
       'mitsubishi': '/car-logos/mitsubisi.png',
+      'isuzu': '/car-logos/isuzu.png',
+      'haval': '/car-logos/haval.png',
     };
-    return logos[make.toLowerCase()] || '/car-logos/toyota.png'; // Default to Toyota if make not found
+    return logos[make.toLowerCase()] || '/car-logos/default.png'; // Default to Toyota if make not found
   };
 
   const getPartIcon = (partName: string): string | null => {
@@ -1432,7 +1420,12 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                         {quote.customer && (
                           <div className="px-2 py-[2px] text-[10px] text-orange-600 font-medium rounded shadow-sm">
                             <div className="flex items-center space-x-1">
-                              <span className="font-semibold">{quote.customer}</span>
+                              <span className="font-semibold">
+                                {quote.customer}
+                                {quote.settlement !== undefined && quote.settlement > 0 && (
+                                  <span className="text-blue-600 font-medium"> ({quote.settlement}%)</span>
+                                )}
+                              </span>
                               {quote.address && (
                                 <>
                                   <span className="text-gray-400">•</span>
@@ -2194,6 +2187,9 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                             <div className="flex items-center space-x-1">
                               <span className="text-[10px] text-orange-600 font-semibold">
                                 {quote.customer}
+                                {quote.settlement !== undefined && quote.settlement > 0 && (
+                                  <span className="text-blue-600 font-medium"> ({quote.settlement}%)</span>
+                                )}
                               </span>
                               {quote.address && (
                                 <>

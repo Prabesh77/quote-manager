@@ -121,7 +121,8 @@ export default function HomePage() {
         })) || [],
         notes: '',
         requiredBy: fields.requiredBy || '',
-        quoteRef: fields.quoteRef
+        quoteRef: fields.quoteRef,
+        settlement: fields.settlement
       };
 
       await createQuoteMutation.mutateAsync(quoteData);

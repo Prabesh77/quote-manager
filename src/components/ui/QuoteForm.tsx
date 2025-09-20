@@ -1,9 +1,9 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { ImagePasteArea } from '@/components/ui/ImagePasteArea';
+import { ImagePasteArea, ImagePasteAreaRef } from '@/components/ui/ImagePasteArea';
 import {
   Accordion,
   AccordionContent,
@@ -68,6 +68,7 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
     customer: '',
     address: '',
     phone: '',
+    settlement: '0',
     notes: '',
   });
   const [selectedParts, setSelectedParts] = useState<string[]>([]);
@@ -79,6 +80,8 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
   const [isFormAccordionOpen, setIsFormAccordionOpen] = useState(false);
   const [showPartsSection, setShowPartsSection] = useState(false);
 
+  // Ref for ImagePasteArea to reset images when form is cleared
+  const imagePasteAreaRef = useRef<ImagePasteAreaRef>(null);
 
   const handlePartsExtracted = (parts: ExtractedPartInfo[]) => {
     setExtractedParts(prevParts => [...prevParts, ...parts]);
@@ -248,370 +251,6 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
     }
   };
 
-  const handlePaste = () => {
-    const lines = rawText.split('\n');
-    const parsed: Record<string, string> = {};
-
-    for (let i = 0; i < lines.length; i++) {
-      const trimmedLine = lines[i].trim();
-      if (!trimmedLine) continue;
-
-      // Handle different patterns in the data
-      let key = '';
-      let value = '';
-
-      // Pattern 0: New format - "Received: 02/09/2025 12:00 PM" etc.
-      if (trimmedLine.includes(':')) {
-        const colonIndex = trimmedLine.indexOf(':');
-        const fieldName = trimmedLine.substring(0, colonIndex).trim().toLowerCase();
-        const fieldValue = trimmedLine.substring(colonIndex + 1).trim();
-        
-        switch (fieldName) {
-          case 'received':
-            // Skip received date for now, but could be used for notes
-            break;
-          case 'bodyshop':
-            parsed['customer'] = fieldValue;
-            break;
-          case 'repairer address':
-            parsed['address'] = fieldValue;
-            break;
-          case 'repairer contact':
-            // Could be used for additional contact info in notes
-            if (parsed['notes']) {
-              parsed['notes'] += ` | Contact: ${fieldValue}`;
-            } else {
-              parsed['notes'] = `Contact: ${fieldValue}`;
-            }
-            break;
-          case 'telephone':
-            parsed['phone'] = fieldValue;
-            break;
-          case 'email':
-            // Could be used for additional contact info in notes
-            if (parsed['notes']) {
-              parsed['notes'] += ` | Email: ${fieldValue}`;
-            } else {
-              parsed['notes'] = `Email: ${fieldValue}`;
-            }
-            break;
-          case 'estimate number':
-            parsed['quoteRef'] = fieldValue;
-            break;
-          case 'insurer':
-            // Could be used for additional info in notes
-            if (parsed['notes']) {
-              parsed['notes'] += ` | Insurer: ${fieldValue}`;
-            } else {
-              parsed['notes'] = `Insurer: ${fieldValue}`;
-            }
-            break;
-          case 'claim number':
-            // Could be used for additional info in notes
-            if (parsed['notes']) {
-              parsed['notes'] += ` | Claim: ${fieldValue}`;
-            } else {
-              parsed['notes'] = `Claim: ${fieldValue}`;
-            }
-            break;
-          case 'required':
-            // Parse required date/time - format: "02/09/2025 1:00 PM"
-            try {
-              // Split date and time
-              const [datePart, timePart] = fieldValue.split(' ');
-              if (datePart && timePart) {
-                const [day, month, year] = datePart.split('/');
-                const timeStr = timePart.toLowerCase();
-                
-                let hours = 0;
-                let minutes = 0;
-                
-                if (timeStr.includes('pm')) {
-                  const time = timeStr.replace('pm', '');
-                  if (time.includes(':')) {
-                    const [h, m] = time.split(':');
-                    const hour = parseInt(h);
-                    hours = hour === 12 ? 12 : hour + 12;
-                    minutes = parseInt(m || '0');
-                  } else {
-                    const timeNum = parseInt(time);
-                    const hour = Math.floor(timeNum / 100);
-                    hours = hour === 12 ? 12 : hour + 12;
-                    minutes = timeNum % 100;
-                  }
-                } else if (timeStr.includes('am')) {
-                  const time = timeStr.replace('am', '');
-                  if (time.includes(':')) {
-                    const [h, m] = time.split(':');
-                    hours = parseInt(h);
-                    minutes = parseInt(m || '0');
-                  } else {
-                    const timeNum = parseInt(time);
-                    hours = Math.floor(timeNum / 100);
-                    minutes = timeNum % 100;
-                  }
-                }
-                
-                const deadline = new Date(parseInt(year), parseInt(month) - 1, parseInt(day), hours, minutes);
-                if (!isNaN(deadline.getTime())) {
-                  parsed['requiredBy'] = deadline.toISOString();
-                }
-              }
-            } catch (error) {
-              parsed['requiredBy'] = fieldValue;
-            }
-            break;
-          case 'vehicle':
-            // Parse vehicle info - format: "TOYOTA LANDCRUISER  SAHARA LC300"
-            const vehicleParts = fieldValue.split('  ').map(part => part.trim()).filter(part => part);
-            if (vehicleParts.length >= 2) {
-              parsed['make'] = vehicleParts[0];
-              parsed['model'] = vehicleParts[1];
-              if (vehicleParts.length > 2) {
-                parsed['series'] = vehicleParts[2];
-              }
-            }
-            break;
-          case 'manufactured':
-            // Parse manufactured date - format: "06/2023"
-            try {
-              const [month, year] = fieldValue.split('/');
-              parsed['mthyr'] = `${year}-${month.padStart(2, '0')}`;
-            } catch (error) {
-              parsed['mthyr'] = fieldValue;
-            }
-            break;
-          case 'registration':
-            parsed['rego'] = fieldValue;
-            break;
-          case 'vin':
-            parsed['vin'] = fieldValue;
-            break;
-          case 'colour':
-            // Could be used for additional info in notes
-            if (parsed['notes']) {
-              parsed['notes'] += ` | Colour: ${fieldValue}`;
-            } else {
-              parsed['notes'] = `Colour: ${fieldValue}`;
-            }
-            break;
-          case 'paint':
-            // Could be used for additional info in notes
-            if (parsed['notes']) {
-              parsed['notes'] += ` | Paint: ${fieldValue}`;
-            } else {
-              parsed['notes'] = `Paint: ${fieldValue}`;
-            }
-            break;
-          default:
-            // Handle other fields that might appear
-            if (parsed['notes']) {
-              parsed['notes'] += ` | ${fieldName.replace(/\b\w/g, l => l.toUpperCase())}: ${fieldValue}`;
-            } else {
-              parsed['notes'] = `${fieldName.replace(/\b\w/g, l => l.toUpperCase())}: ${fieldValue}`;
-            }
-            break;
-        }
-        // Skip normal processing for new format
-        key = '';
-        value = '';
-      }
-      // Pattern 1: "Reference28495#2" (no space)
-      else if (trimmedLine.match(/^(Reference|Make|Model|Series|Trans|Body|Mth\/Yr|Veh Reg)(.+)$/i)) {
-        const match = trimmedLine.match(/^(Reference|Make|Model|Series|Trans|Body|Mth\/Yr|Veh Reg)(.+)$/i);
-        if (match) {
-          key = match[1].toLowerCase();
-          value = match[2].trim();
-        }
-      }
-      // Pattern 2: "Reference 28495#2" (with space)
-      else if (trimmedLine.match(/^(Reference|Make|Model|Series|Trans|Body|Mth\/Yr|Veh Reg)\s+(.+)$/i)) {
-        const match = trimmedLine.match(/^(Reference|Make|Model|Series|Trans|Body|Mth\/Yr|Veh Reg)\s+(.+)$/i);
-        if (match) {
-          key = match[1].toLowerCase();
-          value = match[2].trim();
-        }
-      }
-      // Pattern 3: "Reference: 28495#2" (with colon)
-      else if (trimmedLine.includes(':')) {
-        const [k, ...rest] = trimmedLine.split(':');
-        key = k.trim().toLowerCase();
-        value = rest.join(':').trim();
-      }
-      // Pattern 4: Standalone "VIN" followed by value on next line
-      else if (trimmedLine === 'VIN' && i + 1 < lines.length) {
-        key = 'vin';
-        value = lines[i + 1].trim();
-        i++; // Skip the next line since we've processed it
-      }
-      // Pattern 5: "Required By" followed by value on next line
-      else if (trimmedLine === 'Required By' && i + 1 < lines.length) {
-        key = 'required by';
-        // Get the next two lines for date and time
-        const dateLine = lines[i + 1]?.trim();
-        const timeLine = lines[i + 2]?.trim();
-
-        if (dateLine && timeLine) {
-          try {
-            // Parse the date (format: "11/08/2025" - dd/mm/yyyy for Australian format)
-            const [day, month, year] = dateLine.split('/');
-
-
-            // Validate date components
-            if (!day || !month || !year || isNaN(parseInt(day)) || isNaN(parseInt(month)) || isNaN(parseInt(year))) {
-              throw new Error('Invalid date format');
-            }
-
-            // Parse the time (format: "12:00pm" or "1200pm")
-            const timeStr = timeLine.toLowerCase();
-            let hours = 0;
-            let minutes = 0;
-
-            if (timeStr.includes('pm')) {
-              const time = timeStr.replace('pm', '');
-              if (time.includes(':')) {
-                const [h, m] = time.split(':');
-                const hour = parseInt(h);
-                // 12 PM should be 12, not 24
-                hours = hour === 12 ? 12 : hour + 12;
-                minutes = parseInt(m || '0');
-              } else {
-                // Handle format like "1200pm"
-                const timeNum = parseInt(time);
-                const hour = Math.floor(timeNum / 100);
-                // 12 PM should be 12, not 24
-                hours = hour === 12 ? 12 : hour + 12;
-                minutes = timeNum % 100;
-              }
-            } else if (timeStr.includes('am')) {
-              const time = timeStr.replace('am', '');
-              if (time.includes(':')) {
-                const [h, m] = time.split(':');
-                hours = parseInt(h);
-                minutes = parseInt(m || '0');
-              } else {
-                // Handle format like "1200am"
-                const timeNum = parseInt(time);
-                hours = Math.floor(timeNum / 100);
-                minutes = timeNum % 100;
-              }
-            }
-
-            // Validate time components
-            if (isNaN(hours) || isNaN(minutes) || hours < 0 || hours > 23 || minutes < 0 || minutes > 59) {
-              throw new Error('Invalid time format');
-            }
-
-            // Create ISO timestamp - explicitly handle Australian DD/MM/YYYY format
-            // For "11/08/2025", we want day=11, month=08 (August), year=2025
-            const parsedDay = parseInt(day);
-            const parsedMonth = parseInt(month);
-            const parsedYear = parseInt(year);
-            
-            // Validate that day and month make sense for Australian format
-            if (parsedDay > 31 || parsedMonth > 12) {
-              throw new Error('Invalid date: day or month out of range');
-            }
-            
-            // Additional validation: ensure day doesn't exceed month limits
-            const daysInMonth = new Date(parsedYear, parsedMonth, 0).getDate();
-            if (parsedDay > daysInMonth) {
-              throw new Error(`Invalid date: ${parsedDay} exceeds days in month ${parsedMonth}`);
-            }
-            
-            // Create Date object with explicit Australian DD/MM/YYYY interpretation
-            const deadline = new Date(parsedYear, parsedMonth - 1, parsedDay, hours, minutes);
-            
-
-
-            // Validate the created date
-            if (isNaN(deadline.getTime())) {
-              throw new Error('Invalid date/time combination');
-            }
-
-            value = deadline.toISOString();
-          } catch (error) {
-            // Fallback to original format if parsing fails
-            value = `${dateLine} ${timeLine}`;
-          }
-          i += 2; // Skip the next two lines since we've processed them
-        } else if (dateLine) {
-          value = dateLine;
-          i += 1; // Skip the next line since we've processed it
-        }
-      }
-
-      if (!key || !value) {
-        continue;
-      }
-
-      // Map the keys to our form fields
-      switch (key) {
-        case 'reference':
-          parsed['quoteRef'] = value;
-          break;
-        case 'vin':
-          parsed['vin'] = value;
-          break;
-        case 'make':
-          parsed['make'] = value;
-          break;
-        case 'model':
-          parsed['model'] = value;
-          break;
-        case 'series':
-          parsed['series'] = value;
-          break;
-        case 'trans':
-          parsed['auto'] = value.toLowerCase().includes('auto') ? 'true' : 'false';
-          break;
-        case 'body':
-          parsed['body'] = value;
-          break;
-        case 'mth/yr':
-        case 'mthyr':
-          parsed['mthyr'] = value;
-          break;
-        case 'veh reg':
-          parsed['rego'] = value;
-          break;
-        case 'required by':
-          parsed['requiredBy'] = value;
-          break;
-        case 'customer':
-          parsed['customer'] = value;
-          break;
-        case 'address':
-          parsed['address'] = value;
-          break;
-        case 'phone':
-          parsed['phone'] = value;
-          break;
-      }
-    }
-
-    setFields({
-      quoteRef: parsed['quoteRef'] || '',
-      vin: parsed['vin'] || '',
-      make: parsed['make'] || '',
-      model: parsed['model'] || '',
-      series: parsed['series'] || '',
-      auto: parsed['auto'] || 'true',
-      body: parsed['body'] || '',
-      mthyr: parsed['mthyr'] || '',
-      rego: parsed['rego'] || '',
-      requiredBy: parsed['requiredBy'] || '',
-      customer: parsed['customer'] || '',
-      address: parsed['address'] || '',
-      phone: parsed['phone'] || '',
-      notes: parsed['notes'] || '',
-    });
-
-    // Show parts section when data is populated (but don't auto-open accordion)
-    if (Object.values(parsed).some(value => value)) {
-      setShowPartsSection(true);
-    }
-  };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFields({ ...fields, [e.target.name]: e.target.value });
@@ -637,11 +276,13 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
       customer: '',
       address: '',
       phone: '',
+      settlement: '0',
       notes: '',
     });
     setSelectedParts([]);
     setPartDetails({});
     setExtractedParts([]); // Reset image uploader
+    imagePasteAreaRef.current?.clearImages(); // Clear images from ImagePasteArea
     setShowPartsSection(false); // Hide parts section
     setIsFormAccordionOpen(false); // Close form accordion
   };
@@ -764,7 +405,7 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const { quoteRef, vin, make, model, series, auto, body, mthyr, rego, requiredBy, customer, address, phone } = fields;
+    const { quoteRef, vin, make, model, series, auto, body, mthyr, rego, requiredBy, customer, address, phone, settlement } = fields;
     if (!quoteRef) return;
     if (selectedParts.length === 0) {
       setValidationMessage('Please select at least one part');
@@ -790,7 +431,6 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
       // Convert part details to array
       const partsArray = selectedParts.map(partName => partDetails[partName]);
       
-
       await onSubmit({
         quoteRef,
         vin,
@@ -805,6 +445,7 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
         customer,
         address,
         phone,
+        settlement,
       }, partsArray);
       clearForm();
     } catch (error) {
@@ -861,6 +502,7 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
                     customer: parsedData.customer || prevFields.customer,
                     address: parsedData.address || prevFields.address,
                     phone: parsedData.phone || prevFields.phone,
+                    settlement: parsedData.settlement?.toString() || prevFields.settlement,
                     notes: parsedData.notes || prevFields.notes,
                   }));
 
@@ -900,6 +542,7 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
               </div>
             </div>
             <ImagePasteArea
+              ref={imagePasteAreaRef}
               onPartsExtracted={handlePartsExtracted}
               onPartRemoved={handlePartRemoved}
               onClearAll={() => {
@@ -1170,6 +813,23 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
                       onChange={handleChange}
                         className="w-full h-8 text-sm"
                       placeholder="Enter customer address"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Settlement (%)
+                      </label>
+                      <Input
+                        type="number"
+                        name="settlement"
+                        value={fields.settlement}
+                        onChange={handleChange}
+                        className="w-full h-8 text-sm"
+                        placeholder="0"
+                        min="0"
+                        max="100"
+                        step="0.1"
                       />
                     </div>
                   </div>

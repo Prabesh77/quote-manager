@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef, useCallback, useMemo } from 'react';
+import React, { useState, useRef, useCallback, useMemo, useImperativeHandle, forwardRef } from 'react';
 import { Image as ImageIcon, X, Loader2, Focus, Clipboard, AlertCircle, CheckCircle, Clock } from 'lucide-react';
 import { processImageForParts } from '@/utils/googleVisionApi';
 
@@ -32,7 +32,11 @@ interface ImagePasteAreaProps {
   onClearAll?: () => void;
 }
 
-export const ImagePasteArea = ({ onPartsExtracted, onPartRemoved, onClearAll }: ImagePasteAreaProps) => {
+export interface ImagePasteAreaRef {
+  clearImages: () => void;
+}
+
+export const ImagePasteArea = forwardRef<ImagePasteAreaRef, ImagePasteAreaProps>(({ onPartsExtracted, onPartRemoved, onClearAll }, ref) => {
   const [images, setImages] = useState<ProcessedImage[]>([]);
   const [isDragOver, setIsDragOver] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
@@ -41,6 +45,17 @@ export const ImagePasteArea = ({ onPartsExtracted, onPartRemoved, onClearAll }: 
   const [isProcessing, setIsProcessing] = useState(false);
   const pasteAreaRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Expose clearImages function to parent component
+  useImperativeHandle(ref, () => ({
+    clearImages: () => {
+      setImages([]);
+      setProcessingQueue([]);
+      setIsProcessing(false);
+      onPartsExtracted([]);
+      onClearAll?.();
+    }
+  }));
 
   // Memoized processing queue for performance
   const processingQueueMemo = useMemo(() => processingQueue, [processingQueue]);
@@ -454,4 +469,6 @@ export const ImagePasteArea = ({ onPartsExtracted, onPartRemoved, onClearAll }: 
       )}
     </div>
   );
-}; 
+});
+
+ImagePasteArea.displayName = 'ImagePasteArea'; 

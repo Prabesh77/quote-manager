@@ -209,8 +209,8 @@ export default function PartsSection({
                     </div>
                   </div>
 
-                  <div className="space-y-3">
-                    <div>
+                  <div className="space-y-3 flex items-start justify-between space-x-2">
+                    <div className="w-full">
                       <label className="block text-xs font-medium text-gray-600 mb-2">
                         Part Number *
                       </label>
@@ -234,7 +234,7 @@ export default function PartsSection({
                         value={partDetails[partName]?.list_price || ''}
                         onChange={(e) => onUpdatePartDetails(partName, 'list_price', parseFloat(e.target.value) || 0)}
                         placeholder="Enter list price"
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-28 px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                       />
                     </div>
 

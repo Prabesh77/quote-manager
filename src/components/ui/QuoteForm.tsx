@@ -1,9 +1,9 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { ImagePasteArea } from '@/components/ui/ImagePasteArea';
+import { ImagePasteArea, ImagePasteAreaRef } from '@/components/ui/ImagePasteArea';
 import {
   Accordion,
   AccordionContent,
@@ -80,6 +80,8 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
   const [isFormAccordionOpen, setIsFormAccordionOpen] = useState(false);
   const [showPartsSection, setShowPartsSection] = useState(false);
 
+  // Ref for ImagePasteArea to reset images when form is cleared
+  const imagePasteAreaRef = useRef<ImagePasteAreaRef>(null);
 
   const handlePartsExtracted = (parts: ExtractedPartInfo[]) => {
     setExtractedParts(prevParts => [...prevParts, ...parts]);
@@ -280,6 +282,7 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
     setSelectedParts([]);
     setPartDetails({});
     setExtractedParts([]); // Reset image uploader
+    imagePasteAreaRef.current?.clearImages(); // Clear images from ImagePasteArea
     setShowPartsSection(false); // Hide parts section
     setIsFormAccordionOpen(false); // Close form accordion
   };
@@ -539,6 +542,7 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
               </div>
             </div>
             <ImagePasteArea
+              ref={imagePasteAreaRef}
               onPartsExtracted={handlePartsExtracted}
               onPartRemoved={handlePartRemoved}
               onClearAll={() => {

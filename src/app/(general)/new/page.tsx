@@ -15,7 +15,6 @@ export default function NewQuotePage() {
 
   const handleSubmit = async (fields: Record<string, string>, parts: any[]) => {
     try {
-      
       await createQuoteMutation.mutateAsync({
         customer: {
           name: fields.customer,
@@ -44,7 +43,8 @@ export default function NewQuotePage() {
         })) || [],
         notes: '',
         requiredBy: fields.requiredBy || '',
-        quoteRef: fields.quoteRef
+        quoteRef: fields.quoteRef,
+        settlement: fields.settlement && fields.settlement !== '' ? parseFloat(fields.settlement) : 0
       });
 
       showSnackbar('Quote created successfully!', 'success');

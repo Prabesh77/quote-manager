@@ -112,6 +112,7 @@ export interface Quote {
   customer?: string; // Customer name
   address?: string; // Customer address
   phone?: string; // Customer phone
+  settlement?: number; // Settlement percentage (default: 0)
   status: 'active' | 'completed' | 'unpriced' | 'waiting_verification' | 'priced' | 'ordered' | 'delivered'; // Updated status field
   taxInvoiceNumber?: string; // Tax invoice number for orders
   [key: string]: any; // Allow string indexing

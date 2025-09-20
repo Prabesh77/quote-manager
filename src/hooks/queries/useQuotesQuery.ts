@@ -113,6 +113,7 @@ const fetchQuotes = async (page: number = 1, limit: number = 20, filters?: { sta
         customer: normalizedQuote.customer?.name || '',
         address: normalizedQuote.customer?.address || '',
         phone: normalizedQuote.customer?.phone || '',
+        settlement: normalizedQuote.settlement || 0,
         status: normalizedQuote.status as Quote['status'],
         taxInvoiceNumber: normalizedQuote.tax_invoice_number || undefined,
       };

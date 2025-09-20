@@ -82,11 +82,11 @@ interface QuoteData {
   notes?: string;
   requiredBy?: string;
   quoteRef: string; // User-provided quote reference
+  settlement?: number; // Settlement percentage for the quote
 }
 
 export const createNormalizedQuote = async (quoteData: QuoteData) => {
-  try {
-    
+  try {    
     // Step 1: Create or find customer
     let customerId: string;
     
@@ -218,6 +218,7 @@ export const createNormalizedQuote = async (quoteData: QuoteData) => {
         notes: quoteData.notes || null,
         required_by: quoteData.requiredBy ? convertAustralianDateToISO(quoteData.requiredBy) : null,
         quote_ref: quoteData.quoteRef, // Store user-provided quote reference
+        settlement: quoteData.settlement || 0, // Add settlement field
         parts_requested: partsRequestedJson, // Re-enabled for fresh JSON setup
       })
       .select()

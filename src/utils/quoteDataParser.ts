@@ -16,6 +16,7 @@ export interface ParsedQuoteData {
   customer: string;
   address: string;
   phone: string;
+  settlement: number;
   notes: string;
   source: 'partscheck' | 'repairconnection' | 'unknown';
 }
@@ -78,6 +79,38 @@ function parseTransmission(transString: string): string {
   }
   // Default to automatic for 'automatic', 'auto', or any other value
   return 'true';
+}
+
+/**
+ * Parse settlement percentage from string
+ * @param settlementString - Settlement string like "10%", "10", "10.5%", "Not applicable", "N/A"
+ * @returns Settlement percentage as number (default: 0)
+ */
+function parseSettlement(settlementString: string): number {
+  if (!settlementString) return 0;
+  
+  try {
+    // Remove % sign and any whitespace
+    const cleanValue = settlementString.replace(/%/g, '').trim().toLowerCase();
+    
+    // Check for non-numeric values that should default to 0
+    const nonNumericValues = [
+      'not applicable', 'not applicable.', 'n/a', 'na', 'none', 'nil', 'null', 
+      'zero', '0', 'no settlement', 'no discount', 'standard', 'default',
+      'tbd', 'to be determined', 'pending', 'unknown', '-', '—', ''
+    ];
+    
+    if (nonNumericValues.includes(cleanValue)) {
+      return 0;
+    }
+    
+    const parsed = parseFloat(cleanValue);
+    
+    // Return 0 if parsing fails or value is invalid
+    return isNaN(parsed) ? 0 : Math.max(0, Math.min(100, parsed));
+  } catch (e) {
+    return 0;
+  }
 }
 
 /**
@@ -193,6 +226,9 @@ function parsePartscheckFormat(text: string): Partial<ParsedQuoteData> {
       case 'claim nr':
         data.notes = (data.notes || '') + (data.notes ? ' | ' : '') + `Claim Nr: ${value}`;
         break;
+      case 'settlement':
+        data.settlement = parseSettlement(value);
+        break;
     }
   }
   
@@ -296,6 +332,9 @@ function parseRepairConnectionFormat(text: string): Partial<ParsedQuoteData> {
       case 'colour':
         data.notes = (data.notes || '') + (data.notes ? ' | ' : '') + `Colour: ${value}`;
         break;
+      case 'settlement':
+        data.settlement = parseSettlement(value);
+        break;
     }
   }
   
@@ -323,6 +362,7 @@ export function parseQuoteData(text: string): ParsedQuoteData {
       customer: '',
       address: '',
       phone: '',
+      settlement: 0,
       notes: '',
       source: 'unknown'
     };
@@ -358,6 +398,7 @@ export function parseQuoteData(text: string): ParsedQuoteData {
     customer: parsedData.customer || '',
     address: parsedData.address || '',
     phone: parsedData.phone || '',
+    settlement: parsedData.settlement || 0,
     notes: parsedData.notes || '',
     source: parsedData.source || 'unknown'
   };

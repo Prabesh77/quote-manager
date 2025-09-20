@@ -95,12 +95,17 @@ INSTRUCTIONS:
 
 IMPORTANT RULES:
 - Use these exact standardized part names:
-  'Left Headlamp', 'Right Headlamp', 'Left DayLight', 'Right DayLight', 'Radiator', 'Condenser', 'Fan Assembly', 'Intercooler', 'Radar Sensor', 'Headlight Left', 'Headlight Right', 'Oil Cooler', 'Auxiliary Radiator', 'Camera', 'Parking Sensor', 'Left Blindspot Sensor', 'Right Blindspot Sensor'
+  'Left Headlamp', 'Right Headlamp', 'Left DayLight', 'Right DayLight', 'Radiator', 'Condenser', 'Fan Assembly', 'Intercooler', 'Left Intercooler', 'Right Intercooler', 'Add Cooler', 'Radar Sensor', 'Headlight Left', 'Headlight Right', 'Oil Cooler', 'Auxiliary Radiator', 'Camera', 'Parking Sensor', 'Left Blindspot Sensor', 'Right Blindspot Sensor'
 - COMBINATION LAMP DETECTION: If text contains "LAMP ASSY,COMBINATION" or "combination lamp" → classify as 'DayLight' (NOT 'Headlamp')
 - For combination lamps: If text contains RH/R/Right → 'Right DayLight', if LH/L/Left → 'Left DayLight'
 - Part naming priority:
   * RADIATOR: If "RADIATOR" is found, use "Radiator" instead of generic radiator terms
   * AUXILIARY RADIATOR: If text contains "auxiliary radiator", "additional radiator", "lowtemp radiator", "left radiator" OR part number starts with "G9" → classify as "Auxiliary Radiator" (NOT "Radiator")
+  * INTERCOOLER VARIATIONS: 
+    - If text contains "left intercooler", "lh intercooler", "intercooler left" → classify as "Left Intercooler"
+    - If text contains "right intercooler", "rh intercooler", "intercooler right" → classify as "Right Intercooler"  
+    - If text contains "add cooler", "additional cooler" → classify as "Add Cooler"
+    - If text contains just "intercooler" without L/R context → use generic "Intercooler"
   * CONDENSER: If "CONDENSER" is found, use "Condenser" instead of "Refrigerant Condenser" or generic condenser terms
   * Only use "Refrigerant Condenser" if no specific "Condenser" is found
   * Only use generic radiator terms if no specific "RADIATOR" is found

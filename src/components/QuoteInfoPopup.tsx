@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Info, User, DollarSign, CheckCircle, Calendar, X } from 'lucide-react';
+import { Info, User, DollarSign, CheckCircle, Calendar, X, Edit3, Trash2 } from 'lucide-react';
 import { QuoteActionsService } from '@/services/quoteActions/quoteActionsService';
 import { QuoteActionWithUser } from '@/types/quoteActions';
 
@@ -10,9 +10,11 @@ interface QuoteInfoPopupProps {
   isOpen: boolean;
   onClose: () => void;
   triggerRef: React.RefObject<HTMLElement>;
+  onEditQuote?: () => void;
+  onDeleteQuote?: () => void;
 }
 
-const QuoteInfoPopup: React.FC<QuoteInfoPopupProps> = ({ quoteId, isOpen, onClose, triggerRef }) => {
+const QuoteInfoPopup: React.FC<QuoteInfoPopupProps> = ({ quoteId, isOpen, onClose, triggerRef, onEditQuote, onDeleteQuote }) => {
   const [actions, setActions] = useState<QuoteActionWithUser[]>([]);
   const [loading, setLoading] = useState(false);
   const [position, setPosition] = useState({ top: 0, left: 0 });
@@ -55,7 +57,7 @@ const QuoteInfoPopup: React.FC<QuoteInfoPopupProps> = ({ quoteId, isOpen, onClos
   const updatePosition = () => {
     if (triggerRef.current) {
       const rect = triggerRef.current.getBoundingClientRect();
-      const popupWidth = 320;
+      const popupWidth = 360;
       const popupHeight = 200;
       
       let top = rect.bottom + 8;
@@ -124,7 +126,7 @@ const QuoteInfoPopup: React.FC<QuoteInfoPopupProps> = ({ quoteId, isOpen, onClos
       
       {/* Popup */}
       <div 
-        className="fixed z-50 bg-white rounded-lg shadow-xl border border-gray-200 p-4 w-80"
+        className="fixed z-50 bg-white rounded-lg shadow-xl border border-gray-200 p-4 w-90"
         style={{ top: position.top, left: position.left }}
       >
         {/* Header */}
@@ -140,6 +142,40 @@ const QuoteInfoPopup: React.FC<QuoteInfoPopupProps> = ({ quoteId, isOpen, onClos
             <X className="h-4 w-4" />
           </button>
         </div>
+
+        {/* Action Buttons */}
+        {(onEditQuote || onDeleteQuote) && (
+          <div className="flex items-center space-x-2 mb-3 pb-3 border-b border-gray-200">
+            {onEditQuote && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onEditQuote();
+                  onClose();
+                }}
+                className="flex items-center space-x-1 px-2 py-1 text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded transition-colors cursor-pointer"
+                title="Edit quote details"
+              >
+                <Edit3 className="h-4 w-4" />
+                <span className="text-sm">Edit</span>
+              </button>
+            )}
+            {onDeleteQuote && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDeleteQuote();
+                  onClose();
+                }}
+                className="flex items-center space-x-1 px-2 py-1 text-red-600 hover:text-red-700 hover:bg-red-50 rounded transition-colors cursor-pointer"
+                title="Delete quote"
+              >
+                <Trash2 className="h-4 w-4" />
+                <span className="text-sm">Delete</span>
+              </button>
+            )}
+          </div>
+        )}
 
         {/* Content */}
         <div className="space-y-3">

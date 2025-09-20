@@ -8,6 +8,7 @@ import { ConnectionStatus } from '@/components/common';
 
 import { useAuth } from '@/components/providers/AuthProvider';
 import { useUserProfile } from '@/hooks/useUserProfile';
+import { useQuotesQuery } from '@/hooks/queries/useQuotesQuery';
 
 const Navigation = () => {
   const pathname = usePathname();
@@ -18,6 +19,11 @@ const Navigation = () => {
   const { user, signOut } = useAuth();
   const { profile, loading } = useUserProfile();
   const profileDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Fetch quote counts for different statuses
+  const { data: unpricedData } = useQuotesQuery(1, 1, { status: 'unpriced' });
+  const { data: waitingVerificationData } = useQuotesQuery(1, 1, { status: 'waiting_verification' });
+  const { data: pricedData } = useQuotesQuery(1, 1, { status: 'priced' });
 
   // Handle click outside profile dropdown
   useEffect(() => {
@@ -44,7 +50,7 @@ const Navigation = () => {
     };
   }, [isProfileDropdownOpen]);
 
-  // Define all possible navigation items with their required roles
+  // Define all possible navigation items with their required roles and counts
   const allNavItems = [
     {
       name: 'Add Quote',
@@ -58,21 +64,24 @@ const Navigation = () => {
       href: '/pricing',
       icon: DollarSign,
       description: 'Price pending quotes',
-      requiredRoles: ['price_manager', 'admin']
+      requiredRoles: ['price_manager', 'admin'],
+      count: unpricedData?.total || 0
     },
     {
       name: 'Verify Price',
       href: '/verify-price',
       icon: Eye,
       description: 'Verify price for boss approval',
-      requiredRoles: ['quality_controller', 'admin']
+      requiredRoles: ['quality_controller', 'admin'],
+      count: waitingVerificationData?.total || 0
     },
     {
       name: 'Priced',
       href: '/priced',
       icon: FileText,
       description: 'Review priced quotes',
-      requiredRoles: ['quote_creator', 'price_manager', 'admin']
+      requiredRoles: ['quote_creator', 'price_manager', 'admin'],
+      count: pricedData?.total || 0
     },
     {
       name: 'Completed',
@@ -180,6 +189,17 @@ const Navigation = () => {
                   <div className="flex items-center space-x-2">
                     <IconComponent className={`h-4 w-4 ${isActive ? 'text-red-600' : 'text-gray-500'}`} />
                     <span>{item.name}</span>
+                    {item.count !== undefined && item.count > 0 && (
+                      <span className={`
+                        inline-flex items-center justify-center px-2.5 py-1 rounded-full text-xs font-bold min-w-[24px] h-6
+                        ${isActive 
+                          ? 'bg-red-500 text-white shadow-sm' 
+                          : 'bg-blue-500 text-white shadow-sm'
+                        }
+                      `}>
+                        {item.count}
+                      </span>
+                    )}
                   </div>
                 </Link>
               );
@@ -325,8 +345,21 @@ const Navigation = () => {
                         `}
                       >
                         <IconComponent className={`h-5 w-5 ${isActive ? 'text-red-600' : 'text-gray-500'}`} />
-                        <div className="flex flex-col">
-                          <span className="font-medium">{item.name}</span>
+                        <div className="flex flex-col flex-1">
+                          <div className="flex items-center justify-between">
+                            <span className="font-medium">{item.name}</span>
+                            {item.count !== undefined && item.count > 0 && (
+                              <span className={`
+                                inline-flex items-center justify-center px-2.5 py-1 rounded-full text-xs font-bold min-w-[24px] h-6
+                                ${isActive 
+                                  ? 'bg-red-500 text-white shadow-sm' 
+                                  : 'bg-blue-500 text-white shadow-sm'
+                                }
+                              `}>
+                                {item.count}
+                              </span>
+                            )}
+                          </div>
                           <span className="text-sm text-gray-500">{item.description}</span>
                         </div>
                       </Link>

@@ -33,7 +33,7 @@ export const BRAND_PART_RULES: Record<string, BrandPartRule> = {
     description: 'Required for Korean, European, and premium brands'
   },
   'Camera': {
-    requiredFor: ['Volkswagen', 'BMW', 'Haval', 'Chery', 'BYD', 'MG', 'Great Wall', 'Geely', 'Audi', 'Mercedes'],
+    requiredFor: ['Volkswagen', 'Skoda', 'Seat', 'Cupra', 'Audi', 'BMW', 'MG', 'LDV', 'Ssang Yong'],
     description: 'Required for European and Chinese brands'
   },
   'Auxiliary Radiator': {

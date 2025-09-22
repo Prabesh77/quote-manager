@@ -170,7 +170,7 @@ export default function HomePage() {
         return { data: {} as Part, error: new Error('Quote not found') };
       }
 
-      const result = await updatePartMutation.mutateAsync({ quoteId: quote.id, partId: id, updates });
+      const result = await updatePartMutation.mutateAsync({ quoteId: quote.id, partId: id, updates, changeStatus: true });
       
       // Note: PRICED tracking is now handled in useUpdatePartInQuoteJsonMutation 
       // when status changes to 'waiting_verification'
@@ -186,7 +186,7 @@ export default function HomePage() {
     }
   };
 
-  const onUpdateMultipleParts = async (updates: Array<{ id: string; updates: any }>, quoteId?: string) => {
+  const onUpdateMultipleParts = async (updates: Array<{ id: string; updates: any }>, quoteId?: string, changeStatus: boolean = true) => {
     let quote;
     
     if (quoteId) {
@@ -210,7 +210,7 @@ export default function HomePage() {
       // Update each part individually using the mutation
       for (const { id, updates: partUpdates } of updates) {
         try {
-          await updatePartMutation.mutateAsync({ quoteId: quote.id, partId: id, updates: partUpdates });
+          await updatePartMutation.mutateAsync({ quoteId: quote.id, partId: id, updates: partUpdates, changeStatus });
         } catch (error) {
           console.error(`❌ Error updating part ${id}:`, error);
           showSnackbar(`Error updating part ${id}`, 'error');

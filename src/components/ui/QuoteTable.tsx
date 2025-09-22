@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { ChevronDown, Edit, Save, X, Search, Eye, Copy, CheckCircle, AlertTriangle, ShoppingCart, Package, Plus, Info, MapPin } from 'lucide-react';
+import { ChevronDown, Edit, Save, X, Search, Eye, Copy, CheckCircle, AlertTriangle, ShoppingCart, Package, Plus, Info, MapPin, Send } from 'lucide-react';
 import { Quote, Part } from './useQuotes';
 
 import { SkeletonLoader } from './SkeletonLoader';
@@ -24,7 +24,7 @@ interface QuoteTableProps {
   onUpdateQuote: (id: string, fields: Record<string, any>) => Promise<{ error: Error | null }>;
   onDeleteQuote: (id: string) => Promise<{ error: Error | null }>;
   onUpdatePart: (id: string, updates: Partial<Part>) => Promise<{ data: Part; error: Error | null }>;
-  onUpdateMultipleParts: (updates: Array<{ id: string; updates: Partial<Part> }>, quoteId?: string) => Promise<void>;
+  onUpdateMultipleParts: (updates: Array<{ id: string; updates: Partial<Part> }>, quoteId?: string, changeStatus?: boolean) => Promise<void>;
   onMarkCompleted?: (id: string) => Promise<{ error: Error | null }>;
   onMarkAsOrdered?: (id: string, taxInvoiceNumber: string) => Promise<{ error: Error | null }>;
   onMarkAsOrderedWithParts?: (id: string, taxInvoiceNumber: string, partIds: string[]) => Promise<{ error: Error | null }>;
@@ -476,7 +476,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
     }
   }, [quotes]); // Restore quotes dependency but with better logic
 
-  const handleSave = async () => {
+  const handleSend = async () => {
     if (editingQuote) {
       await onUpdateQuote(editingQuote, editData);
       setEditingQuote(null);
@@ -508,6 +508,143 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                     }
                     return q.status;
                   })(),
+                  partsRequested: (q.partsRequested ?? []).map(p => {
+                    const partEditDataForPart = partEditData[p.part_id];
+                    if (partEditDataForPart) {
+                      // Update all variants for this part
+                      const updatedVariants = (Array.isArray(p.variants) ? p.variants : []).map(variant => {
+                        const variantEditData = partEditDataForPart[variant.id];
+                        if (variantEditData) {
+                          return {
+                            ...variant,
+                            note: variantEditData.note !== undefined ? variantEditData.note : variant.note,
+                            final_price: variantEditData.final_price !== undefined ? variantEditData.final_price : variant.final_price,
+                            list_price: variantEditData.list_price !== undefined ? variantEditData.list_price : variant.list_price,
+                            af: variantEditData.af !== undefined ? variantEditData.af : variant.af
+                          };
+                        }
+                        return variant;
+                      });
+                      
+                      return {
+                        ...p,
+                        variants: updatedVariants
+                      };
+                    }
+                    return p;
+                  })
+                }
+              : q
+          ));
+        };
+        
+        // Then, save the default variant to the backend (for compatibility with current schema)
+        const updates: Array<{ id: string; updates: Partial<Part> & { variantId?: string; list_price?: number | null; af?: boolean } }> = [];
+        
+        Object.keys(partEditData).forEach(partId => {
+          const partEditDataForPart = partEditData[partId];
+          if (partEditDataForPart) {
+            // Process ALL variants for this part, not just the first one
+            const quotePart = quote.partsRequested?.find(qp => qp.part_id === partId);
+            const actualPart = parts.find(p => p.id === partId); // Find the actual Part object
+            const existingVariants = quotePart?.variants || [];
+            
+            // Handle part-level changes (like number) that don't have a variant ID
+            const partLevelNumber = partEditDataForPart.number;
+            if (partLevelNumber !== undefined && typeof partLevelNumber === 'string') {
+              // Apply part-level number change to the first variant (default variant)
+              if (existingVariants.length > 0) {
+                const defaultVariant = existingVariants[0];
+                updates.push({
+                  id: partId,
+                  updates: {
+                    variantId: defaultVariant.id,
+                    number: partLevelNumber
+                  }
+                });
+              }
+            }
+            
+            // Process all existing variants
+            existingVariants.forEach(variant => {
+              const variantEditData = partEditDataForPart[variant.id];
+              if (variantEditData) {
+                updates.push({
+                  id: partId,
+                  updates: {
+                    variantId: variant.id,
+                    number: variantEditData.number !== undefined ? variantEditData.number : actualPart?.number || '',
+                    note: variantEditData.note !== undefined ? variantEditData.note : variant.note,
+                    price: variantEditData.final_price !== undefined ? variantEditData.final_price : variant.final_price,
+                    list_price: variantEditData.list_price !== undefined ? variantEditData.list_price : variant.list_price,
+                    af: variantEditData.af !== undefined ? variantEditData.af : variant.af
+                  }
+                });
+              }
+            });
+            
+            // IMPORTANT FIX: Also process new variants that don't exist yet
+            // This handles cases where parts have no existing variants but have edit data
+            Object.keys(partEditDataForPart).forEach(variantId => {
+              // Skip if we already processed this variant above
+              const alreadyProcessed = existingVariants.some(v => v.id === variantId);
+              if (!alreadyProcessed) {
+                const variantEditData = partEditDataForPart[variantId];
+                if (variantEditData && (variantEditData.number !== undefined || variantEditData.note !== undefined || variantEditData.final_price !== undefined || variantEditData.list_price !== undefined || variantEditData.af !== undefined)) {
+                updates.push({
+                  id: partId,
+                  updates: {
+                      variantId: variantId,
+                      number: variantEditData.number !== undefined ? variantEditData.number : actualPart?.number || '',
+                      note: variantEditData.note !== undefined ? variantEditData.note : '',
+                      price: variantEditData.final_price !== undefined ? variantEditData.final_price : null,
+                      list_price: variantEditData.list_price !== undefined ? variantEditData.list_price : null,
+                      af: variantEditData.af !== undefined ? variantEditData.af : false
+                  }
+                });
+                }
+              }
+            });
+          }
+        });
+
+        if (updates.length > 0) {
+          try {
+            await onUpdateMultipleParts(updates, quote.id, true); // Change status for send button
+            updateLocalState();
+            setEditingParts(null);
+            setPartEditData({});
+          } catch (error) {
+            console.error('Error saving parts:', error);
+          }
+        } else {
+          // No updates to save, just close editing mode
+          setEditingParts(null);
+          setPartEditData({});
+        }
+      }
+    }
+  };
+
+  const handleSave = async () => {
+    if (editingQuote) {
+      await onUpdateQuote(editingQuote, editData);
+      setEditingQuote(null);
+      setEditData({});
+    }
+    if (editingParts) {
+      const quote = localQuotes.find(q => q.id === editingParts);
+      if (quote) {
+        
+        // Prepare the local state update function for after successful backend save
+        // Save button does NOT change status - only updates part details
+        const updateLocalState = () => {
+          setLocalQuotes(prev => prev.map(q => 
+            q.id === editingParts 
+              ? {
+                  ...q,
+                  // Keep the same status - no status changes for save button
+                  status: q.status,
                   partsRequested: (q.partsRequested ?? []).map(p => {
                     const partEditDataForPart = partEditData[p.part_id];
                     if (partEditDataForPart) {
@@ -673,7 +810,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
         if (updates.length > 0) {
           try {
             // Pass the quote ID to onUpdateMultipleParts for more reliable lookup
-            await onUpdateMultipleParts(updates, editingParts);
+            await onUpdateMultipleParts(updates, editingParts, false); // Don't change status for save button
             
             // Update local state after successful backend save
             updateLocalState();
@@ -1636,16 +1773,28 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                     {(quote.status !== 'completed' || showCompleted) && (
                       <>
                         {editingQuote === quote.id ? (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleSave();
-                            }}
-                            className="p-1 text-green-600 hover:text-green-700 hover:bg-green-100 rounded transition-colors cursor-pointer"
-                            title="Save changes"
-                          >
-                            <Save className="h-4 w-4" />
-                          </button>
+                          <>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleSave();
+                              }}
+                              className="p-1 text-green-600 hover:text-green-700 hover:bg-green-100 rounded transition-colors cursor-pointer"
+                              title="Save changes"
+                            >
+                              <Save className="h-4 w-4" />
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleSend();
+                              }}
+                              className="p-1 text-blue-600 hover:text-blue-700 hover:bg-blue-100 rounded transition-colors cursor-pointer"
+                              title="Send for verification"
+                            >
+                              <Send className="h-4 w-4" />
+                            </button>
+                          </>
                         ) : null}
                         
                         {editingQuote === quote.id ? (
@@ -1744,6 +1893,17 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                             >
                               <Save className="h-3 w-3" />
                               <span>Save All</span>
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleSend();
+                              }}
+                              className="px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors cursor-pointer flex items-center space-x-1"
+                              title="Send for verification"
+                            >
+                              <Send className="h-3 w-3" />
+                              <span>Send</span>
                             </button>
                             <button
                               onClick={(e) => {
@@ -2153,16 +2313,28 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                             {(quote.status !== 'completed' || showCompleted) && (
                               <>
                                 {editingQuote === quote.id ? (
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleSave();
-                                    }}
-                                    className="p-1 text-green-600 hover:text-green-700 hover:bg-green-100 rounded transition-colors cursor-pointer"
-                                    title="Save changes"
-                                  >
-                                    <Save className="h-3 w-3" />
-                                  </button>
+                                  <>
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleSave();
+                                      }}
+                                      className="p-1 text-green-600 hover:text-green-700 hover:bg-green-100 rounded transition-colors cursor-pointer"
+                                      title="Save changes"
+                                    >
+                                      <Save className="h-3 w-3" />
+                                    </button>
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleSend();
+                                      }}
+                                      className="p-1 text-blue-600 hover:text-blue-700 hover:bg-blue-100 rounded transition-colors cursor-pointer"
+                                      title="Send for verification"
+                                    >
+                                      <Send className="h-3 w-3" />
+                                    </button>
+                                  </>
                                 ) : null}
                                 
                                 {editingQuote === quote.id ? (
@@ -2339,6 +2511,17 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                     >
                                       <Save className="h-3 w-3" />
                                       <span>Save All</span>
+                                    </button>
+                                    <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleSend();
+                                }}
+                                className="px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors cursor-pointer flex items-center space-x-1"
+                                title="Send for verification"
+                                    >
+                                      <Send className="h-3 w-3" />
+                                      <span>Send</span>
                                     </button>
                                     <button
                                 onClick={(e) => {

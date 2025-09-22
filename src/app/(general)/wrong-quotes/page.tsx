@@ -121,7 +121,7 @@ function WrongQuotesContent() {
   };
 
   // Custom multiple parts update handler
-  const handleUpdateMultipleParts = async (updates: Array<{ id: string; updates: any }>, quoteId?: string) => {
+  const handleUpdateMultipleParts = async (updates: Array<{ id: string; updates: any }>, quoteId?: string, changeStatus: boolean = true) => {
     try {
       console.log('🔍 handleUpdateMultipleParts Debug:', {
         updates,
@@ -168,7 +168,8 @@ function WrongQuotesContent() {
           await updatePartMutation.mutateAsync({ 
             quoteId: quote.id, 
             partId: id, 
-            updates: transformedUpdates 
+            updates: transformedUpdates,
+            changeStatus
           });
         } catch (error) {
           console.error(`❌ Error updating part ${id}:`, error);

@@ -782,7 +782,7 @@ export const useUpdatePartInQuoteJsonMutation = () => {
   const { showSnackbar } = useSnackbar();
   
   return useMutation({
-    mutationFn: async ({ quoteId, partId, updates }: { quoteId: string; partId: string; updates: any }) => {
+    mutationFn: async ({ quoteId, partId, updates, changeStatus = true }: { quoteId: string; partId: string; updates: any; changeStatus?: boolean }) => {
       
       // Get the current quote's parts_requested JSON
       const { data: quote, error: quoteError } = await supabase
@@ -906,11 +906,22 @@ export const useUpdatePartInQuoteJsonMutation = () => {
       const updateData: any = { parts_requested: updatedPartsRequested };
       
       // If any part now has a price, update status to 'waiting_verification' (unless already in a higher status)
-      const shouldChangeToWaitingVerification = anyPartHasPrice && 
+      // Only change status if changeStatus parameter is true
+      const shouldChangeToWaitingVerification = changeStatus && anyPartHasPrice && 
         currentStatus === 'unpriced';
+      
+      console.log('🔍 Status Change Debug:', {
+        changeStatus,
+        anyPartHasPrice,
+        currentStatus,
+        shouldChangeToWaitingVerification
+      });
       
       if (shouldChangeToWaitingVerification) {
         updateData.status = 'waiting_verification';
+        console.log('✅ Status will be changed to waiting_verification');
+      } else {
+        console.log('❌ Status will NOT be changed');
       }
 
 

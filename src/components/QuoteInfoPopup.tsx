@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Info, User, DollarSign, CheckCircle, Calendar, X, Edit3, Trash2 } from 'lucide-react';
+import { Info, User, DollarSign, CheckCircle, Calendar, X, Edit3, Trash2, XCircle } from 'lucide-react';
 import { QuoteActionsService } from '@/services/quoteActions/quoteActionsService';
 import { QuoteActionWithUser } from '@/types/quoteActions';
 
@@ -12,9 +12,10 @@ interface QuoteInfoPopupProps {
   triggerRef: React.RefObject<HTMLElement>;
   onEditQuote?: () => void;
   onDeleteQuote?: () => void;
+  onMarkAsWrong?: () => void;
 }
 
-const QuoteInfoPopup: React.FC<QuoteInfoPopupProps> = ({ quoteId, isOpen, onClose, triggerRef, onEditQuote, onDeleteQuote }) => {
+const QuoteInfoPopup: React.FC<QuoteInfoPopupProps> = ({ quoteId, isOpen, onClose, triggerRef, onEditQuote, onDeleteQuote, onMarkAsWrong }) => {
   const [actions, setActions] = useState<QuoteActionWithUser[]>([]);
   const [loading, setLoading] = useState(false);
   const [position, setPosition] = useState({ top: 0, left: 0 });
@@ -144,7 +145,7 @@ const QuoteInfoPopup: React.FC<QuoteInfoPopupProps> = ({ quoteId, isOpen, onClos
         </div>
 
         {/* Action Buttons */}
-        {(onEditQuote || onDeleteQuote) && (
+        {(onEditQuote || onDeleteQuote || onMarkAsWrong) && (
           <div className="flex items-center space-x-2 mb-3 pb-3 border-b border-gray-200">
             {onEditQuote && (
               <button
@@ -158,6 +159,20 @@ const QuoteInfoPopup: React.FC<QuoteInfoPopupProps> = ({ quoteId, isOpen, onClos
               >
                 <Edit3 className="h-4 w-4" />
                 <span className="text-sm">Edit</span>
+              </button>
+            )}
+            {onMarkAsWrong && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onMarkAsWrong();
+                  onClose();
+                }}
+                className="flex items-center space-x-1 px-2 py-1 text-orange-600 hover:text-orange-700 hover:bg-orange-50 rounded transition-colors cursor-pointer"
+                title="Mark as wrong"
+              >
+                <XCircle className="h-4 w-4" />
+                <span className="text-sm">Mark Wrong</span>
               </button>
             )}
             {onDeleteQuote && (

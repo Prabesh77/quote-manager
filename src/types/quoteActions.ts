@@ -1,4 +1,4 @@
-export type QuoteActionType = 'CREATED' | 'PRICED' | 'COMPLETED';
+export type QuoteActionType = 'CREATED' | 'PRICED' | 'COMPLETED' | 'MARKED_WRONG';
 
 export interface QuoteAction {
   id: number;

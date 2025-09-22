@@ -28,6 +28,7 @@ interface QuoteTableProps {
   onMarkCompleted?: (id: string) => Promise<{ error: Error | null }>;
   onMarkAsOrdered?: (id: string, taxInvoiceNumber: string) => Promise<{ error: Error | null }>;
   onMarkAsOrderedWithParts?: (id: string, taxInvoiceNumber: string, partIds: string[]) => Promise<{ error: Error | null }>;
+  onMarkAsWrong?: (id: string) => Promise<{ error: Error | null }>;
   showCompleted?: boolean;
   defaultFilter?: FilterType;
   isLoading?: boolean;
@@ -47,9 +48,9 @@ interface QuoteTableProps {
 
 type FilterType = 'all' | 'unpriced' | 'priced';
 
-type QuoteStatus = 'unpriced' | 'priced' | 'completed' | 'ordered' | 'delivered' | 'waiting_verification';
+type QuoteStatus = 'unpriced' | 'priced' | 'completed' | 'ordered' | 'delivered' | 'waiting_verification' | 'wrong';
 
-export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote, onUpdatePart, onUpdateMultipleParts, onMarkCompleted, onMarkAsOrdered, onMarkAsOrderedWithParts, showCompleted = false, defaultFilter = 'all', isLoading = false, itemsPerPage = 10, showPagination = true, currentPage: externalCurrentPage, total: externalTotal, totalPages: externalTotalPages, pageSize: externalPageSize, onPageChange, searchTerm: externalSearchTerm, onSearchChange, useServerSideSearch = false }: QuoteTableProps) {
+export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote, onUpdatePart, onUpdateMultipleParts, onMarkCompleted, onMarkAsOrdered, onMarkAsOrderedWithParts, onMarkAsWrong, showCompleted = false, defaultFilter = 'all', isLoading = false, itemsPerPage = 10, showPagination = true, currentPage: externalCurrentPage, total: externalTotal, totalPages: externalTotalPages, pageSize: externalPageSize, onPageChange, searchTerm: externalSearchTerm, onSearchChange, useServerSideSearch = false }: QuoteTableProps) {
   // Safety checks for undefined props
   if (!quotes || !Array.isArray(quotes)) {
     console.warn('QuoteTable: quotes prop is undefined or not an array, using empty array');
@@ -547,6 +548,22 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
             const quotePart = quote.partsRequested?.find(qp => qp.part_id === partId);
             const existingVariants = quotePart?.variants || [];
             
+            // Handle part-level changes (like number) that don't have a variant ID
+            const partLevelNumber = partEditDataForPart.number;
+            if (partLevelNumber !== undefined && typeof partLevelNumber === 'string') {
+              // Apply part-level number change to the first variant (default variant)
+              if (existingVariants.length > 0) {
+                const defaultVariant = existingVariants[0];
+                updates.push({
+                  id: partId,
+                  updates: {
+                    variantId: defaultVariant.id,
+                    number: partLevelNumber
+                  }
+                });
+              }
+            }
+            
             // Process all existing variants
             existingVariants.forEach(variant => {
               const variantEditData = partEditDataForPart[variant.id];
@@ -555,6 +572,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                   id: partId,
                   updates: {
                     variantId: variant.id,
+                    number: variantEditData.number !== undefined ? variantEditData.number : quotePart?.part_id || '',
                     note: variantEditData.note !== undefined ? variantEditData.note : variant.note,
                     price: variantEditData.final_price !== undefined ? variantEditData.final_price : variant.final_price,
                     list_price: variantEditData.list_price !== undefined ? variantEditData.list_price : variant.list_price,
@@ -571,11 +589,12 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
               const alreadyProcessed = existingVariants.some(v => v.id === variantId);
               if (!alreadyProcessed) {
                 const variantEditData = partEditDataForPart[variantId];
-                if (variantEditData && (variantEditData.note !== undefined || variantEditData.final_price !== undefined || variantEditData.list_price !== undefined || variantEditData.af !== undefined)) {
+                if (variantEditData && (variantEditData.number !== undefined || variantEditData.note !== undefined || variantEditData.final_price !== undefined || variantEditData.list_price !== undefined || variantEditData.af !== undefined)) {
                 updates.push({
                   id: partId,
                   updates: {
                       variantId: variantId,
+                      number: variantEditData.number !== undefined ? variantEditData.number : quotePart?.part_id || '',
                       note: variantEditData.note !== undefined ? variantEditData.note : '',
                       price: variantEditData.final_price !== undefined ? variantEditData.final_price : null,
                       list_price: variantEditData.list_price !== undefined ? variantEditData.list_price : null,
@@ -603,6 +622,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                 if (variantEditData) {
                   return {
                     ...variant,
+                    number: variantEditData.number !== undefined ? variantEditData.number : p.part_id,
                     note: variantEditData.note !== undefined ? variantEditData.note : variant.note,
                     final_price: variantEditData.final_price !== undefined ? variantEditData.final_price : variant.final_price,
                     list_price: variantEditData.list_price !== undefined ? variantEditData.list_price : variant.list_price,
@@ -621,6 +641,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                 if (!existingVariant && variantEditData) {
                   updatedVariants.push({
                     id: variantId,
+                    number: variantEditData.number !== undefined ? variantEditData.number : p.part_id,
                     note: variantEditData.note !== undefined ? variantEditData.note : '',
                     final_price: variantEditData.final_price !== undefined ? variantEditData.final_price : null,
                     list_price: variantEditData.list_price !== undefined ? variantEditData.list_price : null,
@@ -749,6 +770,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
     if (quoteStatus === 'priced') return 'priced';
     if (quoteStatus === 'waiting_verification') return 'waiting_verification';
     if (quoteStatus === 'unpriced') return 'unpriced';
+    if (quoteStatus === 'wrong') return 'wrong';
     if (quoteStatus === 'active') {
       // Fallback to calculation for legacy quotes
       if (quoteParts.length === 0) return 'unpriced';
@@ -1101,6 +1123,13 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
         border: 'border-amber-200',
         icon: AlertTriangle,
         label: 'Waiting for Verification'
+      },
+      wrong: {
+        bg: 'bg-red-100',
+        text: 'text-red-800',
+        border: 'border-red-200',
+        icon: X,
+        label: 'Wrong'
       }
     };
 
@@ -1193,6 +1222,12 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
 
   const handleDeleteWithConfirm = async (quoteId: string) => {
     setShowDeleteConfirm(quoteId);
+  };
+
+  const handleMarkAsWrong = async (quoteId: string) => {
+    if (onMarkAsWrong) {
+      await onMarkAsWrong(quoteId);
+    }
   };
 
   const confirmDelete = async (quoteId: string) => {
@@ -1652,6 +1687,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                             <CheckCircle className="h-4 w-4" />
                           </button>
                         )}
+
                         
                         {status === 'completed' && (onMarkAsOrdered || onMarkAsOrderedWithParts) && (
                           <button
@@ -1816,8 +1852,8 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                                 {isPartEditing ? (
                                                   <input
                                                     type="text"
-                                                    value={partEditData[part.id]?.number || part.number || ''}
-                                                    onChange={(e) => handlePartEditChange(part.id, 'number', e.target.value)}
+                                                    value={partEditData[part.id]?.[variant.id]?.number ?? part.number ?? ''}
+                                                    onChange={(e) => handleVariantEditChange(part.id, variant.id, 'number', e.target.value)}
                                                       className="w-full px-2 py-1 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
                                                   />
                                                 ) : (
@@ -2168,6 +2204,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                     <CheckCircle className="h-3 w-3" />
                                   </button>
                                 )}
+
                                 
                                 {status === 'completed' && (onMarkAsOrdered || onMarkAsOrderedWithParts) && (
                                   <button
@@ -2345,7 +2382,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                                 {isPartEditing ? (
                                                   <input
                                                     type="text"
-                                                    value={partEditData[part.id]?.number || ''}
+                                                    value={partEditData[part.id]?.number ?? part.number ?? ''}
                                                     onChange={(e) => handlePartEditChange(part.id, 'number', e.target.value)}
                                                 className="flex-1 px-2 py-1 border border-gray-300 rounded-md text-sm focus:ring-1 focus:ring-red-500 focus:border-transparent"
                                                   />
@@ -2401,7 +2438,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                                 {isPartEditing ? (
                                                   <input
                                                     type="number"
-                                                    value={partEditData[part.id]?.list_price || ''}
+                                                    value={partEditData[part.id]?.list_price ?? ''}
                                                     onChange={(e) => handlePartEditChange(part.id, 'list_price', e.target.value ? Number(e.target.value) : null)}
                                                     className="flex-1 px-2 py-1 border border-gray-300 rounded-md text-sm focus:ring-1 focus:ring-red-500 focus:border-transparent"
                                                   />
@@ -2432,7 +2469,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                                 {isPartEditing ? (
                                                   <input
                                                     type="number"
-                                                    value={partEditData[part.id]?.price || ''}
+                                                    value={partEditData[part.id]?.price ?? ''}
                                                     onChange={(e) => handlePartEditChange(part.id, 'price', e.target.value ? Number(e.target.value) : null)}
                                                 className="flex-1 px-2 py-1 border border-gray-300 rounded-md text-sm focus:ring-1 focus:ring-red-500 focus:border-transparent"
                                                     autoFocus
@@ -2484,7 +2521,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                               <div className="flex items-center space-x-1 min-w-0">
                                                 {isPartEditing ? (
                                                   <QuickFillInput
-                                                    value={partEditData[part.id]?.note || ''}
+                                                    value={partEditData[part.id]?.note ?? ''}
                                                     onChange={(value) => handlePartEditChange(part.id, 'note', value)}
                                                     className="flex-1"
                                                   />
@@ -2793,6 +2830,9 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
           }}
           onDeleteQuote={() => {
             handleDeleteWithConfirm(infoPopupOpen);
+          }}
+          onMarkAsWrong={() => {
+            handleMarkAsWrong(infoPopupOpen);
           }}
         />
       )}

@@ -9,7 +9,8 @@ export type QuoteStatus =
   | 'priced' 
   | 'completed' 
   | 'ordered' 
-  | 'delivered';
+  | 'delivered'
+  | 'wrong';
 
 export type FilterType = 'all' | 'unpriced' | 'priced';
 

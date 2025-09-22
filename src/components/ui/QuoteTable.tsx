@@ -546,6 +546,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
           if (partEditDataForPart) {
             // Process ALL variants for this part, not just the first one
             const quotePart = quote.partsRequested?.find(qp => qp.part_id === partId);
+            const actualPart = parts.find(p => p.id === partId); // Find the actual Part object
             const existingVariants = quotePart?.variants || [];
             
             // Handle part-level changes (like number) that don't have a variant ID
@@ -572,7 +573,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                   id: partId,
                   updates: {
                     variantId: variant.id,
-                    number: variantEditData.number !== undefined ? variantEditData.number : quotePart?.part_id || '',
+                    number: variantEditData.number !== undefined ? variantEditData.number : actualPart?.number || '',
                     note: variantEditData.note !== undefined ? variantEditData.note : variant.note,
                     price: variantEditData.final_price !== undefined ? variantEditData.final_price : variant.final_price,
                     list_price: variantEditData.list_price !== undefined ? variantEditData.list_price : variant.list_price,
@@ -594,7 +595,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                   id: partId,
                   updates: {
                       variantId: variantId,
-                      number: variantEditData.number !== undefined ? variantEditData.number : quotePart?.part_id || '',
+                      number: variantEditData.number !== undefined ? variantEditData.number : actualPart?.number || '',
                       note: variantEditData.note !== undefined ? variantEditData.note : '',
                       price: variantEditData.final_price !== undefined ? variantEditData.final_price : null,
                       list_price: variantEditData.list_price !== undefined ? variantEditData.list_price : null,

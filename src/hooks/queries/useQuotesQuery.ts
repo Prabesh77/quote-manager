@@ -805,6 +805,9 @@ export const useUpdatePartInQuoteJsonMutation = () => {
         if (partItem.part_id === partId) {
           const updatedPart = { ...partItem };
           
+          // Handle part number updates - DON'T change part_id, it's the foreign key
+          // The number field is handled by updating the Part table separately
+
           // Handle price and note updates through variants
           if (updates.price !== undefined || updates.note !== undefined) {
             const variants = partItem.variants || [];

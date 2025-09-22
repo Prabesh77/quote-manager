@@ -834,6 +834,8 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
       'Auxiliary Radiator': '/part-icons/aux.png',
       'Left DayLight': '/part-icons/lh.png',
       'Right DayLight': '/part-icons/rh.png',
+      'Left Rear Lamp': '/part-icons/headlight-left.png',
+      'Right Rear Lamp': '/part-icons/headlight-right.png',
     };
     
     return iconMap[partName] || null;

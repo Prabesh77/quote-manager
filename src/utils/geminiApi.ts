@@ -88,14 +88,15 @@ INSTRUCTIONS:
 10. DAYTIME HEADLAMP RULE: If a line contains 'headlamp' or 'headlight' WITH 'daytime' or 'combination' → classify as 'DayLight' (NOT 'Headlamp'). This takes priority over regular headlamp detection.
 11. CAMERA DETECTION: If text contains 'camera' keyword → classify as 'Camera'. This is definitive and takes priority over other sensor types.
 12. SENSOR DETECTION RULES:
-    - If text contains 'corner' keyword → classify as 'Blindspot Sensor' (Left or Right based on L/R context)
+    - If text contains 'radar', 'radar sensor', 'fwd collision mitigation system', 'forward collision mitigation', 'collision mitigation system', 'fcms' → classify as 'Radar Sensor'
+    - If text contains 'corner radar', 'rear corner radar', 'lh - rear corner radar', 'rh - rear corner radar' → classify as 'Blindspot Sensor' (Left or Right based on L/R context)
     - If text contains 'sensor' AND NOT 'radar' AND NOT 'camera' → classify as 'Parking Sensor' (unless corner is mentioned)
     - For blindspot sensors: Use L/R context to determine 'Left Blindspot Sensor' or 'Right Blindspot Sensor'
     - For parking sensors: Use 'Parking Sensor' (no L/R distinction needed)
 
 IMPORTANT RULES:
 - Use these exact standardized part names:
-  'Left Headlamp', 'Right Headlamp', 'Left DayLight', 'Right DayLight', 'Radiator', 'Condenser', 'Fan Assembly', 'Intercooler', 'Left Intercooler', 'Right Intercooler', 'Add Cooler', 'Radar Sensor', 'Headlight Left', 'Headlight Right', 'Oil Cooler', 'Auxiliary Radiator', 'Camera', 'Parking Sensor', 'Left Blindspot Sensor', 'Right Blindspot Sensor'
+  'Left Headlamp', 'Right Headlamp', 'Left DayLight', 'Right DayLight', 'Left Rear Lamp', 'Right Rear Lamp', 'Radiator', 'Condenser', 'Fan Assembly', 'Intercooler', 'Left Intercooler', 'Right Intercooler', 'Add Cooler', 'Radar Sensor', 'Headlight Left', 'Headlight Right', 'Oil Cooler', 'Auxiliary Radiator', 'Camera', 'Parking Sensor', 'Left Blindspot Sensor', 'Right Blindspot Sensor'
 - COMBINATION LAMP DETECTION: If text contains "LAMP ASSY,COMBINATION" or "combination lamp" → classify as 'DayLight' (NOT 'Headlamp')
 - For combination lamps: If text contains RH/R/Right → 'Right DayLight', if LH/L/Left → 'Left DayLight'
 - Part naming priority:
@@ -115,6 +116,11 @@ IMPORTANT RULES:
 - DAYTIME HEADLAMP DETECTION: If text contains 'headlamp' or 'headlight' WITH 'daytime' or 'combination' → classify as 'DayLight' (NOT 'Headlamp')
 - COMBINATION LAMP ASSEMBLY: If text contains "LAMP ASSY,COMBINATION" or "combination lamp assembly" → always classify as 'DayLight' regardless of other keywords
 - EXAMPLE: "LAMP ASSY,COMBINATION, FR RH" with price "A$855.86" → 'Right DayLight' with list_price: 855.86
+- REAR LAMP DETECTION: If text contains "rear lamp", "back lamp", "rear light", "back light", "rear combination lamp", "back combination lamp", "tail lamp", "tail light", "tail combination lamp" → classify as 'Rear Lamp' (Left or Right based on L/R context)
+- REAR LAMP CONTEXT: 
+  - If text contains "rear lamp lh", "rear combination lamp lh", "rear lamp l", "back lamp left", "tail lamp lh", "tail lamp l", "tail lamp left" → 'Left Rear Lamp'
+  - If text contains "rear lamp rh", "rear combination lamp rh", "rear lamp r", "back lamp right", "tail lamp rh", "tail lamp r", "tail lamp right" → 'Right Rear Lamp'
+  - If no L/R context is specified for rear lamp → default to 'Left Rear Lamp'
 - PART NUMBER LENGTH: Only extract part numbers with ≥ 8 REAL alphanumeric characters (ignore special chars like hyphens)
 - MAXIMUM 8 MAIN PARTS per response
 - IGNORE: brackets, mounting hardware, bolts, nuts, clips, supporting components
@@ -309,7 +315,31 @@ function fallbackExtraction(ocrText: string): AIPartExtraction[] {
       partName = 'Fan Assembly';
     } else if (line.toLowerCase().includes('intercooler') && !line.toLowerCase().includes('bracket')) {
       partName = 'Intercooler';
-    } else if (line.toLowerCase().includes('radar') || line.toLowerCase().includes('sensor')) {
+    } else if (line.toLowerCase().includes('rear lamp') || line.toLowerCase().includes('back lamp') || 
+               line.toLowerCase().includes('rear light') || line.toLowerCase().includes('back light') ||
+               line.toLowerCase().includes('rear combination lamp') || line.toLowerCase().includes('back combination lamp') ||
+               line.toLowerCase().includes('tail lamp') || line.toLowerCase().includes('tail light') ||
+               line.toLowerCase().includes('tail combination lamp')) {
+      // Handle rear lamp detection
+      if (/\b(rh|r\b|right)\b/i.test(line)) {
+        context = 'RH';
+      } else if (/\b(lh|l\b|left)\b/i.test(line)) {
+        context = 'LH';
+      }
+      partName = 'Rear Lamp';
+    } else if (line.toLowerCase().includes('corner') || line.toLowerCase().includes('rear corner radar') || 
+               line.toLowerCase().includes('rear corner') || line.toLowerCase().includes('lh - rear corner radar') || 
+               line.toLowerCase().includes('rh - rear corner radar')) {
+      // Handle blindspot sensor detection
+      if (/\b(rh|r\b|right)\b/i.test(line)) {
+        context = 'RH';
+      } else if (/\b(lh|l\b|left)\b/i.test(line)) {
+        context = 'LH';
+      }
+      partName = 'Blindspot Sensor';
+    } else if (line.toLowerCase().includes('radar') || line.toLowerCase().includes('sensor') || 
+               line.toLowerCase().includes('fwd collision mitigation') || line.toLowerCase().includes('forward collision mitigation') ||
+               line.toLowerCase().includes('collision mitigation system') || line.toLowerCase().includes('fcms')) {
       partName = 'Radar Sensor';
     } else if (line.toLowerCase().includes('auxiliary radiator') || line.toLowerCase().includes('aux radiator') || line.toLowerCase().includes('aux.radiator')) {
       partName = 'Auxiliary Radiator';
@@ -378,6 +408,28 @@ function fallbackExtraction(ocrText: string): AIPartExtraction[] {
           context = 'LH';
         } else {
           normalizedName = 'Left DayLight'; // Default
+          context = 'LH';
+        }
+      } else if (partName.name === 'Blindspot Sensor') {
+        if (partName.context === 'RH' || partName.line.toLowerCase().includes('rh') || partName.line.toLowerCase().includes('right')) {
+          normalizedName = 'Right Blindspot Sensor';
+          context = 'RH';
+        } else if (partName.context === 'LH' || partName.line.toLowerCase().includes('lh') || partName.line.toLowerCase().includes('left')) {
+          normalizedName = 'Left Blindspot Sensor';
+          context = 'LH';
+        } else {
+          normalizedName = 'Left Blindspot Sensor'; // Default
+          context = 'LH';
+        }
+      } else if (partName.name === 'Rear Lamp') {
+        if (partName.context === 'RH' || partName.line.toLowerCase().includes('rh') || partName.line.toLowerCase().includes('right')) {
+          normalizedName = 'Right Rear Lamp';
+          context = 'RH';
+        } else if (partName.context === 'LH' || partName.line.toLowerCase().includes('lh') || partName.line.toLowerCase().includes('left')) {
+          normalizedName = 'Left Rear Lamp';
+          context = 'LH';
+        } else {
+          normalizedName = 'Left Rear Lamp'; // Default
           context = 'LH';
         }
       }

@@ -52,6 +52,14 @@ export const BRAND_PART_RULES: Record<string, BrandPartRule> = {
     requiredFor: ['Mercedes', 'Land Rover', 'BMW'],
     description: 'Required for Mercedes, Land Rover, and BMW'
   },
+  'Left Rear Lamp': {
+    requiredFor: ['Kia', 'Hyundai'],
+    description: 'Rear combination lamp required for Kia and Hyundai'
+  },
+  'Right Rear Lamp': {
+    requiredFor: ['Kia', 'Hyundai'],
+    description: 'Rear combination lamp required for Kia and Hyundai'
+  },
 };
 
 // Helper function to check if a part is available for a specific brand
@@ -63,14 +71,17 @@ export function isPartAvailableForBrand(partName: string, brand: string): boolea
     return true;
   }
   
-  // Check if brand is in the notRequiredFor list
-  if (rule.notRequiredFor && rule.notRequiredFor.includes(brand)) {
+  // Normalize brand name for case-insensitive comparison
+  const normalizedBrand = brand.trim();
+  
+  // Check if brand is in the notRequiredFor list (case-insensitive)
+  if (rule.notRequiredFor && rule.notRequiredFor.some(b => b.toLowerCase() === normalizedBrand.toLowerCase())) {
     return false;
   }
   
-  // Check if brand is in the requiredFor list
+  // Check if brand is in the requiredFor list (case-insensitive)
   if (rule.requiredFor && rule.requiredFor.length > 0) {
-    return rule.requiredFor.includes(brand);
+    return rule.requiredFor.some(b => b.toLowerCase() === normalizedBrand.toLowerCase());
   }
   
   // If only notRequiredFor is specified and brand is not in it, part is available

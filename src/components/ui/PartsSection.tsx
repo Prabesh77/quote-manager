@@ -27,6 +27,7 @@ const hasLeftRightVariants = (partName: string): boolean => {
   const leftRightParts = [
     'Left Headlamp', 'Right Headlamp',
     'Left DayLight', 'Right DayLight', 
+    'Left Rear Lamp', 'Right Rear Lamp',
     'Left Blindspot Sensor', 'Right Blindspot Sensor'
   ];
   return leftRightParts.includes(partName);
@@ -38,6 +39,8 @@ const getOppositeSidePart = (partName: string): string => {
     'Right Headlamp': 'Left Headlamp',
     'Left DayLight': 'Right DayLight',
     'Right DayLight': 'Left DayLight',
+    'Left Rear Lamp': 'Right Rear Lamp',
+    'Right Rear Lamp': 'Left Rear Lamp',
     'Left Blindspot Sensor': 'Right Blindspot Sensor',
     'Right Blindspot Sensor': 'Left Blindspot Sensor'
   };
@@ -55,6 +58,8 @@ const getPartIcon = (partName: string): string | null => {
     'Intercooler': '/part-icons/intercooler.png',
     'Left DayLight': '/part-icons/lh.png',
     'Right DayLight': '/part-icons/rh.png',
+    'Left Rear Lamp': '/part-icons/taillamp.png',
+    'Right Rear Lamp': '/part-icons/taillamp.png',
     'Auxiliary Radiator': '/part-icons/aux.png',
     'Camera': '/part-icons/camera.png',
     'Parking Sensor': '/part-icons/parking.png',
@@ -75,6 +80,8 @@ const PART_OPTIONS = [
   { name: 'Intercooler', icon: getPartIcon('Intercooler') },
   { name: 'Left DayLight', icon: getPartIcon('Left DayLight') },
   { name: 'Right DayLight', icon: getPartIcon('Right DayLight') },
+  { name: 'Left Rear Lamp', icon: getPartIcon('Left Rear Lamp') },
+  { name: 'Right Rear Lamp', icon: getPartIcon('Right Rear Lamp') },
   { name: 'Oil Cooler', icon: getPartIcon('Radiator') },
   { name: 'Auxiliary Radiator', icon: getPartIcon('Auxiliary Radiator') },
   { name: 'Camera', icon: getPartIcon('Camera') },
@@ -128,19 +135,19 @@ export default function PartsSection({
                 key={part.name}
                 type="button"
                 onClick={() => onTogglePart(part.name)}
-                className={`flex items-center space-x-2 px-3 py-2 rounded-lg border transition-colors ${
+                className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg border transition-colors ${
                   isSelected
                     ? 'bg-red-600 border-red-600 text-white'
                     : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
                 }`}
               >
                 {iconUrl && (
-                  <div className={`w-5 h-5 rounded-full flex items-center justify-center shadow-sm border ${
+                  <div className={`w-6 h-6 p-0.5 rounded-full flex items-center justify-center shadow-sm border ${
                     isSelected 
                       ? 'bg-white border-white' 
                       : 'bg-white border-gray-200'
                   }`}>
-                    <img src={iconUrl} alt={part.name} className="h-3 w-3 object-contain" />
+                    <img src={iconUrl} alt={part.name} className="object-contain" />
                   </div>
                 )}
                 <span className="text-sm font-medium">{part.name}</span>

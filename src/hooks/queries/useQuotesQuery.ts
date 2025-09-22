@@ -910,18 +910,8 @@ export const useUpdatePartInQuoteJsonMutation = () => {
       const shouldChangeToWaitingVerification = changeStatus && anyPartHasPrice && 
         currentStatus === 'unpriced';
       
-      console.log('🔍 Status Change Debug:', {
-        changeStatus,
-        anyPartHasPrice,
-        currentStatus,
-        shouldChangeToWaitingVerification
-      });
-      
       if (shouldChangeToWaitingVerification) {
         updateData.status = 'waiting_verification';
-        console.log('✅ Status will be changed to waiting_verification');
-      } else {
-        console.log('❌ Status will NOT be changed');
       }
 
 

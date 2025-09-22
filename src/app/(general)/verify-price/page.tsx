@@ -86,7 +86,7 @@ export default function VerifyPricePage() {
     }
   };
 
-  const updateMultipleParts = async (updates: Array<{ id: string; updates: any }>) => {
+  const updateMultipleParts = async (updates: Array<{ id: string; updates: any }>, quoteId?: string, changeStatus: boolean = true) => {
     // Find the quote that contains these parts
     const quote = quotesData?.quotes?.find(q => 
       q.parts_requested?.some((partItem: any) => 
@@ -103,7 +103,7 @@ export default function VerifyPricePage() {
       // Update each part individually using the mutation
       for (const { id, updates: partUpdates } of updates) {
         try {
-          await updatePartMutation.mutateAsync({ quoteId: quote.id, partId: id, updates: partUpdates });
+          await updatePartMutation.mutateAsync({ quoteId: quote.id, partId: id, updates: partUpdates, changeStatus });
         } catch (error) {
           console.error(`❌ Error updating part ${id}:`, error);
         }
@@ -200,9 +200,9 @@ export default function VerifyPricePage() {
     return { data: result.data || null, error: null };
   };
 
-  const handleUpdateMultipleParts = async (updates: Array<{ id: string; updates: any }>): Promise<void> => {
+  const handleUpdateMultipleParts = async (updates: Array<{ id: string; updates: any }>, quoteId?: string, changeStatus: boolean = true): Promise<void> => {
     try {
-      await updateMultipleParts(updates);
+      await updateMultipleParts(updates, quoteId, changeStatus);
     } catch (error) {
       console.error('Error updating multiple parts:', error);
     }

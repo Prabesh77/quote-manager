@@ -7,6 +7,7 @@ import { ProtectedRoute } from "@/components/common/ProtectedRoute";
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useDebouncedSearchWithPageReset } from '@/hooks/useDebouncedSearch';
+import supabase from '@/utils/supabase';
 
 export default function VerifyPricePage() {
   // Server-side pagination state
@@ -85,7 +86,7 @@ export default function VerifyPricePage() {
     }
   };
 
-  const updateMultipleParts = async (updates: Array<{ id: string; updates: any }>) => {
+  const updateMultipleParts = async (updates: Array<{ id: string; updates: any }>, quoteId?: string, changeStatus: boolean = true) => {
     // Find the quote that contains these parts
     const quote = quotesData?.quotes?.find(q => 
       q.parts_requested?.some((partItem: any) => 
@@ -102,7 +103,7 @@ export default function VerifyPricePage() {
       // Update each part individually using the mutation
       for (const { id, updates: partUpdates } of updates) {
         try {
-          await updatePartMutation.mutateAsync({ quoteId: quote.id, partId: id, updates: partUpdates });
+          await updatePartMutation.mutateAsync({ quoteId: quote.id, partId: id, updates: partUpdates, changeStatus });
         } catch (error) {
           console.error(`❌ Error updating part ${id}:`, error);
         }
@@ -155,6 +156,36 @@ export default function VerifyPricePage() {
     return { error: new Error('Not implemented yet') };
   };
 
+  const markQuoteAsWrong = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from('quotes')
+        .update({ status: 'wrong' })
+        .eq('id', id);
+      
+      if (error) {
+        console.error('Error marking quote as wrong:', error);
+        return { error: new Error(error.message) };
+      }
+      
+      // Track quote action
+      try {
+        const { QuoteActionsService } = await import('@/services/quoteActions/quoteActionsService');
+        await QuoteActionsService.trackQuoteAction(id, 'MARKED_WRONG');
+      } catch (trackingError) {
+        console.warn('Failed to track quote action:', trackingError);
+      }
+      
+      // Invalidate queries to refresh the UI
+      queryClient.invalidateQueries({ queryKey: queryKeys.quotesBase });
+      
+      return { error: null };
+    } catch (error) {
+      console.error('Error marking quote as wrong:', error);
+      return { error: error instanceof Error ? error : new Error('Unknown error') };
+    }
+  };
+
   // Wrapper functions to match QuoteTable's expected interface
   const handleUpdateQuote = async (id: string, fields: Record<string, any>): Promise<{ error: Error | null }> => {
     const result = await updateQuote(id, fields);
@@ -169,9 +200,9 @@ export default function VerifyPricePage() {
     return { data: result.data || null, error: null };
   };
 
-  const handleUpdateMultipleParts = async (updates: Array<{ id: string; updates: any }>): Promise<void> => {
+  const handleUpdateMultipleParts = async (updates: Array<{ id: string; updates: any }>, quoteId?: string, changeStatus: boolean = true): Promise<void> => {
     try {
-      await updateMultipleParts(updates);
+      await updateMultipleParts(updates, quoteId, changeStatus);
     } catch (error) {
       console.error('Error updating multiple parts:', error);
     }
@@ -182,16 +213,17 @@ export default function VerifyPricePage() {
       <div className="py-6">
         <h1 className="text-2xl font-bold text-gray-900 mb-6">Verify Price</h1>
         <p className="text-gray-600 mb-6">Verify and approve quotes that have been priced.</p>
-        <QuoteTable
+      <QuoteTable
           quotes={quotesData?.quotes || []}
           parts={parts || []}
-          onUpdateQuote={handleUpdateQuote}
-          onDeleteQuote={deleteQuote}
-          onUpdatePart={handleUpdatePart}
-          onUpdateMultipleParts={handleUpdateMultipleParts}
+        onUpdateQuote={handleUpdateQuote}
+        onDeleteQuote={deleteQuote}
+        onUpdatePart={handleUpdatePart}
+        onUpdateMultipleParts={handleUpdateMultipleParts}
           onMarkCompleted={markQuoteCompleted}
           onMarkAsOrdered={markQuoteAsOrdered}
-          showCompleted={false}
+          onMarkAsWrong={markQuoteAsWrong}
+        showCompleted={false}
           defaultFilter="priced"
           isLoading={quotesLoading || partsLoading}
           showPagination={true}
@@ -205,8 +237,8 @@ export default function VerifyPricePage() {
           searchTerm={searchTerm}
           onSearchChange={setSearchTerm}
           useServerSideSearch={true}
-        />
-      </div>
+      />
+    </div>
     </ProtectedRoute>
   );
 } 

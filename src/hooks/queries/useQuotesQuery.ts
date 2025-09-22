@@ -10,7 +10,7 @@ import { createNormalizedQuote } from '@/utils/normalizedQuoteCreation';
 
 // Query Keys - centralized for consistency
 export const queryKeys = {
-  quotes: (page: number = 1, limit: number = 20, filters?: { status?: string; customer?: string; make?: string; search?: string }) => ['quotes', page, limit, filters] as const,
+  quotes: (page: number = 1, limit: number = 20, filters?: { status?: string; customer?: string; make?: string; search?: string; created_by?: string }) => ['quotes', page, limit, filters] as const,
   quotesBase: ['quotes'] as const, // Base key for invalidating all quote queries
   parts: ['parts'] as const,
   quote: (id: string) => ['quotes', id] as const,
@@ -19,7 +19,7 @@ export const queryKeys = {
 };
 
 // Fetch functions
-const fetchQuotes = async (page: number = 1, limit: number = 20, filters?: { status?: string; customer?: string; make?: string; search?: string }): Promise<{ quotes: Quote[]; total: number; totalPages: number }> => {
+const fetchQuotes = async (page: number = 1, limit: number = 20, filters?: { status?: string; customer?: string; make?: string; search?: string; created_by?: string }): Promise<{ quotes: Quote[]; total: number; totalPages: number }> => {
   try {
     // Build the base query
     let query = supabase
@@ -39,6 +39,9 @@ const fetchQuotes = async (page: number = 1, limit: number = 20, filters?: { sta
     }
     if (filters?.make) {
       query = query.ilike('vehicle.make', `%${filters.make}%`);
+    }
+    if (filters?.created_by) {
+      query = query.eq('created_by', filters.created_by);
     }
     
     // Apply search filter - smart search by quote_ref and vehicle make
@@ -79,6 +82,7 @@ const fetchQuotes = async (page: number = 1, limit: number = 20, filters?: { sta
       console.error('Error fetching normalized quotes:', quotesError);
       throw new Error(quotesError.message);
     }
+
 
     // Convert normalized quotes to legacy format for QuoteTable compatibility
     const legacyQuotes: Quote[] = (normalizedQuotes || []).map(normalizedQuote => {
@@ -121,6 +125,7 @@ const fetchQuotes = async (page: number = 1, limit: number = 20, filters?: { sta
       return legacyQuote;
     });
 
+
     // Calculate pagination info using the count from Supabase
     const total = count || 0;
     const totalPages = Math.ceil(total / limit);
@@ -148,17 +153,17 @@ const fetchParts = async (): Promise<Part[]> => {
       throw new Error(error.message);
     }
 
-          // Convert normalized parts to legacy format
-      const legacyParts: Part[] = (normalizedParts || []).map(part => ({
-        id: part.id,
-        name: part.part_name,
-        number: part.part_number || '',
-        price: part.price,
+    // Convert normalized parts to legacy format
+    const legacyParts: Part[] = (normalizedParts || []).map(part => ({
+      id: part.id,
+      name: part.part_name,
+      number: part.part_number || '',
+      price: part.price,
         list_price: part.list_price || null,
         af: part.af || false,
         note: '', // Notes are now stored in parts_requested JSON, not parts table
-        createdAt: part.created_at,
-      }));
+      createdAt: part.created_at,
+    }));
 
     return legacyParts;
   } catch (error) {
@@ -168,7 +173,7 @@ const fetchParts = async (): Promise<Part[]> => {
 };
 
 // Custom hooks using TanStack Query
-export const useQuotesQuery = (page: number = 1, limit: number = 20, filters?: { status?: string; customer?: string; make?: string; search?: string }) => {
+export const useQuotesQuery = (page: number = 1, limit: number = 20, filters?: { status?: string; customer?: string; make?: string; search?: string; created_by?: string }) => {
   return useQuery({
     queryKey: queryKeys.quotes(page, limit, filters),
     queryFn: () => fetchQuotes(page, limit, filters),
@@ -777,7 +782,7 @@ export const useUpdatePartInQuoteJsonMutation = () => {
   const { showSnackbar } = useSnackbar();
   
   return useMutation({
-    mutationFn: async ({ quoteId, partId, updates }: { quoteId: string; partId: string; updates: any }) => {
+    mutationFn: async ({ quoteId, partId, updates, changeStatus = true }: { quoteId: string; partId: string; updates: any; changeStatus?: boolean }) => {
       
       // Get the current quote's parts_requested JSON
       const { data: quote, error: quoteError } = await supabase
@@ -800,6 +805,9 @@ export const useUpdatePartInQuoteJsonMutation = () => {
         if (partItem.part_id === partId) {
           const updatedPart = { ...partItem };
           
+          // Handle part number updates - DON'T change part_id, it's the foreign key
+          // The number field is handled by updating the Part table separately
+
           // Handle price and note updates through variants
           if (updates.price !== undefined || updates.note !== undefined) {
             const variants = partItem.variants || [];
@@ -874,7 +882,7 @@ export const useUpdatePartInQuoteJsonMutation = () => {
       
       // Get current quote status before updating
       const { data: currentQuoteData, error: currentQuoteError } = await supabase
-        .from('quotes')
+      .from('quotes')
         .select('status')
         .eq('id', quoteId)
         .single();
@@ -898,7 +906,8 @@ export const useUpdatePartInQuoteJsonMutation = () => {
       const updateData: any = { parts_requested: updatedPartsRequested };
       
       // If any part now has a price, update status to 'waiting_verification' (unless already in a higher status)
-      const shouldChangeToWaitingVerification = anyPartHasPrice && 
+      // Only change status if changeStatus parameter is true
+      const shouldChangeToWaitingVerification = changeStatus && anyPartHasPrice && 
         currentStatus === 'unpriced';
       
       if (shouldChangeToWaitingVerification) {
@@ -906,12 +915,12 @@ export const useUpdatePartInQuoteJsonMutation = () => {
       }
 
 
-      const { error: updateError } = await supabase
-        .from('quotes')
+        const { error: updateError } = await supabase
+          .from('quotes')
         .update(updateData)
         .eq('id', quoteId);
 
-      if (updateError) {
+        if (updateError) {
         throw new Error(`Error updating quote: ${updateError.message}`);
       }
 
@@ -951,7 +960,7 @@ export const useUpdatePartInQuoteJsonMutation = () => {
         .from('parts')
         .select('*')
         .eq('id', partId)
-        .single();
+      .single();
 
       if (partFetchError) {
         console.warn('Warning: Could not fetch updated part data:', partFetchError);

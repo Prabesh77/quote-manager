@@ -250,6 +250,9 @@ export class QuoteActionsService {
             stats.quotes_completed++;
             stats.total_value_completed += quoteValue;
             break;
+          case 'MARKED_WRONG':
+            // Don't increment any counters for wrong quotes
+            break;
         }
       });
 

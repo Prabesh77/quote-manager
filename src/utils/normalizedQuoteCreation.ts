@@ -209,6 +209,7 @@ export const createNormalizedQuote = async (quoteData: QuoteData) => {
       list_price: partData.list_price || null
     }));
 
+
     const { data: quote, error: quoteError } = await supabase
       .from('quotes')
       .insert({
@@ -228,6 +229,7 @@ export const createNormalizedQuote = async (quoteData: QuoteData) => {
       console.error('Error creating quote:', quoteError);
       throw quoteError;
     }
+
 
     // Step 4: Create parts and update the JSON array with actual part IDs
     const finalPartsRequested = [];

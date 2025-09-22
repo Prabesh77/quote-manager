@@ -7,6 +7,7 @@ import { ProtectedRoute } from "@/components/common/ProtectedRoute";
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useDebouncedSearchWithPageReset } from '@/hooks/useDebouncedSearch';
+import supabase from '@/utils/supabase';
 
 export default function PricingPage() {
   // Server-side pagination state
@@ -67,7 +68,7 @@ export default function PricingPage() {
     }
   };
 
-  const updateMultipleParts = async (updates: Array<{ id: string; updates: any }>, quoteId?: string) => {
+  const updateMultipleParts = async (updates: Array<{ id: string; updates: any }>, quoteId?: string, changeStatus: boolean = true) => {
     let quote;
     
     if (quoteId) {
@@ -103,7 +104,7 @@ export default function PricingPage() {
       // Update each part individually using the mutation
       for (const { id, updates: partUpdates } of updates) {
         try {
-          await updatePartMutation.mutateAsync({ quoteId: quote.id, partId: id, updates: partUpdates });
+          await updatePartMutation.mutateAsync({ quoteId: quote.id, partId: id, updates: partUpdates, changeStatus });
         } catch (error) {
           console.error(`❌ Error updating part ${id}:`, error);
         }
@@ -153,6 +154,36 @@ export default function PricingPage() {
     return { error: new Error('Not implemented yet') };
   };
 
+  const markQuoteAsWrong = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from('quotes')
+        .update({ status: 'wrong' })
+        .eq('id', id);
+      
+      if (error) {
+        console.error('Error marking quote as wrong:', error);
+        return { error: new Error(error.message) };
+      }
+      
+      // Track quote action
+      try {
+        const { QuoteActionsService } = await import('@/services/quoteActions/quoteActionsService');
+        await QuoteActionsService.trackQuoteAction(id, 'MARKED_WRONG');
+      } catch (trackingError) {
+        console.warn('Failed to track quote action:', trackingError);
+      }
+      
+      // Invalidate queries to refresh the UI
+      queryClient.invalidateQueries({ queryKey: queryKeys.quotesBase });
+      
+      return { error: null };
+    } catch (error) {
+      console.error('Error marking quote as wrong:', error);
+      return { error: error instanceof Error ? error : new Error('Unknown error') };
+    }
+  };
+
   // Wrapper functions to match QuoteTable's expected interface
   const handleUpdateQuote = async (id: string, fields: Record<string, any>): Promise<{ error: Error | null }> => {
     const result = await updateQuote(id, fields);
@@ -167,9 +198,9 @@ export default function PricingPage() {
     return { data: result.data || null, error: null };
   };
 
-  const handleUpdateMultipleParts = async (updates: Array<{ id: string; updates: any }>, quoteId?: string): Promise<void> => {
+  const handleUpdateMultipleParts = async (updates: Array<{ id: string; updates: any }>, quoteId?: string, changeStatus: boolean = true): Promise<void> => {
     try {
-      await updateMultipleParts(updates, quoteId);
+      await updateMultipleParts(updates, quoteId, changeStatus);
     } catch (error) {
       console.error('❌ Pricing Page - Error in handleUpdateMultipleParts wrapper:', error);
       throw error; // Re-throw to maintain error handling
@@ -195,6 +226,7 @@ export default function PricingPage() {
           onUpdateMultipleParts={handleUpdateMultipleParts}
           onMarkCompleted={markQuoteCompleted}
           onMarkAsOrdered={markQuoteAsOrdered}
+          onMarkAsWrong={markQuoteAsWrong}
           showCompleted={false}
           defaultFilter="unpriced"
           isLoading={quotesLoading || partsLoading}

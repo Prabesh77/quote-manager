@@ -9,6 +9,7 @@ import { ConnectionStatus } from '@/components/common';
 import { useAuth } from '@/components/providers/AuthProvider';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { useQuotesQuery } from '@/hooks/queries/useQuotesQuery';
+import WrongQuotesNotification from '@/components/ui/WrongQuotesNotification';
 
 const Navigation = () => {
   const pathname = usePathname();
@@ -210,6 +211,11 @@ const Navigation = () => {
           <div className="flex items-center">
             <div className="ml-4 flex items-center space-x-4">
               <ConnectionStatus status="connected" />
+              
+              {/* Wrong Quotes Notification */}
+              {user && (
+                <WrongQuotesNotification userId={user.id} />
+              )}
               
               {/* User Profile Dropdown */}
               {user && (

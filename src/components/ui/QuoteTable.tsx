@@ -834,6 +834,8 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
       'Auxiliary Radiator': '/part-icons/aux.png',
       'Left DayLight': '/part-icons/lh.png',
       'Right DayLight': '/part-icons/rh.png',
+      'Left Rear Lamp': '/part-icons/headlight-left.png',
+      'Right Rear Lamp': '/part-icons/headlight-right.png',
     };
     
     return iconMap[partName] || null;
@@ -1732,8 +1734,8 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                   <tr>
                                     <th className="px-4 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider w-1/5">Part & Variants</th>
                                     <th className="px-4 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider w-1/5">Part Number</th>
-                                    <th className="px-4 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider w-1/6">Price</th>
                                     <th className="px-4 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider w-1/6">List Price</th>
+                                    <th className="px-4 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider w-1/6">Price</th>
                                     <th className="px-4 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider w-1/12">AF</th>
                                     <th className="px-4 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider w-1/4">Notes</th>
                                   </tr>
@@ -1871,6 +1873,38 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                                 {isPartEditing ? (
                                                   <input
                                                     type="number"
+                                                    value={partEditData[part.id]?.[variant.id]?.list_price ?? variant.list_price ?? ''}
+                                                    onChange={(e) => handleVariantEditChange(part.id, variant.id, 'list_price', e.target.value ? Number(e.target.value) : null)}
+                                                    className={`w-full px-2 py-1 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 ${index === 0 ? 'bg-white' : 'bg-gray-50'}`}
+                                                    placeholder="Enter list price"
+                                                  />
+                                                ) : (
+                                                  <>
+                                                    <span className={`text-sm font-medium ${variant.list_price ? 'text-gray-900' : 'text-gray-400'}`}>
+                                                      {variant.list_price ? `$${variant.list_price.toFixed(2)}` : 'Not set'}
+                                                    </span>
+                                                    {variant.list_price && (
+                                                    <button
+                                                        onClick={() => copyToClipboard(variant.list_price ? variant.list_price.toString() : '')}
+                                                        className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-md transition-all duration-200 cursor-pointer"
+                                                      title="Copy to clipboard"
+                                                    >
+                                                        {isRecentlyCopied(variant.list_price ? variant.list_price.toString() : '') ? (
+                                                          <CheckCircle className="h-3.5 w-3.5 text-green-500" />
+                                                        ) : (
+                                                          <Copy className="h-3.5 w-3.5" />
+                                                        )}
+                                                    </button>
+                                                    )}
+                                                  </>
+                                                )}
+                                              </div>
+                                            </td>
+                                            <td className="px-4 py-1">
+                                              <div className="flex items-center space-x-1">
+                                                {isPartEditing ? (
+                                                  <input
+                                                    type="number"
                                                     value={partEditData[part.id]?.[variant.id]?.final_price ?? variant.final_price ?? ''}
                                                     onChange={(e) => handleVariantEditChange(part.id, variant.id, 'final_price', e.target.value ? Number(e.target.value) : null)}
                                                     className={`w-full px-2 py-1 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 ${index === 0 ? 'bg-white' : 'bg-gray-50'}`}
@@ -1894,38 +1928,6 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                                           <Copy className="h-3.5 w-3.5" />
                                                         )}
                                                     </button>
-                                                    )}
-                                                  </>
-                                                )}
-                                              </div>
-                                            </td>
-                                            <td className="px-4 py-1">
-                                              <div className="flex items-center space-x-1">
-                                                {isPartEditing ? (
-                                                  <input
-                                                    type="number"
-                                                    value={partEditData[part.id]?.[variant.id]?.list_price ?? variant.list_price ?? ''}
-                                                    onChange={(e) => handleVariantEditChange(part.id, variant.id, 'list_price', e.target.value ? Number(e.target.value) : null)}
-                                                    className={`w-full px-2 py-1 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 ${index === 0 ? 'bg-white' : 'bg-gray-50'}`}
-                                                    placeholder="Enter list price"
-                                                  />
-                                                ) : (
-                                                  <>
-                                                    <span className={`text-sm font-medium ${variant.list_price ? 'text-gray-900' : 'text-gray-400'}`}>
-                                                      {variant.list_price ? `$${variant.list_price.toFixed(2)}` : 'Not set'}
-                                                    </span>
-                                                    {variant.list_price && (
-                                                    <button
-                                                        onClick={() => copyToClipboard(variant.list_price ? variant.list_price.toString() : '')}
-                                                        className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-md transition-all duration-200 cursor-pointer"
-                                                      title="Copy to clipboard"
-                                                    >
-                                                        {isRecentlyCopied(variant.list_price ? variant.list_price.toString() : '') ? (
-                                                          <CheckCircle className="h-3.5 w-3.5 text-green-500" />
-                                                        ) : (
-                                                          <Copy className="h-3.5 w-3.5" />
-                                                        )}
-                                                  </button>
                                                     )}
                                                   </>
                                                 )}
@@ -2394,6 +2396,37 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                             
                                       <div className="grid grid-cols-2 gap-3">
                                             <div>
+                                              <label className="block text-xs font-medium text-gray-500 mb-1">List Price</label>
+                                              <div className="flex items-center space-x-1">
+                                                {isPartEditing ? (
+                                                  <input
+                                                    type="number"
+                                                    value={partEditData[part.id]?.list_price || ''}
+                                                    onChange={(e) => handlePartEditChange(part.id, 'list_price', e.target.value ? Number(e.target.value) : null)}
+                                                    className="flex-1 px-2 py-1 border border-gray-300 rounded-md text-sm focus:ring-1 focus:ring-red-500 focus:border-transparent"
+                                                  />
+                                                ) : (
+                                                  <>
+                                                    <span className="text-sm font-medium text-gray-900">
+                                                      {part.list_price ? `$${part.list_price.toFixed(2)}` : '-'}
+                                                    </span>
+                                                    <button
+                                                      onClick={() => copyToClipboard(part.list_price ? part.list_price.toString() : '')}
+                                                      className="p-1 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
+                                                      title="Copy to clipboard"
+                                                    >
+                                                      {isRecentlyCopied(part.list_price ? part.list_price.toString() : '') ? (
+                                                        <CheckCircle className="h-3 w-3 text-green-500" />
+                                                      ) : (
+                                                        <Copy className="h-3 w-3" />
+                                                      )}
+                                                    </button>
+                                                  </>
+                                                )}
+                                              </div>
+                                            </div>
+                                            
+                                            <div>
                                           <label className="block text-xs font-medium text-gray-500 mb-1">Price</label>
                                               <div className="flex items-center space-x-1">
                                                 {isPartEditing ? (
@@ -2418,37 +2451,6 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                                         <CheckCircle className="h-3 w-3 text-green-500" />
                                                       ) : (
                                                       <Copy className="h-3 w-3" />
-                                                      )}
-                                                    </button>
-                                                  </>
-                                                )}
-                                              </div>
-                                            </div>
-                                            
-                                            <div>
-                                              <label className="block text-xs font-medium text-gray-500 mb-1">List Price</label>
-                                              <div className="flex items-center space-x-1">
-                                                {isPartEditing ? (
-                                                  <input
-                                                    type="number"
-                                                    value={partEditData[part.id]?.list_price || ''}
-                                                    onChange={(e) => handlePartEditChange(part.id, 'list_price', e.target.value ? Number(e.target.value) : null)}
-                                                    className="flex-1 px-2 py-1 border border-gray-300 rounded-md text-sm focus:ring-1 focus:ring-red-500 focus:border-transparent"
-                                                  />
-                                                ) : (
-                                                  <>
-                                                    <span className="text-sm font-medium text-gray-900">
-                                                      {part.list_price ? `$${part.list_price.toFixed(2)}` : '-'}
-                                                    </span>
-                                                    <button
-                                                      onClick={() => copyToClipboard(part.list_price ? part.list_price.toString() : '')}
-                                                      className="p-1 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
-                                                      title="Copy to clipboard"
-                                                    >
-                                                      {isRecentlyCopied(part.list_price ? part.list_price.toString() : '') ? (
-                                                        <CheckCircle className="h-3 w-3 text-green-500" />
-                                                      ) : (
-                                                        <Copy className="h-3 w-3" />
                                                       )}
                                                     </button>
                                                   </>

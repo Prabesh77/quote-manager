@@ -53,12 +53,12 @@ export const BRAND_PART_RULES: Record<string, BrandPartRule> = {
     description: 'Required for Mercedes, Land Rover, and BMW'
   },
   'Left Rear Lamp': {
-    requiredFor: ['Kia', 'Hyundai'],
-    description: 'Rear combination lamp required for Kia and Hyundai'
+    requiredFor: ['Kia', 'Hyundai', 'Toyota'],
+    description: 'Rear combination lamp required for Kia, Hyundai, and Toyota'
   },
   'Right Rear Lamp': {
-    requiredFor: ['Kia', 'Hyundai'],
-    description: 'Rear combination lamp required for Kia and Hyundai'
+    requiredFor: ['Kia', 'Hyundai', 'Toyota'],
+    description: 'Rear combination lamp required for Kia, Hyundai, and Toyota'
   },
 };
 

@@ -116,7 +116,7 @@ IMPORTANT RULES:
 - DAYTIME HEADLAMP DETECTION: If text contains 'headlamp' or 'headlight' WITH 'daytime' or 'combination' → classify as 'DayLight' (NOT 'Headlamp')
 - COMBINATION LAMP ASSEMBLY: If text contains "LAMP ASSY,COMBINATION" or "combination lamp assembly" → always classify as 'DayLight' regardless of other keywords
 - EXAMPLE: "LAMP ASSY,COMBINATION, FR RH" with price "A$855.86" → 'Right DayLight' with list_price: 855.86
-- REAR LAMP DETECTION: If text contains "rear lamp", "back lamp", "rear light", "back light", "rear combination lamp", "back combination lamp", "tail lamp", "tail light", "tail combination lamp" → classify as 'Rear Lamp' (Left or Right based on L/R context)
+- REAR LAMP DETECTION: If text contains "rear lamp", "back lamp", "rear light", "back light", "rear combination lamp", "back combination lamp", "tail lamp", "tail light", "tail combination lamp", "lens and body rear combination lamp" → classify as 'Rear Lamp' (Left or Right based on L/R context)
 - REAR LAMP CONTEXT: 
   - If text contains "rear lamp lh", "rear combination lamp lh", "rear lamp l", "back lamp left", "tail lamp lh", "tail lamp l", "tail lamp left" → 'Left Rear Lamp'
   - If text contains "rear lamp rh", "rear combination lamp rh", "rear lamp r", "back lamp right", "tail lamp rh", "tail lamp r", "tail lamp right" → 'Right Rear Lamp'
@@ -319,7 +319,7 @@ function fallbackExtraction(ocrText: string): AIPartExtraction[] {
                line.toLowerCase().includes('rear light') || line.toLowerCase().includes('back light') ||
                line.toLowerCase().includes('rear combination lamp') || line.toLowerCase().includes('back combination lamp') ||
                line.toLowerCase().includes('tail lamp') || line.toLowerCase().includes('tail light') ||
-               line.toLowerCase().includes('tail combination lamp')) {
+               line.toLowerCase().includes('tail combination lamp') || line.toLowerCase().includes('lens and body rear combination lamp')) {
       // Handle rear lamp detection
       if (/\b(rh|r\b|right)\b/i.test(line)) {
         context = 'RH';

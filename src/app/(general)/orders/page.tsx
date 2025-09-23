@@ -1,6 +1,6 @@
 'use client';
 
-import { useQuotesQuery, useDeleteQuoteMutation, useUpdatePartInQuoteJsonMutation, queryKeys } from '@/hooks/queries/useQuotesQuery';
+import { useQuotesQuery, useDeleteQuoteMutation, useUpdatePartInQuoteJsonMutation, useUpdateMultiplePartsInQuoteJsonMutation, queryKeys } from '@/hooks/queries/useQuotesQuery';
 import { useAllQuoteParts } from '@/hooks/useAllQuoteParts';
 import QuoteTable from '@/components/ui/QuoteTable';
 import { ProtectedRoute } from '@/components/common/ProtectedRoute';

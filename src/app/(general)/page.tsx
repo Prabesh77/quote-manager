@@ -1,6 +1,6 @@
 'use client';
 
-import { useQuotesQuery, useDeleteQuoteMutation, useUpdatePartInQuoteJsonMutation, useCreateQuoteMutation } from '@/hooks/queries/useQuotesQuery';
+import { useQuotesQuery, useDeleteQuoteMutation, useUpdatePartInQuoteJsonMutation, useUpdateMultiplePartsInQuoteJsonMutation, useUpdatePartNumbersBatchMutation, useCreateQuoteMutation } from '@/hooks/queries/useQuotesQuery';
 import { useQuery } from '@tanstack/react-query';
 import { QuoteForm } from "@/components/ui/QuoteForm";
 import QuoteTable from "@/components/ui/QuoteTable";
@@ -89,6 +89,8 @@ export default function HomePage() {
   // Use the actual mutations
   const deleteQuoteMutation = useDeleteQuoteMutation();
   const updatePartMutation = useUpdatePartInQuoteJsonMutation();
+  const updateMultiplePartsMutation = useUpdateMultiplePartsInQuoteJsonMutation();
+  const updatePartNumbersBatchMutation = useUpdatePartNumbersBatchMutation();
   const createQuoteMutation = useCreateQuoteMutation();
 
   const handleSubmit = async (fields: Record<string, string>, parts: any[]) => {
@@ -207,20 +209,24 @@ export default function HomePage() {
     }
 
     try {
-      // Update each part individually using the mutation
-      for (const { id, updates: partUpdates } of updates) {
-        try {
-          await updatePartMutation.mutateAsync({ quoteId: quote.id, partId: id, updates: partUpdates, changeStatus });
-        } catch (error) {
-          console.error(`❌ Error updating part ${id}:`, error);
-          showSnackbar(`Error updating part ${id}`, 'error');
-        }
-      }
-      
-      showSnackbar(`${updates.length} parts updated successfully!`, 'success');
+      // Use the batch mutation to update all parts in a single call
+      await updateMultiplePartsMutation.mutateAsync({ 
+        quoteId: quote.id, 
+        updates, 
+        changeStatus 
+      });
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       showSnackbar(`Error updating parts: ${errorMessage}`, 'error');
+    }
+  };
+
+  const onUpdatePartNumbersBatch = async (updates: Array<{ id: string; partNumber: string }>) => {
+    try {
+      await updatePartNumbersBatchMutation.mutateAsync({ updates });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      showSnackbar(`Error updating part numbers: ${errorMessage}`, 'error');
     }
   };
 
@@ -296,6 +302,7 @@ export default function HomePage() {
             onDeleteQuote={onDeleteQuote}
             onUpdatePart={onUpdatePart}
             onUpdateMultipleParts={onUpdateMultipleParts}
+            onUpdatePartNumbersBatch={onUpdatePartNumbersBatch}
             onMarkCompleted={onMarkCompleted}
             onMarkAsOrdered={onMarkAsOrdered}
             onMarkAsOrderedWithParts={onMarkAsOrderedWithParts}

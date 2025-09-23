@@ -1,6 +1,6 @@
 'use client';
 
-import { useQuotesQuery, useDeleteQuoteMutation, useUpdatePartInQuoteJsonMutation, queryKeys } from '@/hooks/queries/useQuotesQuery';
+import { useQuotesQuery, useDeleteQuoteMutation, useUpdatePartInQuoteJsonMutation, useUpdateMultiplePartsInQuoteJsonMutation, queryKeys } from '@/hooks/queries/useQuotesQuery';
 import { useAllQuoteParts } from '@/hooks/useAllQuoteParts';
 import QuoteTable from "@/components/ui/QuoteTable";
 import { ProtectedRoute } from "@/components/common/ProtectedRoute";
@@ -33,6 +33,7 @@ export default function PricingPage() {
   // Use the actual mutations
   const deleteQuoteMutation = useDeleteQuoteMutation();
   const updatePartMutation = useUpdatePartInQuoteJsonMutation();
+  const updateMultiplePartsMutation = useUpdateMultiplePartsInQuoteJsonMutation();
 
   // Placeholder functions for now - these will need to be implemented with the new API
   const updateQuote = async (id: string, fields: Record<string, any>) => {
@@ -101,14 +102,12 @@ export default function PricingPage() {
     }
 
     try {
-      // Update each part individually using the mutation
-      for (const { id, updates: partUpdates } of updates) {
-        try {
-          await updatePartMutation.mutateAsync({ quoteId: quote.id, partId: id, updates: partUpdates, changeStatus });
-        } catch (error) {
-          console.error(`❌ Error updating part ${id}:`, error);
-        }
-      }
+      // Use the batch mutation to update all parts in a single call
+      await updateMultiplePartsMutation.mutateAsync({ 
+        quoteId: quote.id, 
+        updates, 
+        changeStatus 
+      });
     } catch (error) {
       console.error('❌ Error in updateMultipleParts:', error);
     }

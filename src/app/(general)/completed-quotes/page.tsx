@@ -1,6 +1,6 @@
 'use client';
 
-import { useQuotesQuery, useDeleteQuoteMutation, useUpdatePartInQuoteJsonMutation, queryKeys } from '@/hooks/queries/useQuotesQuery';
+import { useQuotesQuery, useDeleteQuoteMutation, useUpdatePartInQuoteJsonMutation, useUpdatePartsComprehensiveBatchMutation, queryKeys } from '@/hooks/queries/useQuotesQuery';
 import { useAllQuoteParts } from '@/hooks/useAllQuoteParts';
 import QuoteTable from '@/components/ui/QuoteTable';
 import { ProtectedRoute } from '@/components/common/ProtectedRoute';
@@ -30,6 +30,7 @@ export default function CompletedQuotesPage() {
   // Use the actual mutations
   const deleteQuoteMutation = useDeleteQuoteMutation();
   const updatePartMutation = useUpdatePartInQuoteJsonMutation();
+  const updatePartsComprehensiveBatchMutation = useUpdatePartsComprehensiveBatchMutation();
 
   // Update quote function - handles status updates and other quote fields
   const updateQuote = async (id: string, fields: Record<string, any>) => {
@@ -196,11 +197,35 @@ export default function CompletedQuotesPage() {
 
   const handleUpdateMultipleParts = async (updates: Array<{ id: string; updates: any }>, quoteId?: string, changeStatus: boolean = true): Promise<void> => {
     try {
-      await updateMultipleParts(updates, quoteId, changeStatus);
+      // Find the quote that contains these parts
+      let quote;
+      if (quoteId) {
+        quote = quotesData?.quotes?.find(q => q.id === quoteId);
+      } else {
+        // Fallback: Find the quote that contains these parts
+        quote = quotesData?.quotes?.find(q => 
+          q.parts_requested?.some((partItem: any) => 
+            updates.some(update => update.id === partItem.part_id)
+          )
+        );
+      }
+      
+      if (!quote) {
+        console.error('Quote not found for these parts');
+        return;
+      }
+
+      // Use the comprehensive batch mutation to update all parts in a single operation
+      await updatePartsComprehensiveBatchMutation.mutateAsync({ 
+        quoteId: quote.id, 
+        updates, 
+        changeStatus 
+      });
     } catch (error) {
       console.error('Error updating multiple parts:', error);
     }
   };
+
 
   return (
     <ProtectedRoute allowedRoles={['quote_creator', 'price_manager', 'quality_controller', 'admin']}>
@@ -230,6 +255,8 @@ export default function CompletedQuotesPage() {
           searchTerm={searchTerm}
           onSearchChange={setSearchTerm}
           useServerSideSearch={true}
+          // Page identification
+          currentPageName="completed-quotes"
         />
       </div>
     </ProtectedRoute>

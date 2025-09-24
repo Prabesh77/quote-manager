@@ -1,6 +1,6 @@
 'use client';
 
-import { useQuotesQuery, useDeleteQuoteMutation, useUpdatePartInQuoteJsonMutation, useCreateQuoteMutation } from '@/hooks/queries/useQuotesQuery';
+import { useQuotesQuery, useDeleteQuoteMutation, useUpdatePartInQuoteJsonMutation, useUpdatePartsComprehensiveBatchMutation, useCreateQuoteMutation } from '@/hooks/queries/useQuotesQuery';
 import { useQuery } from '@tanstack/react-query';
 import { QuoteForm } from "@/components/ui/QuoteForm";
 import QuoteTable from "@/components/ui/QuoteTable";
@@ -89,6 +89,7 @@ export default function HomePage() {
   // Use the actual mutations
   const deleteQuoteMutation = useDeleteQuoteMutation();
   const updatePartMutation = useUpdatePartInQuoteJsonMutation();
+  const updatePartsComprehensiveBatchMutation = useUpdatePartsComprehensiveBatchMutation();
   const createQuoteMutation = useCreateQuoteMutation();
 
   const handleSubmit = async (fields: Record<string, string>, parts: any[]) => {
@@ -207,22 +208,18 @@ export default function HomePage() {
     }
 
     try {
-      // Update each part individually using the mutation
-      for (const { id, updates: partUpdates } of updates) {
-        try {
-          await updatePartMutation.mutateAsync({ quoteId: quote.id, partId: id, updates: partUpdates, changeStatus });
-        } catch (error) {
-          console.error(`❌ Error updating part ${id}:`, error);
-          showSnackbar(`Error updating part ${id}`, 'error');
-        }
-      }
-      
-      showSnackbar(`${updates.length} parts updated successfully!`, 'success');
+      // Use the comprehensive batch mutation to update all parts in a single operation
+      await updatePartsComprehensiveBatchMutation.mutateAsync({ 
+        quoteId: quote.id, 
+        updates, 
+        changeStatus 
+      });
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       showSnackbar(`Error updating parts: ${errorMessage}`, 'error');
     }
   };
+
 
   const onMarkAsOrdered = async (id: string, taxInvoiceNumber: string) => {
     try {
@@ -313,6 +310,8 @@ export default function HomePage() {
             searchTerm={searchTerm}
             onSearchChange={setSearchTerm}
             useServerSideSearch={true}
+            // Page identification
+            currentPageName="home"
           />
         </div>
       </div>

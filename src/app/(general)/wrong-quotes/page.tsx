@@ -6,7 +6,7 @@ import { ArrowLeft, AlertTriangle } from 'lucide-react';
 import Link from 'next/link';
 import { useAuth } from '@/components/providers/AuthProvider';
 import QuoteTable from '@/components/ui/QuoteTable';
-import { useQuotesQuery, useUpdatePartInQuoteJsonMutation, queryKeys } from '@/hooks/queries/useQuotesQuery';
+import { useQuotesQuery, useUpdatePartInQuoteJsonMutation, useUpdatePartsComprehensiveBatchMutation, queryKeys } from '@/hooks/queries/useQuotesQuery';
 import { useAllQuoteParts } from '@/hooks/useAllQuoteParts';
 import { useQueryClient } from '@tanstack/react-query';
 import supabase from '@/utils/supabase';
@@ -34,6 +34,7 @@ function WrongQuotesContent() {
 
   // Use the actual mutation for part updates
   const updatePartMutation = useUpdatePartInQuoteJsonMutation();
+  const updatePartsComprehensiveBatchMutation = useUpdatePartsComprehensiveBatchMutation();
 
   // Filter quotes if a specific quote ID is provided
   const quotes = quoteId 
@@ -154,36 +155,12 @@ function WrongQuotesContent() {
         return;
       }
 
-      // Update each part individually using the mutation
-      for (const { id, updates: partUpdates } of updates) {
-        try {
-          // Transform the updates to match what the mutation expects
-          const transformedUpdates = { ...partUpdates };
-          
-          // If updates contains a number field, extract it to the top level
-          if (partUpdates.number !== undefined) {
-            transformedUpdates.number = partUpdates.number;
-          }
-
-          await updatePartMutation.mutateAsync({ 
-            quoteId: quote.id, 
-            partId: id, 
-            updates: transformedUpdates,
-            changeStatus
-          });
-        } catch (error) {
-          console.error(`❌ Error updating part ${id}:`, error);
-        }
-      }
-
-      // Manually invalidate queries to ensure instant refresh
-      // Invalidate the specific query used by this page
-      const specificQueryKey = queryKeys.quotes(1, 100, { status: 'wrong', created_by: user?.id });
-      queryClient.invalidateQueries({ queryKey: specificQueryKey });
-      queryClient.refetchQueries({ queryKey: specificQueryKey });
-      
-      // Also invalidate base quotes to ensure other pages update
-      queryClient.invalidateQueries({ queryKey: queryKeys.quotesBase });
+      // Use the comprehensive batch mutation to update all parts in a single operation
+      await updatePartsComprehensiveBatchMutation.mutateAsync({ 
+        quoteId: quote.id, 
+        updates, 
+        changeStatus 
+      });
 
       // After successful parts update, check if quote should transition status
       await checkAndTransitionQuoteStatus(quote.id);
@@ -335,6 +312,7 @@ function WrongQuotesContent() {
             itemsPerPage={10}
             showPagination={true}
             useServerSideSearch={false}
+            currentPageName="wrong-quotes"
           />
         )}
       </div>

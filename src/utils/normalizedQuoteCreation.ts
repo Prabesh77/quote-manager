@@ -200,38 +200,7 @@ export const createNormalizedQuote = async (quoteData: QuoteData) => {
       vehicleId = newVehicle.id;
     }
 
-    // Step 3: Create quote with JSON parts structure
-    // Build the parts_requested JSON array
-    const partsRequestedJson = quoteData.parts.map(partData => ({
-      part_id: '', // Will be filled after creating parts
-      note: partData.note || '',
-      final_price: null, // Initially null, will be set during pricing
-      list_price: partData.list_price || null
-    }));
-
-
-    const { data: quote, error: quoteError } = await supabase
-      .from('quotes')
-      .insert({
-        customer_id: customerId,
-        vehicle_id: vehicleId,
-        status: 'unpriced',
-        notes: quoteData.notes || null,
-        required_by: quoteData.requiredBy ? convertAustralianDateToISO(quoteData.requiredBy) : null,
-        quote_ref: quoteData.quoteRef, // Store user-provided quote reference
-        settlement: quoteData.settlement || 0, // Add settlement field
-        parts_requested: partsRequestedJson, // Re-enabled for fresh JSON setup
-      })
-      .select()
-      .single();
-
-    if (quoteError) {
-      console.error('Error creating quote:', quoteError);
-      throw quoteError;
-    }
-
-
-    // Step 4: Create parts and update the JSON array with actual part IDs
+    // Step 3: Create parts first, then create quote with complete data
     const finalPartsRequested = [];
     
     for (let i = 0; i < quoteData.parts.length; i++) {
@@ -264,18 +233,27 @@ export const createNormalizedQuote = async (quoteData: QuoteData) => {
       });
     }
 
-    // Step 5: Update quote with final parts_requested JSON array
-    const { error: updateQuoteError } = await supabase
+    // Step 4: Create quote with complete parts_requested JSON array
+    const { data: quote, error: quoteError } = await supabase
       .from('quotes')
-      .update({
-        parts_requested: finalPartsRequested
+      .insert({
+        customer_id: customerId,
+        vehicle_id: vehicleId,
+        status: 'unpriced',
+        notes: quoteData.notes || null,
+        required_by: quoteData.requiredBy ? convertAustralianDateToISO(quoteData.requiredBy) : null,
+        quote_ref: quoteData.quoteRef, // Store user-provided quote reference
+        settlement: quoteData.settlement || 0, // Add settlement field
+        parts_requested: finalPartsRequested, // Create with complete data
       })
-      .eq('id', quote.id);
+      .select()
+      .single();
 
-    if (updateQuoteError) {
-      console.error('Error updating quote with parts:', updateQuoteError);
-      throw updateQuoteError;
+    if (quoteError) {
+      console.error('Error creating quote:', quoteError);
+      throw quoteError;
     }
+
 
     // Track quote creation action
     try {

@@ -1,6 +1,6 @@
 'use client';
 
-import { useQuotesQuery, useDeleteQuoteMutation, useUpdatePartInQuoteJsonMutation, useUpdateMultiplePartsInQuoteJsonMutation, queryKeys } from '@/hooks/queries/useQuotesQuery';
+import { useQuotesQuery, useDeleteQuoteMutation, useUpdatePartInQuoteJsonMutation, useUpdatePartsComprehensiveBatchMutation, queryKeys } from '@/hooks/queries/useQuotesQuery';
 import { useAllQuoteParts } from '@/hooks/useAllQuoteParts';
 import QuoteTable from "@/components/ui/QuoteTable";
 import { ProtectedRoute } from "@/components/common/ProtectedRoute";
@@ -33,7 +33,7 @@ export default function PricingPage() {
   // Use the actual mutations
   const deleteQuoteMutation = useDeleteQuoteMutation();
   const updatePartMutation = useUpdatePartInQuoteJsonMutation();
-  const updateMultiplePartsMutation = useUpdateMultiplePartsInQuoteJsonMutation();
+  const updatePartsComprehensiveBatchMutation = useUpdatePartsComprehensiveBatchMutation();
 
   // Placeholder functions for now - these will need to be implemented with the new API
   const updateQuote = async (id: string, fields: Record<string, any>) => {
@@ -102,8 +102,8 @@ export default function PricingPage() {
     }
 
     try {
-      // Use the batch mutation to update all parts in a single call
-      await updateMultiplePartsMutation.mutateAsync({ 
+      // Use the comprehensive batch mutation to update all parts in a single operation
+      await updatePartsComprehensiveBatchMutation.mutateAsync({ 
         quoteId: quote.id, 
         updates, 
         changeStatus 

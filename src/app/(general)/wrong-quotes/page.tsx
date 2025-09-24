@@ -6,7 +6,7 @@ import { ArrowLeft, AlertTriangle } from 'lucide-react';
 import Link from 'next/link';
 import { useAuth } from '@/components/providers/AuthProvider';
 import QuoteTable from '@/components/ui/QuoteTable';
-import { useQuotesQuery, useUpdatePartInQuoteJsonMutation, useUpdateMultiplePartsInQuoteJsonMutation, queryKeys } from '@/hooks/queries/useQuotesQuery';
+import { useQuotesQuery, useUpdatePartInQuoteJsonMutation, useUpdatePartsComprehensiveBatchMutation, queryKeys } from '@/hooks/queries/useQuotesQuery';
 import { useAllQuoteParts } from '@/hooks/useAllQuoteParts';
 import { useQueryClient } from '@tanstack/react-query';
 import supabase from '@/utils/supabase';
@@ -34,7 +34,7 @@ function WrongQuotesContent() {
 
   // Use the actual mutation for part updates
   const updatePartMutation = useUpdatePartInQuoteJsonMutation();
-  const updateMultiplePartsMutation = useUpdateMultiplePartsInQuoteJsonMutation();
+  const updatePartsComprehensiveBatchMutation = useUpdatePartsComprehensiveBatchMutation();
 
   // Filter quotes if a specific quote ID is provided
   const quotes = quoteId 
@@ -155,8 +155,8 @@ function WrongQuotesContent() {
         return;
       }
 
-      // Use the batch mutation to update all parts in a single call
-      await updateMultiplePartsMutation.mutateAsync({ 
+      // Use the comprehensive batch mutation to update all parts in a single operation
+      await updatePartsComprehensiveBatchMutation.mutateAsync({ 
         quoteId: quote.id, 
         updates, 
         changeStatus 

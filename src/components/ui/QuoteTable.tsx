@@ -25,7 +25,6 @@ interface QuoteTableProps {
   onDeleteQuote: (id: string) => Promise<{ error: Error | null }>;
   onUpdatePart: (id: string, updates: Partial<Part>) => Promise<{ data: Part; error: Error | null }>;
   onUpdateMultipleParts: (updates: Array<{ id: string; updates: Partial<Part> }>, quoteId?: string, changeStatus?: boolean) => Promise<void>;
-  onUpdatePartNumbersBatch: (updates: Array<{ id: string; partNumber: string }>) => Promise<void>;
   onMarkCompleted?: (id: string) => Promise<{ error: Error | null }>;
   onMarkAsOrdered?: (id: string, taxInvoiceNumber: string) => Promise<{ error: Error | null }>;
   onMarkAsOrderedWithParts?: (id: string, taxInvoiceNumber: string, partIds: string[]) => Promise<{ error: Error | null }>;
@@ -51,7 +50,7 @@ type FilterType = 'all' | 'unpriced' | 'priced';
 
 type QuoteStatus = 'unpriced' | 'priced' | 'completed' | 'ordered' | 'delivered' | 'waiting_verification' | 'wrong';
 
-export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote, onUpdatePart, onUpdateMultipleParts, onUpdatePartNumbersBatch, onMarkCompleted, onMarkAsOrdered, onMarkAsOrderedWithParts, onMarkAsWrong, showCompleted = false, defaultFilter = 'all', isLoading = false, itemsPerPage = 10, showPagination = true, currentPage: externalCurrentPage, total: externalTotal, totalPages: externalTotalPages, pageSize: externalPageSize, onPageChange, searchTerm: externalSearchTerm, onSearchChange, useServerSideSearch = false }: QuoteTableProps) {
+export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote, onUpdatePart, onUpdateMultipleParts, onMarkCompleted, onMarkAsOrdered, onMarkAsOrderedWithParts, onMarkAsWrong, showCompleted = false, defaultFilter = 'all', isLoading = false, itemsPerPage = 10, showPagination = true, currentPage: externalCurrentPage, total: externalTotal, totalPages: externalTotalPages, pageSize: externalPageSize, onPageChange, searchTerm: externalSearchTerm, onSearchChange, useServerSideSearch = false }: QuoteTableProps) {
   // Safety checks for undefined props
   if (!quotes || !Array.isArray(quotes)) {
     console.warn('QuoteTable: quotes prop is undefined or not an array, using empty array');
@@ -542,6 +541,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
         // Then, save the default variant to the backend (for compatibility with current schema)
         const updates: Array<{ id: string; updates: Partial<Part> & { variantId?: string; list_price?: number | null; af?: boolean } }> = [];
         
+        // Only process parts that have actual changes to avoid unnecessary updates
         Object.keys(partEditData).forEach(partId => {
           const partEditDataForPart = partEditData[partId];
           if (partEditDataForPart) {
@@ -550,9 +550,21 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
             const actualPart = parts.find(p => p.id === partId); // Find the actual Part object
             const existingVariants = quotePart?.variants || [];
             
+            let hasActualChanges = false;
+            
             // Handle part-level changes (like number) that don't have a variant ID
             const partLevelNumber = partEditDataForPart.number;
-            if (partLevelNumber !== undefined && typeof partLevelNumber === 'string') {
+            console.log('🔍 Part number change check:', {
+              partId,
+              partLevelNumber,
+              actualPartNumber: actualPart?.number,
+              isDifferent: partLevelNumber !== actualPart?.number,
+              hasValue: partLevelNumber !== undefined && typeof partLevelNumber === 'string'
+            });
+            
+            if (partLevelNumber !== undefined && typeof partLevelNumber === 'string' && partLevelNumber !== actualPart?.number) {
+              hasActualChanges = true;
+              console.log('✅ Part number change detected, adding to updates');
               // Apply part-level number change to the first variant (default variant)
               if (existingVariants.length > 0) {
                 const defaultVariant = existingVariants[0];
@@ -566,21 +578,42 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
               }
             }
             
-            // Process all existing variants
+            // Process all existing variants and check for actual changes
             existingVariants.forEach(variant => {
               const variantEditData = partEditDataForPart[variant.id];
               if (variantEditData) {
-                updates.push({
-                  id: partId,
-                  updates: {
-                    variantId: variant.id,
-                    number: variantEditData.number !== undefined ? variantEditData.number : actualPart?.number || '',
-                    note: variantEditData.note !== undefined ? variantEditData.note : variant.note,
-                    price: variantEditData.final_price !== undefined ? variantEditData.final_price : variant.final_price,
-                    list_price: variantEditData.list_price !== undefined ? variantEditData.list_price : variant.list_price,
-                    af: variantEditData.af !== undefined ? variantEditData.af : variant.af
-                  }
+                // Check if there are actual changes compared to current values
+                const hasChanges = (
+                  (variantEditData.note !== undefined && variantEditData.note !== variant.note) ||
+                  (variantEditData.final_price !== undefined && variantEditData.final_price !== variant.final_price) ||
+                  (variantEditData.list_price !== undefined && variantEditData.list_price !== variant.list_price) ||
+                  (variantEditData.af !== undefined && variantEditData.af !== variant.af) ||
+                  (variantEditData.number !== undefined && variantEditData.number !== actualPart?.number)
+                );
+                
+                console.log('🔍 Variant change check:', {
+                  partId,
+                  variantId: variant.id,
+                  variantEditDataNumber: variantEditData.number,
+                  actualPartNumber: actualPart?.number,
+                  hasNumberChange: variantEditData.number !== undefined && variantEditData.number !== actualPart?.number,
+                  hasChanges
                 });
+                
+                if (hasChanges) {
+                  hasActualChanges = true;
+                  updates.push({
+                    id: partId,
+                    updates: {
+                      variantId: variant.id,
+                      number: variantEditData.number !== undefined ? variantEditData.number : actualPart?.number || '',
+                      note: variantEditData.note !== undefined ? variantEditData.note : variant.note,
+                      price: variantEditData.final_price !== undefined ? variantEditData.final_price : variant.final_price,
+                      list_price: variantEditData.list_price !== undefined ? variantEditData.list_price : variant.list_price,
+                      af: variantEditData.af !== undefined ? variantEditData.af : variant.af
+                    }
+                  });
+                }
               }
             });
             
@@ -592,17 +625,18 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
               if (!alreadyProcessed) {
                 const variantEditData = partEditDataForPart[variantId];
                 if (variantEditData && (variantEditData.number !== undefined || variantEditData.note !== undefined || variantEditData.final_price !== undefined || variantEditData.list_price !== undefined || variantEditData.af !== undefined)) {
-                updates.push({
-                  id: partId,
-                  updates: {
-                      variantId: variantId,
-                      number: variantEditData.number !== undefined ? variantEditData.number : actualPart?.number || '',
-                      note: variantEditData.note !== undefined ? variantEditData.note : '',
-                      price: variantEditData.final_price !== undefined ? variantEditData.final_price : null,
-                      list_price: variantEditData.list_price !== undefined ? variantEditData.list_price : null,
-                      af: variantEditData.af !== undefined ? variantEditData.af : false
-                  }
-                });
+                  hasActualChanges = true;
+                  updates.push({
+                    id: partId,
+                    updates: {
+                        variantId: variantId,
+                        number: variantEditData.number !== undefined ? variantEditData.number : actualPart?.number || '',
+                        note: variantEditData.note !== undefined ? variantEditData.note : '',
+                        price: variantEditData.final_price !== undefined ? variantEditData.final_price : null,
+                        list_price: variantEditData.list_price !== undefined ? variantEditData.list_price : null,
+                        af: variantEditData.af !== undefined ? variantEditData.af : false
+                    }
+                  });
                 }
               }
             });
@@ -610,6 +644,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
         });
 
         if (updates.length > 0) {
+          console.log('📤 Send button: Sending updates for', updates.length, 'parts:', updates.map(u => ({ id: u.id, hasPrice: u.updates.price !== undefined, hasNote: u.updates.note !== undefined, hasListPrice: u.updates.list_price !== undefined, hasNumber: u.updates.number !== undefined })));
           try {
             await onUpdateMultipleParts(updates, quote.id, true); // Change status for send button
             updateLocalState();
@@ -679,6 +714,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
         // Then, save the default variant to the backend (for compatibility with current schema)
         const updates: Array<{ id: string; updates: Partial<Part> & { variantId?: string; list_price?: number | null; af?: boolean } }> = [];
         
+        // Only process parts that have actual changes to avoid unnecessary updates
         Object.keys(partEditData).forEach(partId => {
           const partEditDataForPart = partEditData[partId];
           if (partEditDataForPart) {
@@ -687,9 +723,21 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
             const actualPart = parts.find(p => p.id === partId); // Find the actual Part object
             const existingVariants = quotePart?.variants || [];
             
+            let hasActualChanges = false;
+            
             // Handle part-level changes (like number) that don't have a variant ID
             const partLevelNumber = partEditDataForPart.number;
-            if (partLevelNumber !== undefined && typeof partLevelNumber === 'string') {
+            console.log('🔍 Part number change check:', {
+              partId,
+              partLevelNumber,
+              actualPartNumber: actualPart?.number,
+              isDifferent: partLevelNumber !== actualPart?.number,
+              hasValue: partLevelNumber !== undefined && typeof partLevelNumber === 'string'
+            });
+            
+            if (partLevelNumber !== undefined && typeof partLevelNumber === 'string' && partLevelNumber !== actualPart?.number) {
+              hasActualChanges = true;
+              console.log('✅ Part number change detected, adding to updates');
               // Apply part-level number change to the first variant (default variant)
               if (existingVariants.length > 0) {
                 const defaultVariant = existingVariants[0];
@@ -703,21 +751,42 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
               }
             }
             
-            // Process all existing variants
+            // Process all existing variants and check for actual changes
             existingVariants.forEach(variant => {
               const variantEditData = partEditDataForPart[variant.id];
               if (variantEditData) {
-                updates.push({
-                  id: partId,
-                  updates: {
-                    variantId: variant.id,
-                    number: variantEditData.number !== undefined ? variantEditData.number : actualPart?.number || '',
-                    note: variantEditData.note !== undefined ? variantEditData.note : variant.note,
-                    price: variantEditData.final_price !== undefined ? variantEditData.final_price : variant.final_price,
-                    list_price: variantEditData.list_price !== undefined ? variantEditData.list_price : variant.list_price,
-                    af: variantEditData.af !== undefined ? variantEditData.af : variant.af
-                  }
+                // Check if there are actual changes compared to current values
+                const hasChanges = (
+                  (variantEditData.note !== undefined && variantEditData.note !== variant.note) ||
+                  (variantEditData.final_price !== undefined && variantEditData.final_price !== variant.final_price) ||
+                  (variantEditData.list_price !== undefined && variantEditData.list_price !== variant.list_price) ||
+                  (variantEditData.af !== undefined && variantEditData.af !== variant.af) ||
+                  (variantEditData.number !== undefined && variantEditData.number !== actualPart?.number)
+                );
+                
+                console.log('🔍 Variant change check:', {
+                  partId,
+                  variantId: variant.id,
+                  variantEditDataNumber: variantEditData.number,
+                  actualPartNumber: actualPart?.number,
+                  hasNumberChange: variantEditData.number !== undefined && variantEditData.number !== actualPart?.number,
+                  hasChanges
                 });
+                
+                if (hasChanges) {
+                  hasActualChanges = true;
+                  updates.push({
+                    id: partId,
+                    updates: {
+                      variantId: variant.id,
+                      number: variantEditData.number !== undefined ? variantEditData.number : actualPart?.number || '',
+                      note: variantEditData.note !== undefined ? variantEditData.note : variant.note,
+                      price: variantEditData.final_price !== undefined ? variantEditData.final_price : variant.final_price,
+                      list_price: variantEditData.list_price !== undefined ? variantEditData.list_price : variant.list_price,
+                      af: variantEditData.af !== undefined ? variantEditData.af : variant.af
+                    }
+                  });
+                }
               }
             });
             
@@ -729,19 +798,20 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
               if (!alreadyProcessed) {
                 const variantEditData = partEditDataForPart[variantId];
                 if (variantEditData && (variantEditData.number !== undefined || variantEditData.note !== undefined || variantEditData.final_price !== undefined || variantEditData.list_price !== undefined || variantEditData.af !== undefined)) {
-                updates.push({
-                  id: partId,
-                  updates: {
-                      variantId: variantId,
-                      number: variantEditData.number !== undefined ? variantEditData.number : actualPart?.number || '',
-                      note: variantEditData.note !== undefined ? variantEditData.note : '',
-                      price: variantEditData.final_price !== undefined ? variantEditData.final_price : null,
-                      list_price: variantEditData.list_price !== undefined ? variantEditData.list_price : null,
-                      af: variantEditData.af !== undefined ? variantEditData.af : false
-                  }
-                });
+                  hasActualChanges = true;
+                  updates.push({
+                    id: partId,
+                    updates: {
+                        variantId: variantId,
+                        number: variantEditData.number !== undefined ? variantEditData.number : actualPart?.number || '',
+                        note: variantEditData.note !== undefined ? variantEditData.note : '',
+                        price: variantEditData.final_price !== undefined ? variantEditData.final_price : null,
+                        list_price: variantEditData.list_price !== undefined ? variantEditData.list_price : null,
+                        af: variantEditData.af !== undefined ? variantEditData.af : false
+                    }
+                  });
+                }
               }
-            }
             });
           }
         });
@@ -752,28 +822,10 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
         // Note: JSON structure updates are now handled by the mutation
         
         if (updates.length > 0) {
+          console.log('💾 Save button: Sending updates for', updates.length, 'parts:', updates.map(u => ({ id: u.id, hasPrice: u.updates.price !== undefined, hasNote: u.updates.note !== undefined, hasListPrice: u.updates.list_price !== undefined, hasNumber: u.updates.number !== undefined })));
           try {
-            // Separate part number updates from other updates
-            const partNumberUpdates = updates.filter(update => 
-              update.updates.number !== undefined && update.updates.number !== ''
-            );
-            const otherUpdates = updates.filter(update => 
-              update.updates.number === undefined || update.updates.number === ''
-            );
-
-            // Handle part number updates with batch mutation
-            if (partNumberUpdates.length > 0) {
-              const partNumberBatchUpdates = partNumberUpdates.map(update => ({
-                id: update.id,
-                partNumber: update.updates.number
-              }));
-              await onUpdatePartNumbersBatch(partNumberBatchUpdates);
-            }
-
-            // Handle other updates (price, notes, list_price, af) with individual mutation
-            if (otherUpdates.length > 0) {
-              await onUpdateMultipleParts(otherUpdates, editingParts, false); // Don't change status for save button
-            }
+            // Pass the quote ID to onUpdateMultipleParts for more reliable lookup
+            await onUpdateMultipleParts(updates, editingParts, false); // Don't change status for save button
             
             // Update local state after successful backend save
             updateLocalState();

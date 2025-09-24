@@ -1,6 +1,6 @@
 'use client';
 
-import { useQuotesQuery, useDeleteQuoteMutation, useUpdatePartInQuoteJsonMutation, useUpdateMultiplePartsInQuoteJsonMutation, useUpdatePartNumbersBatchMutation, queryKeys } from '@/hooks/queries/useQuotesQuery';
+import { useQuotesQuery, useDeleteQuoteMutation, useUpdatePartInQuoteJsonMutation, useUpdatePartsComprehensiveBatchMutation, queryKeys } from '@/hooks/queries/useQuotesQuery';
 import { useAllQuoteParts } from '@/hooks/useAllQuoteParts';
 import QuoteTable from '@/components/ui/QuoteTable';
 import { ProtectedRoute } from '@/components/common/ProtectedRoute';
@@ -30,8 +30,7 @@ export default function CompletedQuotesPage() {
   // Use the actual mutations
   const deleteQuoteMutation = useDeleteQuoteMutation();
   const updatePartMutation = useUpdatePartInQuoteJsonMutation();
-  const updateMultiplePartsMutation = useUpdateMultiplePartsInQuoteJsonMutation();
-  const updatePartNumbersBatchMutation = useUpdatePartNumbersBatchMutation();
+  const updatePartsComprehensiveBatchMutation = useUpdatePartsComprehensiveBatchMutation();
 
   // Update quote function - handles status updates and other quote fields
   const updateQuote = async (id: string, fields: Record<string, any>) => {
@@ -216,8 +215,8 @@ export default function CompletedQuotesPage() {
         return;
       }
 
-      // Use the batch mutation to update all parts in a single call
-      await updateMultiplePartsMutation.mutateAsync({ 
+      // Use the comprehensive batch mutation to update all parts in a single operation
+      await updatePartsComprehensiveBatchMutation.mutateAsync({ 
         quoteId: quote.id, 
         updates, 
         changeStatus 
@@ -227,13 +226,6 @@ export default function CompletedQuotesPage() {
     }
   };
 
-  const handleUpdatePartNumbersBatch = async (updates: Array<{ id: string; partNumber: string }>): Promise<void> => {
-    try {
-      await updatePartNumbersBatchMutation.mutateAsync({ updates });
-    } catch (error) {
-      console.error('Error updating part numbers:', error);
-    }
-  };
 
   return (
     <ProtectedRoute allowedRoles={['quote_creator', 'price_manager', 'quality_controller', 'admin']}>
@@ -247,7 +239,6 @@ export default function CompletedQuotesPage() {
           onDeleteQuote={deleteQuote}
           onUpdatePart={handleUpdatePart}
           onUpdateMultipleParts={handleUpdateMultipleParts}
-          onUpdatePartNumbersBatch={handleUpdatePartNumbersBatch}
           onMarkCompleted={markQuoteCompleted}
           onMarkAsOrdered={markQuoteAsOrdered}
           showCompleted={true}

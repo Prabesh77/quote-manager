@@ -1094,7 +1094,8 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
       if (requiredBy.includes('T')) {
         // ISO timestamp format
         const deadline = new Date(requiredBy);
-        const now = currentTime; // Use currentTime from state instead of new Date()
+        const now = new Date(); // Use current time for accurate comparison
+        
         const diffMs = deadline.getTime() - now.getTime();
         const diffMins = Math.floor(diffMs / (1000 * 60));
         
@@ -1208,7 +1209,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
       }
       
       const deadline = new Date(parseInt(year), parseInt(month) - 1, parseInt(day), hours, minutes);
-      const now = currentTime; // Use currentTime from state instead of new Date()
+      const now = new Date(); // Use current time for accurate comparison
       const diffMs = deadline.getTime() - now.getTime();
       const diffMins = Math.floor(diffMs / (1000 * 60));
       
@@ -1373,7 +1374,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
     
     try {
       const deadline = new Date(quote.requiredBy);
-      const now = currentTime;
+      const now = new Date();
       const diffMs = deadline.getTime() - now.getTime();
       const diffMins = Math.floor(diffMs / (1000 * 60));
       
@@ -1387,7 +1388,23 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
     }
   };
 
-  const filteredQuotes = quotes.filter(quote => {
+  // Function to check if quote ref contains special characters
+  const hasSpecialCharacters = (quoteRef: string) => {
+    return quoteRef && (quoteRef.includes('.') || quoteRef.includes('/') || quoteRef.includes('#'));
+  };
+
+  // Sort quotes by deadline priority (least time remaining = highest priority)
+  const sortedQuotes = useMemo(() => {
+    return [...quotes].sort((a, b) => {
+      const priorityA = getDeadlinePriority(a);
+      const priorityB = getDeadlinePriority(b);
+      
+      // Lower priority number = higher priority (appears first)
+      return priorityA - priorityB;
+    });
+  }, [quotes]);
+
+  const filteredQuotes = sortedQuotes.filter(quote => {
     const quoteParts = getQuotePartsWithNotesSync(quote.id);
     const status = getQuoteStatus(quoteParts, quote.status);
     
@@ -1678,19 +1695,19 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                           )}
                         </div>
                         {quote.customer && (
-                          <div className="px-2 py-[2px] text-[10px] text-orange-600 font-medium rounded shadow-sm">
+                          <div className="px-2 py-[2px] text-[10px] text-orange-600 font-medium border-b border-gray-100">
                             <div className="flex items-center space-x-1">
-                              <span className="font-semibold">
-                            {quote.customer}
+                              <span className="font-semibold text-[12px]">
+                                {quote.customer}
                                 {quote.settlement !== undefined && quote.settlement > 0 && (
-                                  <span className="text-blue-600 font-medium"> ({quote.settlement}%)</span>
+                                  <span className="text-blue-600 font-bold text-[13px]"> ({quote.settlement}%)</span>
                                 )}
                               </span>
                               {quote.address && (
                                 <>
                                   <span className="text-gray-400">•</span>
-                                  <MapPin className="h-2.5 w-2.5 text-gray-500" />
-                                  <span className="text-[9px] text-gray-600">
+                                  <MapPin className="h-4 w-4 text-red-500" />
+                                  <span className="text-[12px] text-gray-800">
                                     {quote.address}
                                   </span>
                                 </>
@@ -1743,7 +1760,9 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                           />
                         ) : (
                       <>
-                        <span className="font-medium text-gray-900">{quote.quoteRef}</span>
+                        <span className={`font-medium ${hasSpecialCharacters(quote.quoteRef || '') ? 'text-blue-600 bg-blue-50 px-2 py-1 rounded-md border border-blue-200 shadow-sm' : 'text-gray-900'}`}>
+                          {quote.quoteRef}
+                        </span>
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
@@ -1955,7 +1974,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                           >
                             <Edit className="h-3 w-3" />
                             <span>Edit Parts</span>
-                            </button>
+                          </button>
                             {currentPageName === 'pricing' && (
                               <button
                                 onClick={(e) => {
@@ -2043,7 +2062,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                     <th className="px-4 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider w-1/5">Part Number</th>
                                     <th className="px-4 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider w-1/6">List Price</th>
                                     <th className="px-4 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider w-1/6">Price</th>
-                                    <th className="px-4 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider w-1/12">AF</th>
+                                    <th className="px-4 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider w-1/12">AM</th>
                                     <th className="px-4 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider w-1/4">Notes</th>
                                   </tr>
                                 </thead>
@@ -2252,7 +2271,13 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                                   />
                                                 ) : (
                                                   <span className={`text-sm ${variant.af ? 'text-green-600 font-medium' : 'text-gray-400'}`}>
-                                                    {variant.af ? '✓' : 'X'}
+                                                    {variant.af ? (
+                                                      <span className='bg-green-500 text-white rounded-full px-2 py-1 text-xs font-bold shadow-md border-2 border-green-600'>
+                                                        ✓ AM
+                                                    </span>
+                                                    ) : (
+                                                      <span className='text-gray-400 text-sm'>○ OEM</span>
+                                                    )}
                                                     </span>
                                                 )}
                                               </div>
@@ -2381,7 +2406,9 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                           <div className="flex items-center space-x-2">
                             <div className="flex flex-col">
                               <span className="text-xs font-medium text-gray-500">Quote Ref</span>
-                              <span className="font-semibold text-gray-900">{quote.quoteRef}</span>
+                              <span className={`font-semibold ${hasSpecialCharacters(quote.quoteRef || '') ? 'text-blue-600 bg-blue-50 px-2 py-1 rounded-md border border-blue-200 shadow-sm' : 'text-gray-900'}`}>
+                                {quote.quoteRef}
+                              </span>
                             </div>
                             <button
                               onClick={(e) => {
@@ -2598,7 +2625,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                   >
                                     <Edit className="h-3 w-3" />
                               <span>Edit Parts</span>
-                                    </button>
+                                  </button>
                                     {currentPageName === 'pricing' && (
                                       <button
                                         onClick={(e) => {
@@ -2817,7 +2844,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                             
                                           <div className="grid grid-cols-2 gap-3">
                                             <div>
-                                              <label className="block text-xs font-medium text-gray-500 mb-1">AF (Aftermarket)</label>
+                                              <label className="block text-xs font-medium text-gray-500 mb-1">AM (Aftermarket)</label>
                                               <div className="flex items-center space-x-1">
                                                 {isPartEditing ? (
                                                   <input
@@ -2829,7 +2856,13 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                                   />
                                                 ) : (
                                                   <span className={`text-sm ${part.af ? 'text-green-600 font-medium' : 'text-gray-400'}`}>
-                                                    {part.af ? '✓ Aftermarket' : '○ OEM'}
+                                                    {part.af ? (
+                                                      <span className='bg-green-500 text-white rounded-full px-2 py-1 text-xs font-bold shadow-md border-2 border-green-600'>
+                                                        ✓ AM
+                                                      </span>
+                                                    ) : (
+                                                      <span className='text-gray-400 text-sm'>○ OEM</span>
+                                                    )}
                                                   </span>
                                                 )}
                                               </div>

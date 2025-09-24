@@ -465,9 +465,9 @@ export const useCreateQuoteMutation = () => {
       return await createNormalizedQuote(quoteData);
     },
     onSuccess: (data) => {
-      // For new quotes, we only need to invalidate the main quotes query
-      // Parts data will be fetched fresh when the quote is loaded
+      // Invalidate both quotes and parts cache since new parts are created during quote creation
       queryClient.invalidateQueries({ queryKey: queryKeys.quotesBase });
+      queryClient.invalidateQueries({ queryKey: ['all-parts-for-quotes'] });
     },
     onError: (error) => {
       console.error('Error creating quote:', error);

@@ -138,64 +138,66 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
         matchedPartName === 'Blindspot Sensor' || matchedPartName === 'Blindspot'
       );
 
+      // Determine the final part name to use
+      let finalPartName = matchedPartName;
+
       // Apply auto-assignment rules for left/right parts
       if (leftRightParts.includes(matchedPartName) || isUnidentifiedLeftRightPart) {
-        setSelectedParts(prev => {
+        // If the AI already detected the side (Left/Right), respect it
+        if (leftRightParts.includes(matchedPartName)) {
+          // AI already determined the correct side - use it directly
+          finalPartName = matchedPartName;
+        } else if (isUnidentifiedLeftRightPart) {
+          // Only apply auto-assignment for unidentified parts (generic "Headlamp", "DayLight", etc.)
           let partType: string;
           
           // Determine the part type based on the matched part name
-          if (isUnidentifiedLeftRightPart) {
-            // Handle unidentified parts
-            if (matchedPartName === 'Headlamp' || matchedPartName === 'Headlight') {
-              partType = 'Headlamp';
-            } else if (matchedPartName === 'DayLight' || matchedPartName === 'Daylight') {
-              partType = 'DayLight';
-            } else if (matchedPartName === 'Blindspot Sensor' || matchedPartName === 'Blindspot') {
-              partType = 'Blindspot Sensor';
-            } else {
-              partType = matchedPartName;
-            }
+          if (matchedPartName === 'Headlamp' || matchedPartName === 'Headlight') {
+            partType = 'Headlamp';
+          } else if (matchedPartName === 'DayLight' || matchedPartName === 'Daylight') {
+            partType = 'DayLight';
+          } else if (matchedPartName === 'Blindspot Sensor' || matchedPartName === 'Blindspot') {
+            partType = 'Blindspot Sensor';
           } else {
-            // Handle identified parts (already have Left/Right)
-            partType = matchedPartName.split(' ')[1]; // Get "Headlamp", "DayLight", or "Blindspot Sensor"
+            partType = matchedPartName;
           }
+          
+          // Get current selected parts to check existing parts
+          const currentSelectedParts = selectedParts;
           
           // Count existing parts of this type (both left and right)
           const leftPartName = `Left ${partType}`;
           const rightPartName = `Right ${partType}`;
-          const leftExists = prev.includes(leftPartName);
-          const rightExists = prev.includes(rightPartName);
+          const leftExists = currentSelectedParts.includes(leftPartName);
+          const rightExists = currentSelectedParts.includes(rightPartName);
           
           if (leftExists && rightExists) {
-            // Both parts exist - keep current assignment if it's not already present
-            if (!prev.includes(matchedPartName)) {
-              return [...prev, matchedPartName];
-            }
+            // Both parts exist - keep current assignment
+            finalPartName = matchedPartName;
           } else if (leftExists && !rightExists) {
             // Left exists, right doesn't - assign as right
-            if (!prev.includes(rightPartName)) {
-              matchedPartName = rightPartName;
-            }
+            finalPartName = rightPartName;
           } else if (!leftExists && rightExists) {
             // Right exists, left doesn't - assign as left
-            if (!prev.includes(leftPartName)) {
-              matchedPartName = leftPartName;
-            }
+            finalPartName = leftPartName;
           } else {
             // Neither exists - assign as left by default (first part)
-            matchedPartName = leftPartName;
+            finalPartName = leftPartName;
           }
-          
-          if (!prev.includes(matchedPartName)) {
-            return [...prev, matchedPartName];
+        }
+        
+        // Add to selected parts
+        setSelectedParts(prev => {
+          if (!prev.includes(finalPartName)) {
+            return [...prev, finalPartName];
           }
           return prev;
         });
       } else {
         // Add to selected parts if not already present (non left/right parts)
         setSelectedParts(prev => {
-          if (!prev.includes(matchedPartName)) {
-            return [...prev, matchedPartName];
+          if (!prev.includes(finalPartName)) {
+            return [...prev, finalPartName];
           }
           return prev;
         });
@@ -204,8 +206,8 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
       // Populate part details with confidence information
       setPartDetails(prev => ({
         ...prev,
-        [matchedPartName]: {
-          name: matchedPartName,
+        [finalPartName]: {
+          name: finalPartName,
           number: part.partNumber !== 'Not found' ? cleanPartNumber(part.partNumber) : '',
           price: null,
           list_price: part.list_price || null,

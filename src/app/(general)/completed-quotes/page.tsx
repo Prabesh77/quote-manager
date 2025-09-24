@@ -255,6 +255,8 @@ export default function CompletedQuotesPage() {
           searchTerm={searchTerm}
           onSearchChange={setSearchTerm}
           useServerSideSearch={true}
+          // Page identification
+          currentPageName="completed-quotes"
         />
       </div>
     </ProtectedRoute>

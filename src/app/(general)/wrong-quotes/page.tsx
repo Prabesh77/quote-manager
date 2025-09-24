@@ -312,6 +312,7 @@ function WrongQuotesContent() {
             itemsPerPage={10}
             showPagination={true}
             useServerSideSearch={false}
+            currentPageName="wrong-quotes"
           />
         )}
       </div>

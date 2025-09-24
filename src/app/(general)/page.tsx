@@ -310,6 +310,8 @@ export default function HomePage() {
             searchTerm={searchTerm}
             onSearchChange={setSearchTerm}
             useServerSideSearch={true}
+            // Page identification
+            currentPageName="home"
           />
         </div>
       </div>

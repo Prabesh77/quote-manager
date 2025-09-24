@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { ChevronDown, Edit, Save, X, Search, Eye, Copy, CheckCircle, AlertTriangle, ShoppingCart, Package, Plus, Info, MapPin, Send } from 'lucide-react';
+import { ChevronDown, Edit, Save, X, Search, Eye, Copy, CheckCircle, AlertTriangle, ShoppingCart, Package, Plus, Info, MapPin, Send, Loader2 } from 'lucide-react';
 import { Quote, Part } from './useQuotes';
 
 import { SkeletonLoader } from './SkeletonLoader';
@@ -16,6 +16,7 @@ import { getQuotePartsFromJson } from '@/utils/quotePartsHelpers';
 import { QuoteEditModal } from './QuoteEditModal';
 import QuickFillInput from './QuickFillInput';
 import QuoteInfoPopup from '../QuoteInfoPopup';
+import { useSnackbar } from '@/components/ui/Snackbar';
 
 
 interface QuoteTableProps {
@@ -44,13 +45,17 @@ interface QuoteTableProps {
   searchTerm?: string;
   onSearchChange?: (searchTerm: string) => void;
   useServerSideSearch?: boolean;
+  // Page identification
+  currentPageName?: string; // 'pricing', 'verify-price', 'completed-quotes', etc.
 }
 
 type FilterType = 'all' | 'unpriced' | 'priced';
 
 type QuoteStatus = 'unpriced' | 'priced' | 'completed' | 'ordered' | 'delivered' | 'waiting_verification' | 'wrong';
 
-export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote, onUpdatePart, onUpdateMultipleParts, onMarkCompleted, onMarkAsOrdered, onMarkAsOrderedWithParts, onMarkAsWrong, showCompleted = false, defaultFilter = 'all', isLoading = false, itemsPerPage = 10, showPagination = true, currentPage: externalCurrentPage, total: externalTotal, totalPages: externalTotalPages, pageSize: externalPageSize, onPageChange, searchTerm: externalSearchTerm, onSearchChange, useServerSideSearch = false }: QuoteTableProps) {
+export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote, onUpdatePart, onUpdateMultipleParts, onMarkCompleted, onMarkAsOrdered, onMarkAsOrderedWithParts, onMarkAsWrong, showCompleted = false, defaultFilter = 'all', isLoading = false, itemsPerPage = 10, showPagination = true, currentPage: externalCurrentPage, total: externalTotal, totalPages: externalTotalPages, pageSize: externalPageSize, onPageChange, searchTerm: externalSearchTerm, onSearchChange, useServerSideSearch = false, currentPageName }: QuoteTableProps) {
+  const { showSnackbar } = useSnackbar();
+  
   // Safety checks for undefined props
   if (!quotes || !Array.isArray(quotes)) {
     console.warn('QuoteTable: quotes prop is undefined or not an array, using empty array');
@@ -85,6 +90,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
   const [editData, setEditData] = useState<Record<string, any>>({});
   const [partEditData, setPartEditData] = useState<Record<string, Record<string, any>>>({});
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
+  const [sendForReviewLoading, setSendForReviewLoading] = useState<string | null>(null);
   const [showOrderConfirm, setShowOrderConfirm] = useState<string | null>(null);
   const [taxInvoiceNumber, setTaxInvoiceNumber] = useState('');
   const [selectedPartIds, setSelectedPartIds] = useState<string[]>([]);
@@ -476,6 +482,54 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
     }
   }, [quotes]); // Restore quotes dependency but with better logic
 
+  const handleSendForReview = async (quoteId: string) => {
+    const quote = localQuotes.find(q => q.id === quoteId);
+    if (!quote) return;
+
+    // Check if there are any parts with prices
+    const quoteParts = getQuotePartsWithNotesSync(quoteId);
+    const hasAnyPrice = quoteParts.some(part => part.price && part.price > 0);
+    
+    if (!hasAnyPrice) {
+      showSnackbar('Please add prices to at least one part before sending for review', 'warning');
+      return;
+    }
+
+    setSendForReviewLoading(quoteId);
+
+    try {
+      // Always save all parts with status change (both editing and non-editing states)
+      const quoteParts = getQuotePartsWithNotesSync(quoteId);
+      const updates = quoteParts.map(part => ({
+        id: part.id,
+        updates: {
+          variantId: 'default',
+          note: part.note || '',
+          price: part.price || null,
+          list_price: part.list_price || null,
+          af: part.af || false,
+          number: part.number || ''
+        }
+      }));
+
+      // Use the comprehensive batch mutation that handles both parts and status
+      await onUpdateMultipleParts(updates, quoteId, true); // Pass true to change status
+      
+      // If we were in editing mode, exit it
+      if (editingParts === quoteId) {
+        setEditingParts(null);
+        setPartEditData({});
+      }
+      
+      showSnackbar('Quote sent for review successfully!', 'success');
+    } catch (error) {
+      console.error('Error sending quote for review:', error);
+      showSnackbar('Error sending quote for review', 'error');
+    } finally {
+      setSendForReviewLoading(null);
+    }
+  };
+
   const handleSend = async () => {
     if (editingQuote) {
       await onUpdateQuote(editingQuote, editData);
@@ -602,9 +656,9 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                 
                 if (hasChanges) {
                   hasActualChanges = true;
-                  updates.push({
-                    id: partId,
-                    updates: {
+                updates.push({
+                  id: partId,
+                  updates: {
                       variantId: variant.id,
                       number: variantEditData.number !== undefined ? variantEditData.number : actualPart?.number || '',
                       note: variantEditData.note !== undefined ? variantEditData.note : variant.note,
@@ -662,7 +716,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
     }
   };
 
-  const handleSave = async () => {
+  const handleSave = async (forceSave: boolean = false) => {
     if (editingQuote) {
       await onUpdateQuote(editingQuote, editData);
       setEditingQuote(null);
@@ -786,10 +840,10 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                       af: variantEditData.af !== undefined ? variantEditData.af : variant.af
                     }
                   });
-                }
-              }
-            });
-            
+            }
+          }
+        });
+        
             // IMPORTANT FIX: Also process new variants that don't exist yet
             // This handles cases where parts have no existing variants but have edit data
             Object.keys(partEditDataForPart).forEach(variantId => {
@@ -821,18 +875,41 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
         
         // Note: JSON structure updates are now handled by the mutation
         
-        if (updates.length > 0) {
-          console.log('💾 Save button: Sending updates for', updates.length, 'parts:', updates.map(u => ({ id: u.id, hasPrice: u.updates.price !== undefined, hasNote: u.updates.note !== undefined, hasListPrice: u.updates.list_price !== undefined, hasNumber: u.updates.number !== undefined })));
-          try {
-            // Pass the quote ID to onUpdateMultipleParts for more reliable lookup
-            await onUpdateMultipleParts(updates, editingParts, false); // Don't change status for save button
-            
-            // Update local state after successful backend save
-            updateLocalState();
-            
+        if (updates.length > 0 || forceSave) {
+          if (forceSave && updates.length === 0) {
+            // If force save is true but no updates, create dummy updates for all parts to ensure save happens
+            const quoteParts = getQuotePartsWithNotesSync(editingParts);
+            const dummyUpdates = quoteParts.map(part => ({
+              id: part.id,
+              updates: {
+                variantId: 'default',
+                note: part.note || '',
+                price: part.price || null,
+                list_price: part.list_price || null,
+                af: part.af || false,
+                number: part.number || ''
+              }
+            }));
+            console.log('💾 Force Save: Sending dummy updates for', dummyUpdates.length, 'parts');
+            try {
+              await onUpdateMultipleParts(dummyUpdates, editingParts, false); // Don't change status for save button
+              updateLocalState();
+            } catch (error) {
+              console.error('Error force saving parts to backend:', error);
+            }
+          } else {
+            console.log('💾 Save button: Sending updates for', updates.length, 'parts:', updates.map(u => ({ id: u.id, hasPrice: u.updates.price !== undefined, hasNote: u.updates.note !== undefined, hasListPrice: u.updates.list_price !== undefined, hasNumber: u.updates.number !== undefined })));
+            try {
+              // Pass the quote ID to onUpdateMultipleParts for more reliable lookup
+              await onUpdateMultipleParts(updates, editingParts, false); // Don't change status for save button
+              
+              // Update local state after successful backend save
+              updateLocalState();
+              
           } catch (error) {
             console.error('Error saving parts to backend:', error);
-            // Don't update local state if backend save failed
+              // Don't update local state if backend save failed
+            }
           }
         }
       }
@@ -1792,16 +1869,6 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                           >
                             <Save className="h-4 w-4" />
                           </button>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                                handleSend();
-                            }}
-                            className="p-1 text-blue-600 hover:text-blue-700 hover:bg-blue-100 rounded transition-colors cursor-pointer"
-                              title="Send for verification"
-                          >
-                              <Send className="h-4 w-4" />
-                          </button>
                           </>
                         ) : null}
                         
@@ -1877,6 +1944,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                           <span className="text-sm text-gray-500">No parts linked to this quote</span>
                         )}
                         {quoteParts.length > 0 && editingParts !== quote.id && quote.status !== 'completed' && (
+                          <div className="flex space-x-2">
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
@@ -1887,7 +1955,30 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                           >
                             <Edit className="h-3 w-3" />
                             <span>Edit Parts</span>
+                            </button>
+                            {currentPageName === 'pricing' && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleSendForReview(quote.id);
+                                }}
+                                disabled={sendForReviewLoading === quote.id}
+                                className={`px-3 py-1 text-xs rounded transition-colors flex items-center space-x-1 ${
+                                  sendForReviewLoading === quote.id
+                                    ? 'bg-green-500 text-white cursor-not-allowed opacity-70'
+                                    : 'bg-green-600 text-white hover:bg-green-700 cursor-pointer'
+                                }`}
+                                title="Send for review"
+                              >
+                                {sendForReviewLoading === quote.id ? (
+                                  <Loader2 className="h-3 w-3 animate-spin" />
+                                ) : (
+                                  <Send className="h-3 w-3" />
+                                )}
+                                <span>Send for Review</span>
                           </button>
+                            )}
+                          </div>
                         )}
                         {editingParts === quote.id && (
                           <div className="flex space-x-1">
@@ -1902,17 +1993,28 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                               <Save className="h-3 w-3" />
                               <span>Save All</span>
                             </button>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleSend();
-                              }}
-                              className="px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors cursor-pointer flex items-center space-x-1"
-                              title="Send for verification"
-                            >
-                              <Send className="h-3 w-3" />
-                              <span>Send</span>
-                            </button>
+                            {currentPageName === 'pricing' && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleSendForReview(quote.id);
+                                }}
+                                disabled={sendForReviewLoading === quote.id}
+                                className={`px-3 py-1 text-xs rounded transition-colors flex items-center space-x-1 ${
+                                  sendForReviewLoading === quote.id
+                                    ? 'bg-blue-500 text-white cursor-not-allowed opacity-70'
+                                    : 'bg-blue-600 text-white hover:bg-blue-700 cursor-pointer'
+                                }`}
+                                title="Save and send for review"
+                              >
+                                {sendForReviewLoading === quote.id ? (
+                                  <Loader2 className="h-3 w-3 animate-spin" />
+                                ) : (
+                                  <Send className="h-3 w-3" />
+                                )}
+                                <span>Send for Review</span>
+                              </button>
+                            )}
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
@@ -2332,19 +2434,9 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                           >
                                       <Save className="h-3 w-3" />
                           </button>
-                                    <button
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleSend();
-                                      }}
-                                      className="p-1 text-blue-600 hover:text-blue-700 hover:bg-blue-100 rounded transition-colors cursor-pointer"
-                                      title="Send for verification"
-                                    >
-                                      <Send className="h-3 w-3" />
-                                    </button>
                                   </>
                                 ) : null}
-                                
+                          
                                 {editingQuote === quote.id ? (
                           <button
                             onClick={(e) => {
@@ -2495,6 +2587,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                   <span className="text-sm text-gray-500">No parts linked to this quote</span>
                                 )}
                           {quoteParts.length > 0 && editingParts !== quote.id && quote.status !== 'completed' && (
+                                  <div className="flex space-x-2">
                                   <button
                               onClick={(e) => {
                                 e.stopPropagation();
@@ -2505,7 +2598,30 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                   >
                                     <Edit className="h-3 w-3" />
                               <span>Edit Parts</span>
+                                    </button>
+                                    {currentPageName === 'pricing' && (
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleSendForReview(quote.id);
+                                        }}
+                                        disabled={sendForReviewLoading === quote.id}
+                                        className={`px-3 py-1 text-xs rounded transition-colors flex items-center space-x-1 ${
+                                          sendForReviewLoading === quote.id
+                                            ? 'bg-green-500 text-white cursor-not-allowed opacity-70'
+                                            : 'bg-green-600 text-white hover:bg-green-700 cursor-pointer'
+                                        }`}
+                                        title="Send for review"
+                                      >
+                                        {sendForReviewLoading === quote.id ? (
+                                          <Loader2 className="h-3 w-3 animate-spin" />
+                                        ) : (
+                                          <Send className="h-3 w-3" />
+                                        )}
+                                        <span>Send for Review</span>
                                   </button>
+                                    )}
+                                  </div>
                                 )}
                           {editingParts === quote.id && (
                                   <div className="flex space-x-1">
@@ -2520,17 +2636,28 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                       <Save className="h-3 w-3" />
                                       <span>Save All</span>
                                     </button>
-                                    <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleSend();
-                                }}
-                                className="px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors cursor-pointer flex items-center space-x-1"
-                                title="Send for verification"
-                                    >
-                                      <Send className="h-3 w-3" />
-                                      <span>Send</span>
-                                    </button>
+                                    {currentPageName === 'pricing' && (
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleSendForReview(quote.id);
+                                        }}
+                                        disabled={sendForReviewLoading === quote.id}
+                                        className={`px-3 py-1 text-xs rounded transition-colors flex items-center space-x-1 ${
+                                          sendForReviewLoading === quote.id
+                                            ? 'bg-blue-500 text-white cursor-not-allowed opacity-70'
+                                            : 'bg-blue-600 text-white hover:bg-blue-700 cursor-pointer'
+                                        }`}
+                                        title="Save and send for review"
+                                      >
+                                        {sendForReviewLoading === quote.id ? (
+                                          <Loader2 className="h-3 w-3 animate-spin" />
+                                        ) : (
+                                          <Send className="h-3 w-3" />
+                                        )}
+                                        <span>Send for Review</span>
+                                      </button>
+                                    )}
                                     <button
                                 onClick={(e) => {
                                   e.stopPropagation();

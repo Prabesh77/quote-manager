@@ -279,7 +279,6 @@ export default function HomePage() {
   return (
     <ProtectedRoute allowedRoles={['quote_creator', 'admin']}>
       <div className="py-6">
-        <h1 className="text-2xl font-bold text-gray-900 mb-6">Create New Quote</h1>
         <QuoteForm onSubmit={handleSubmit} />
         
         {/* Display quotes with server-side pagination */}

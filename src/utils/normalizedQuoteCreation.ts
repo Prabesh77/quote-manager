@@ -14,11 +14,11 @@ const convertAustralianDateToISO = (dateString: string | undefined): string | nu
     return trimmed; // Already in correct format
   }
 
-  // Handle Australian format like "11/08/2025 12:00pm" (DD/MM/YYYY)
+  // Handle Australian format like "24/09/2025 9:30am" (DD/MM/YYYY)
   if (trimmed.includes('/')) {
     const parts = trimmed.split(' ');
-    const datePart = parts[0]; // "11/08/2025"
-    const timePart = parts[1]; // "12:00pm"
+    const datePart = parts[0]; // "24/09/2025"
+    const timePart = parts[1]; // "9:30am"
     
     const dateComponents = datePart.split('/');
     if (dateComponents.length === 3) {
@@ -30,15 +30,53 @@ const convertAustralianDateToISO = (dateString: string | undefined): string | nu
       if (!isNaN(day) && !isNaN(month) && !isNaN(year) && 
           day >= 1 && day <= 31 && month >= 1 && month <= 12 && year >= 1900 && year <= 2100) {
         
-        // Convert to ISO format: YYYY-MM-DD
-        const isoDate = `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
-        
-        // If there's a time part, append it
         if (timePart) {
-          return `${isoDate} ${timePart}`;
+          // Parse time part (e.g., "9:30am", "12:00pm")
+          const timeStr = timePart.toLowerCase();
+          let hours = 0;
+          let minutes = 0;
+          
+          if (timeStr.includes('pm')) {
+            const time = timeStr.replace('pm', '');
+            if (time.includes(':')) {
+              const [h, m] = time.split(':');
+              const hour = parseInt(h);
+              hours = hour === 12 ? 12 : hour + 12;
+              minutes = parseInt(m || '0');
+            } else {
+              const timeNum = parseInt(time);
+              const hour = Math.floor(timeNum / 100);
+              hours = hour === 12 ? 12 : hour + 12;
+              minutes = timeNum % 100;
+            }
+          } else if (timeStr.includes('am')) {
+            const time = timeStr.replace('am', '');
+            if (time.includes(':')) {
+              const [h, m] = time.split(':');
+              hours = parseInt(h);
+              minutes = parseInt(m || '0');
+            } else {
+              const timeNum = parseInt(time);
+              hours = Math.floor(timeNum / 100);
+              minutes = timeNum % 100;
+            }
+          }
+          
+          // Create a date string that represents the Sydney time
+          const isoDateTime = `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}T${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:00`;
+          
+          // Create a date object - since we're in Sydney timezone, this will automatically
+          // convert the local time to UTC when we call toISOString()
+          const sydneyDate = new Date(isoDateTime);
+          
+          // The date object is already correctly converted to UTC by JavaScript
+          // No need for manual timezone conversion since we're in Sydney timezone
+          return sydneyDate.toISOString();
+        } else {
+          // No time part, just return the date
+          const isoDate = `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
+          return isoDate;
         }
-        
-        return isoDate;
       }
     }
   }

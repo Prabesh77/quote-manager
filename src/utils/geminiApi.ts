@@ -93,6 +93,11 @@ INSTRUCTIONS:
     - If text contains 'sensor' AND NOT 'radar' AND NOT 'camera' → classify as 'Parking Sensor' (unless corner is mentioned)
     - For blindspot sensors: Use L/R context to determine 'Left Blindspot Sensor' or 'Right Blindspot Sensor'
     - For parking sensors: Use 'Parking Sensor' (no L/R distinction needed)
+13. FORD-SPECIFIC RULES:
+    - FORD PART NUMBER SELECTION: When multiple values look like part numbers, prioritize the one that:
+      * Has spaces in it (e.g., "12345 ABC" vs "12345ABC")
+      * Has a label that includes "Part number" in the screenshot
+    - FORD RADAR SENSOR DETECTION: If text contains 'Sensor Assy' OR 'Les Bracket' → classify as 'Radar Sensor' for Ford cars
 
 IMPORTANT RULES:
 - Use these exact standardized part names:
@@ -339,7 +344,8 @@ function fallbackExtraction(ocrText: string): AIPartExtraction[] {
       partName = 'Blindspot Sensor';
     } else if (line.toLowerCase().includes('radar') || line.toLowerCase().includes('sensor') || 
                line.toLowerCase().includes('fwd collision mitigation') || line.toLowerCase().includes('forward collision mitigation') ||
-               line.toLowerCase().includes('collision mitigation system') || line.toLowerCase().includes('fcms')) {
+               line.toLowerCase().includes('collision mitigation system') || line.toLowerCase().includes('fcms') ||
+               line.toLowerCase().includes('sensor assy') || line.toLowerCase().includes('les bracket')) {
       partName = 'Radar Sensor';
     } else if (line.toLowerCase().includes('auxiliary radiator') || line.toLowerCase().includes('aux radiator') || line.toLowerCase().includes('aux.radiator')) {
       partName = 'Auxiliary Radiator';

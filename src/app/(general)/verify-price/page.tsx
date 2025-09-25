@@ -87,27 +87,44 @@ export default function VerifyPricePage() {
   };
 
   const updateMultipleParts = async (updates: Array<{ id: string; updates: any }>, quoteId?: string, changeStatus: boolean = true) => {
-    // Find the quote that contains these parts
-    const quote = quotesData?.quotes?.find(q => 
-      q.parts_requested?.some((partItem: any) => 
-        updates.some(update => update.id === partItem.part_id)
-      )
-    );
+    let quote;
+    
+    if (quoteId) {
+      // If quoteId is provided, use it directly (more reliable)
+      quote = quotesData?.quotes?.find(q => q.id === quoteId);
+    } else {
+      // Fallback: Find the quote that contains these parts
+      quote = quotesData?.quotes?.find(q => 
+        q.parts_requested?.some((partItem: any) => 
+          updates.some(update => update.id === partItem.part_id)
+        )
+      );
+
+      // If no quote found with parts_requested, try to find by checking if we're editing parts
+      // This handles the case where parts_requested might be empty but we're still editing
+      if (!quote && quotesData?.quotes?.length === 1) {
+        // If there's only one quote on the pricing page, it's likely the one we're editing
+        quote = quotesData.quotes[0];
+      }
+    }
     
     if (!quote) {
-      console.error('Quote not found for these parts');
+      console.error('❌ Quote not found for these parts');
+      console.error('❌ Part IDs being searched:', updates.map(u => u.id));
+      console.error('❌ Available quotes and their parts:', quotesData?.quotes?.map(q => ({
+        quoteId: q.id,
+        parts: q.parts_requested?.map((p: any) => p.part_id) || []
+      })));
       return;
     }
 
     try {
-      // Update each part individually using the mutation
-      for (const { id, updates: partUpdates } of updates) {
-        try {
-          await updatePartMutation.mutateAsync({ quoteId: quote.id, partId: id, updates: partUpdates, changeStatus });
-        } catch (error) {
-          console.error(`❌ Error updating part ${id}:`, error);
-        }
-      }
+      // Use the comprehensive batch mutation to update all parts in a single operation
+      await updatePartsComprehensiveBatchMutation.mutateAsync({ 
+        quoteId: quote.id, 
+        updates, 
+        changeStatus 
+      });
     } catch (error) {
       console.error('❌ Error in updateMultipleParts:', error);
     }

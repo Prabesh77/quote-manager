@@ -256,11 +256,42 @@ export class QuoteActionsService {
         }
       });
 
-      // Convert map to array and sort
-      const userStats = Array.from(userStatsMap.values())
-        .sort((a, b) => b.total_quotes - a.total_quotes || b.quotes_created - a.quotes_created);
+      // Convert map to array and get user information
+      const userIds = Array.from(userStatsMap.keys());
+      
+      // Fetch user data from user_profiles table
+      const { data: userProfiles, error: usersError } = await supabase
+        .from('user_profiles')
+        .select('id, username, full_name')
+        .in('id', userIds);
+      
+      if (usersError) {
+        console.error('Error fetching user profiles for stats:', usersError);
+        // Return stats with fallback user data
+        return Array.from(userStatsMap.values())
+          .sort((a, b) => b.total_quotes - a.total_quotes || b.quotes_created - a.quotes_created);
+      }
 
-      return userStats;
+      // Create a map of user data for quick lookup
+      const userMap = new Map();
+      (userProfiles || []).forEach(profile => {
+        userMap.set(profile.id, {
+          username: profile.username,
+          full_name: profile.full_name
+        });
+      });
+
+      // Update user stats with real user information
+      const userStats = Array.from(userStatsMap.values()).map(stats => {
+        const userInfo = userMap.get(stats.user_id);
+        return {
+          ...stats,
+          user_email: userInfo?.username || 'User',
+          user_name: userInfo?.full_name || userInfo?.username || 'User'
+        };
+      });
+
+      return userStats.sort((a, b) => b.total_quotes - a.total_quotes || b.quotes_created - a.quotes_created);
     } catch (error) {
       console.error('Error in getUserStats:', error);
       return [];

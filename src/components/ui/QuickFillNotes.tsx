@@ -38,9 +38,11 @@ const QuickFillNotes: React.FC<QuickFillNotesProps> = ({
           items.availableIn = part.replace('AVAILABLE IN ', '').trim();
         } else if (part.startsWith('ETA ')) {
           items.eta = part.replace('ETA ', '').trim();
-        } else if (['STOCK ARRIVING', 'ON BACKORDER'].includes(part.toUpperCase())) {
+        } else if (['STOCK ARRIVING', 'ON BACKORDER', 'INVOICE PRICE: $', 'COMPLETE FAN ASSEMBLY'].includes(part.toUpperCase())) {
           items.info = part.toUpperCase();
-        } else if (['GENUINE', 'ZILAX', 'KOYO', 'CRYOMAX', 'MAHLE', 'DELPHI', 'DENSO', 'GENUINE WITH LOGO', 'GENUINE WITH BRACKET', 'GEN. W/O BRACKET'].includes(part.toUpperCase())) {
+        } else if (['GENUINE WITH BRACKET', 'GENUINE WITHOUT BRACKET'].includes(part.toUpperCase())) {
+          items.info = part.toUpperCase();
+        } else if (['GENUINE', 'GENUINE WITH LOGO', 'ZILAX', 'CRYOMAX', 'KOYO', 'DELPHI', 'MAHLE', 'DENSO', 'DELANG', 'NRF'].includes(part.toUpperCase())) {
           items.brand = part.toUpperCase();
         }
       });
@@ -113,30 +115,12 @@ const QuickFillNotes: React.FC<QuickFillNotesProps> = ({
   }, [isOpen]);
 
   const handleSelect = (section: string, value: string, displayValue: string) => {
-    // Prevent duplicate selections
-    if (selectedItems[section as keyof typeof selectedItems] === displayValue) {
-      return;
-    }
-    
     const newSelectedItems = { ...selectedItems };
     
-    // Remove existing item from the same section
-    if (section === 'location') {
-      delete newSelectedItems.location;
-    } else if (section === 'availableIn') {
-      delete newSelectedItems.availableIn;
-    } else if (section === 'brand') {
-      delete newSelectedItems.brand;
-    } else if (section === 'info') {
-      delete newSelectedItems.info;
-    } else if (section === 'eta') {
-      delete newSelectedItems.eta;
-    }
-    
-    // Add new item
+    // Replace existing item in the same section (no need to delete first)
     newSelectedItems[section as keyof typeof newSelectedItems] = displayValue;
     
-    // Build the final string
+    // Build the final string by combining existing text with new quick fill items
     const parts = [];
     if (newSelectedItems.location) parts.push(`EX ${newSelectedItems.location.toUpperCase()}`);
     if (newSelectedItems.availableIn) parts.push(`AVAILABLE IN ${newSelectedItems.availableIn.toUpperCase()}`);
@@ -144,7 +128,41 @@ const QuickFillNotes: React.FC<QuickFillNotesProps> = ({
     if (newSelectedItems.info) parts.push(newSelectedItems.info);
     if (newSelectedItems.eta) parts.push(`ETA ${newSelectedItems.eta}`);
     
-    const finalValue = parts.join(' | ');
+    // Combine quick fill items with any existing custom text
+    const quickFillText = parts.join(' | ');
+    const existingText = currentValue.trim();
+    
+    let finalValue = quickFillText;
+    
+    // If there's existing text that's not part of quick fill items, append it
+    if (existingText && existingText !== quickFillText) {
+      // Extract custom text by removing quick fill patterns
+      const quickFillPatterns = [
+        /EX\s+[A-Z\s]+/g,
+        /AVAILABLE\s+IN\s+[A-Z\s]+/g,
+        /ETA\s+[A-Z0-9\s]+/g,
+        /GENUINE\s+WITH\s+BRACKET/g,
+        /GENUINE\s+WITHOUT\s+BRACKET/g,
+        /STOCK\s+ARRIVING/g,
+        /ON\s+BACKORDER/g,
+        /INVOICE\s+PRICE:\s+\$/g,
+        /COMPLETE\s+FAN\s+ASSEMBLY/g,
+        /GENUINE\s+WITH\s+LOGO/g,
+        /ZILAX|CRYOMAX|KOYO|DELPHI|MAHLE|DENSO|DELANG|NRF/g
+      ];
+      
+      let customText = existingText;
+      quickFillPatterns.forEach(pattern => {
+        customText = customText.replace(pattern, '').trim();
+      });
+      
+      // Clean up separators
+      customText = customText.replace(/\|\s*\|\s*/g, '|').replace(/^\|\s*|\s*\|$/g, '').trim();
+      
+      if (customText) {
+        finalValue = quickFillText ? `${quickFillText} | ${customText}` : customText;
+      }
+    }
     
     // Update local state first
     setSelectedItems(newSelectedItems);
@@ -166,7 +184,41 @@ const QuickFillNotes: React.FC<QuickFillNotesProps> = ({
     if (newSelectedItems.info) parts.push(newSelectedItems.info);
     if (newSelectedItems.eta) parts.push(`ETA ${newSelectedItems.eta}`);
     
-    const finalValue = parts.join(' | ');
+    // Combine remaining quick fill items with any existing custom text
+    const quickFillText = parts.join(' | ');
+    const existingText = currentValue.trim();
+    
+    let finalValue = quickFillText;
+    
+    // If there's existing text that's not part of quick fill items, append it
+    if (existingText && existingText !== quickFillText) {
+      // Extract custom text by removing quick fill patterns
+      const quickFillPatterns = [
+        /EX\s+[A-Z\s]+/g,
+        /AVAILABLE\s+IN\s+[A-Z\s]+/g,
+        /ETA\s+[A-Z0-9\s]+/g,
+        /GENUINE\s+WITH\s+BRACKET/g,
+        /GENUINE\s+WITHOUT\s+BRACKET/g,
+        /STOCK\s+ARRIVING/g,
+        /ON\s+BACKORDER/g,
+        /INVOICE\s+PRICE:\s+\$/g,
+        /COMPLETE\s+FAN\s+ASSEMBLY/g,
+        /GENUINE\s+WITH\s+LOGO/g,
+        /ZILAX|CRYOMAX|KOYO|DELPHI|MAHLE|DENSO|DELANG|NRF/g
+      ];
+      
+      let customText = existingText;
+      quickFillPatterns.forEach(pattern => {
+        customText = customText.replace(pattern, '').trim();
+      });
+      
+      // Clean up separators
+      customText = customText.replace(/\|\s*\|\s*/g, '|').replace(/^\|\s*|\s*\|$/g, '').trim();
+      
+      if (customText) {
+        finalValue = quickFillText ? `${quickFillText} | ${customText}` : customText;
+      }
+    }
     
     // Update local state first
     setSelectedItems(newSelectedItems);
@@ -189,7 +241,7 @@ const QuickFillNotes: React.FC<QuickFillNotesProps> = ({
     }
     
     const rect = triggerRef.current.getBoundingClientRect();
-    const popupWidth = 700; // Width of the popup
+    const popupWidth = 700; // Width of the popup (5 columns)
     const popupHeight = 320; // Approximate height of the popup
     
     // Calculate initial position
@@ -232,11 +284,19 @@ const QuickFillNotes: React.FC<QuickFillNotesProps> = ({
         left: position.left,
       }}
     >
-      {/* Selected Items Display */}
-      {Object.keys(selectedItems).length > 0 && (
-        <div className="p-2 border-b border-gray-100 bg-gray-50">
-          <h3 className="text-xs font-semibold text-gray-700 mb-2">SELECTED ITEMS</h3>
-          <div className="flex flex-wrap gap-1">
+      {/* Editable Preview Area */}
+      <div className="p-2 border-b border-gray-100 bg-gray-50">
+        <h3 className="text-xs font-semibold text-gray-700 mb-2">NOTES PREVIEW</h3>
+        <textarea
+          value={currentValue}
+          onChange={(e) => onSelect(e.target.value.toUpperCase())}
+          placeholder="Click quick fill options above or type custom notes here..."
+          className="w-full px-2 py-1 text-xs border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
+          rows={2}
+          style={{ minHeight: '40px' }}
+        />
+        {Object.keys(selectedItems).length > 0 && (
+          <div className="mt-2 flex flex-wrap gap-1">
             {selectedItems.location && (
               <span className="px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded-md flex items-center gap-1">
                 EX {selectedItems.location}
@@ -293,8 +353,8 @@ const QuickFillNotes: React.FC<QuickFillNotesProps> = ({
               </span>
             )}
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* Main Sections Grid */}
       <div className="grid grid-cols-5 gap-2 p-3">
@@ -302,7 +362,7 @@ const QuickFillNotes: React.FC<QuickFillNotesProps> = ({
         <div className="border border-gray-200 rounded-lg p-2 bg-blue-50 min-w-0">
           <h3 className="text-xs font-semibold text-blue-700 mb-2 text-center">EX</h3>
           <div className="space-y-1">
-            {['Sydney', 'Melbourne', 'Perth', 'Brisbane', 'QLD', 'VIC', 'WA', 'East Coast'].map((location) => (
+            {['SYDNEY', 'BRISBANE', 'MELBOURNE', 'PERTH', 'WESTERN AUSTRALIA', 'VICTORIA', 'QUEENSLAND', 'EAST COAST'].map((location) => (
               <button
                 key={location}
                 onClick={(e) => {
@@ -310,12 +370,9 @@ const QuickFillNotes: React.FC<QuickFillNotesProps> = ({
                   e.stopPropagation();
                   handleSelect('location', location, location);
                 }}
-                disabled={!!selectedItems.location}
                 className={`w-full px-2 py-1 text-xs rounded-md transition-colors truncate ${
                   selectedItems.location === location
                     ? 'bg-blue-200 text-blue-800'
-                    : selectedItems.location
-                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
                     : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
                 }`}
                 title={location}
@@ -330,7 +387,7 @@ const QuickFillNotes: React.FC<QuickFillNotesProps> = ({
         <div className="border border-gray-200 rounded-lg p-2 bg-green-50 min-w-0">
           <h3 className="text-xs font-semibold text-green-700 mb-2 text-center">AVAILABLE IN</h3>
           <div className="space-y-1">
-            {['Sydney', 'Melbourne', 'Perth', 'Brisbane', 'QLD', 'VIC', 'WA', 'East Coast'].map((location) => (
+            {['SYDNEY', 'BRISBANE', 'MELBOURNE', 'PERTH', 'WESTERN AUSTRALIA', 'VICTORIA', 'QUEENSLAND', 'EAST COAST'].map((location) => (
               <button
                 key={location}
                 onClick={(e) => {
@@ -338,12 +395,9 @@ const QuickFillNotes: React.FC<QuickFillNotesProps> = ({
                   e.stopPropagation();
                   handleSelect('availableIn', location, location);
                 }}
-                disabled={!!selectedItems.availableIn}
                 className={`w-full px-2 py-1 text-xs rounded-md transition-colors truncate ${
                   selectedItems.availableIn === location
                     ? 'bg-green-200 text-green-800'
-                    : selectedItems.availableIn
-                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
                     : 'bg-green-100 text-green-700 hover:bg-green-200'
                 }`}
                 title={location}
@@ -359,8 +413,7 @@ const QuickFillNotes: React.FC<QuickFillNotesProps> = ({
           <h3 className="text-xs font-semibold text-purple-700 mb-2 text-center">BRANDS</h3>
           <div className="space-y-1">
             {[
-              'Genuine', 'Zilax', 'Koyo', 'Cryomax', 'Mahle', 'Delphi', 'Denso',
-              'Genuine with Logo', 'Genuine with Bracket', 'Gen. w/o Bracket'
+              'GENUINE', 'GENUINE WITH LOGO', 'ZILAX', 'CRYOMAX', 'KOYO', 'DELPHI', 'MAHLE', 'DENSO', 'DELANG', 'NRF'
             ].map((brand) => (
               <button
                 key={brand}
@@ -369,12 +422,9 @@ const QuickFillNotes: React.FC<QuickFillNotesProps> = ({
                   e.stopPropagation();
                   handleSelect('brand', brand, brand);
                 }}
-                disabled={!!selectedItems.brand}
                 className={`w-full px-2 py-1 text-xs rounded-md transition-colors truncate ${
                   selectedItems.brand === brand
                     ? 'bg-purple-200 text-purple-800'
-                    : selectedItems.brand
-                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
                     : 'bg-purple-100 text-purple-700 hover:bg-purple-200'
                 }`}
                 title={brand}
@@ -385,31 +435,58 @@ const QuickFillNotes: React.FC<QuickFillNotesProps> = ({
           </div>
         </div>
 
-        {/* Info Section */}
+        {/* Stock & Info Section */}
         <div className="border border-gray-200 rounded-lg p-2 bg-orange-50 min-w-0">
-          <h3 className="text-xs font-semibold text-orange-700 mb-2 text-center">INFO</h3>
-          <div className="space-y-1">
-            {['Stock Arriving', 'On Backorder'].map((info) => (
-              <button
-                key={info}
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  handleSelect('info', info, info);
-                }}
-                disabled={!!selectedItems.info}
-                className={`w-full px-2 py-1 text-xs rounded-md transition-colors truncate ${
-                  selectedItems.info === info
-                    ? 'bg-orange-200 text-orange-800'
-                    : selectedItems.info
-                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                    : 'bg-orange-100 text-orange-700 hover:bg-orange-200'
-                }`}
-                title={info}
-              >
-                {info}
-              </button>
-            ))}
+          <h3 className="text-xs font-semibold text-orange-700 mb-2 text-center">STOCK & INFO</h3>
+          
+          {/* Stock Section */}
+          <div className="mb-3">
+            <h4 className="text-xs font-medium text-orange-600 mb-1">STOCK</h4>
+            <div className="space-y-1">
+              {['STOCK ARRIVING', 'ON BACKORDER', 'INVOICE PRICE: $', 'COMPLETE FAN ASSEMBLY'].map((stock) => (
+                <button
+                  key={stock}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    handleSelect('info', stock, stock);
+                  }}
+                  className={`w-full px-2 py-1 text-xs rounded-md transition-colors truncate ${
+                    selectedItems.info === stock
+                      ? 'bg-orange-200 text-orange-800'
+                      : 'bg-orange-100 text-orange-700 hover:bg-orange-200'
+                  }`}
+                  title={stock}
+                >
+                  {stock}
+                </button>
+              ))}
+            </div>
+          </div>
+          
+          {/* Info Section */}
+          <div>
+            <h4 className="text-xs font-medium text-orange-600 mb-1">INFO</h4>
+            <div className="space-y-1">
+              {['GENUINE WITH BRACKET', 'GENUINE WITHOUT BRACKET'].map((info) => (
+                <button
+                  key={info}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    handleSelect('info', info, info);
+                  }}
+                  className={`w-full px-2 py-1 text-xs rounded-md transition-colors truncate ${
+                    selectedItems.info === info
+                      ? 'bg-orange-200 text-orange-800'
+                      : 'bg-orange-100 text-orange-700 hover:bg-orange-200'
+                  }`}
+                  title={info}
+                >
+                  {info}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 
@@ -418,8 +495,7 @@ const QuickFillNotes: React.FC<QuickFillNotesProps> = ({
           <h3 className="text-xs font-semibold text-red-700 mb-2 text-center">ETA</h3>
           <div className="space-y-1">
             {[
-              '3 Days', '4 Days', '5 Days', '1 Week', '2 Weeks', '3 Weeks',
-              '4 Weeks', '8 Weeks', '1 Month', '2 Months'
+              '1 DAY', '2 DAYS', '3 DAYS', '5 DAYS', '1 WEEK', '2 WEEKS', '3 WEEKS', '1 MONTH', '2 MONTHS'
             ].map((eta) => (
               <button
                 key={eta}
@@ -428,12 +504,9 @@ const QuickFillNotes: React.FC<QuickFillNotesProps> = ({
                   e.stopPropagation();
                   handleSelect('eta', eta, eta);
                 }}
-                disabled={!!selectedItems.eta}
                 className={`w-full px-2 py-1 text-xs rounded-md transition-colors truncate ${
                   selectedItems.eta === eta
                     ? 'bg-red-200 text-red-800'
-                    : selectedItems.eta
-                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
                     : 'bg-red-100 text-red-700 hover:bg-red-200'
                 }`}
                 title={eta}

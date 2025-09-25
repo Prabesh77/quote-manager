@@ -1,6 +1,6 @@
 'use client';
 
-import { useQuotesQuery, useDeleteQuoteMutation, useUpdatePartInQuoteJsonMutation, useUpdateMultiplePartsInQuoteJsonMutation, queryKeys } from '@/hooks/queries/useQuotesQuery';
+import { useQuotesQuery, useDeleteQuoteMutation, useUpdatePartInQuoteJsonMutation,useUpdatePartsComprehensiveBatchMutation, useUpdateMultiplePartsInQuoteJsonMutation, queryKeys } from '@/hooks/queries/useQuotesQuery';
 import { useAllQuoteParts } from '@/hooks/useAllQuoteParts';
 import QuoteTable from "@/components/ui/QuoteTable";
 import { ProtectedRoute } from "@/components/common/ProtectedRoute";
@@ -31,6 +31,7 @@ export default function VerifyPricePage() {
   // Use the actual mutations
   const deleteQuoteMutation = useDeleteQuoteMutation();
   const updatePartMutation = useUpdatePartInQuoteJsonMutation();
+   const updatePartsComprehensiveBatchMutation = useUpdatePartsComprehensiveBatchMutation();
 
   // Update quote function - handles status updates and other quote fields
   const updateQuote = async (id: string, fields: Record<string, any>) => {

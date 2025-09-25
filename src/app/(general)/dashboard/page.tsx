@@ -41,7 +41,9 @@ export default function DashboardPage() {
   quotes.forEach(quote => {
     if (quote.partsRequested) {
       quote.partsRequested.forEach(partItem => {
-        const partName = partItem.part_id;
+        // Look up the part name from the parts array using part_id
+        const part = parts?.find(p => p.id === partItem.part_id);
+        const partName = part?.name || partItem.part_id;
         partUsageCount[partName] = (partUsageCount[partName] || 0) + 1;
       });
     }
@@ -50,10 +52,9 @@ export default function DashboardPage() {
   const mostQuotedParts = Object.entries(partUsageCount)
     .sort(([,a], [,b]) => b - a)
     .slice(0, 5)
-    .map(([partId, count]) => {
-      const part = parts?.find(p => p.id === partId);
+    .map(([partName, count]) => {
       return {
-        name: part?.name || partId,
+        name: partName,
         count
       };
     });

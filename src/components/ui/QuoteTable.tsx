@@ -1676,7 +1676,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                 const status = getQuoteStatus(quoteParts, quote.status);
 
                 return (
-              <AccordionItem key={quote.id} value={quote.id} className="border-b border-gray-100 last:border-b-0 relative">
+              <AccordionItem key={quote.id} value={quote.id} className={`border-b border-gray-100 last:border-b-0 relative transition-all duration-300 ${expandedRows.has(quote.id) ? 'shadow-md bg-white z-10' : ''}`}>
                 {/* Deadline Indicator - Only for unpriced and priced quotes */}
                 {quote.status !== 'completed' && quote.status !== 'ordered' && quote.status !== 'delivered' && (() => {
                   const deadlineInfo = getDeadlineIndicator(quote.requiredBy);
@@ -2396,7 +2396,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
               const status = getQuoteStatus(quoteParts, quote.status);
               
               return (
-                <AccordionItem key={quote.id} value={quote.id} className="bg-white rounded-lg border border-gray-200 shadow-sm">
+                <AccordionItem key={quote.id} value={quote.id} className={`bg-white rounded-lg border border-gray-200 shadow-sm transition-all duration-300 ${expandedRows.has(quote.id) ? 'shadow-lg z-10' : ''}`}>
                   <AccordionTrigger className="p-4 hover:bg-gray-50 transition-colors cursor-pointer">
                     <div className="grid grid-rows-2 gap-3 w-full">
                       {/* Row 1: Quote Ref VIN Status */}

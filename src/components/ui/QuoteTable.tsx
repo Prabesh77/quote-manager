@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { ChevronDown, Edit, Save, X, Search, Eye, Copy, CheckCircle, AlertTriangle, ShoppingCart, Package, Plus, Info, MapPin, Send, Loader2 } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
 import { Quote, Part } from './useQuotes';
 
 import { SkeletonLoader } from './SkeletonLoader';
@@ -56,6 +57,7 @@ type QuoteStatus = 'unpriced' | 'priced' | 'completed' | 'ordered' | 'delivered'
 
 export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote, onUpdatePart, onUpdateMultipleParts, onMarkCompleted, onMarkAsOrdered, onMarkAsOrderedWithParts, onMarkAsWrong, showCompleted = false, defaultFilter = 'all', isLoading = false, itemsPerPage = 10, showPagination = true, currentPage: externalCurrentPage, total: externalTotal, totalPages: externalTotalPages, pageSize: externalPageSize, onPageChange, searchTerm: externalSearchTerm, onSearchChange, useServerSideSearch = false, currentPageName }: QuoteTableProps) {
   const { showSnackbar } = useSnackbar();
+  const queryClient = useQueryClient();
 
   // Safety checks for undefined props
   if (!quotes || !Array.isArray(quotes)) {
@@ -86,6 +88,21 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
 
     setExpandedRows(newExpandedRows);
   }, [quotes]);
+
+  // Listen for realtime toggle events to refresh data
+  useEffect(() => {
+    const handleRefreshQuotes = () => {
+      // Trigger a manual refresh of quotes data using TanStack Query
+      queryClient.invalidateQueries({ queryKey: ['quotes'] });
+      queryClient.invalidateQueries({ queryKey: ['parts'] });
+    };
+
+    window.addEventListener('refresh-quotes-data', handleRefreshQuotes);
+    
+    return () => {
+      window.removeEventListener('refresh-quotes-data', handleRefreshQuotes);
+    };
+  }, [queryClient]);
   const [editingQuote, setEditingQuote] = useState<string | null>(null);
   const [editingParts, setEditingParts] = useState<string | null>(null);
   const [editData, setEditData] = useState<Record<string, any>>({});
@@ -1308,51 +1325,44 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
   const getStatusChip = (status: QuoteStatus) => {
     const statusConfig = {
       unpriced: {
-        bg: 'bg-yellow-100',
-        text: 'text-yellow-800',
-        border: 'border-yellow-200',
+        bg: 'bg-gray-100',
+        text: 'text-gray-700',
         icon: AlertTriangle,
         label: 'Waiting for Price'
       },
       priced: {
-        bg: 'bg-green-100',
-        text: 'text-green-800',
-        border: 'border-green-200',
+        bg: 'bg-blue-500',
+        text: 'text-white',
         icon: CheckCircle,
         label: 'Priced'
       },
       completed: {
-        bg: 'bg-blue-100',
-        text: 'text-blue-800',
-        border: 'border-blue-200',
+        bg: 'bg-green-100',
+        text: 'text-green-600',
         icon: CheckCircle,
         label: 'Completed'
       },
       ordered: {
         bg: 'bg-purple-100',
-        text: 'text-purple-800',
-        border: 'border-purple-200',
+        text: 'text-purple-600',
         icon: ShoppingCart,
         label: 'Ordered'
       },
       delivered: {
         bg: 'bg-orange-100',
-        text: 'text-orange-800',
-        border: 'border-orange-200',
+        text: 'text-orange-600',
         icon: Package,
         label: 'Delivered'
       },
       waiting_verification: {
-        bg: 'bg-amber-100',
-        text: 'text-amber-800',
-        border: 'border-amber-200',
+        bg: 'bg-orange-100',
+        text: 'text-orange-600',
         icon: AlertTriangle,
         label: 'Waiting for Verification'
       },
       wrong: {
         bg: 'bg-red-100',
-        text: 'text-red-800',
-        border: 'border-red-200',
+        text: 'text-red-600',
         icon: X,
         label: 'Wrong'
       }
@@ -1362,8 +1372,10 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
     const IconComponent = config.icon;
 
     return (
-      <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-semibold border ${config.bg} ${config.text} ${config.border} shadow-sm whitespace-nowrap`}>
-        <IconComponent className="h-4 w-4" />
+      <div className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium ${config.bg} ${config.text} whitespace-nowrap`}>
+        <div className={`w-4 h-4 rounded-full flex items-center justify-center ${config.bg === 'bg-blue-500' ? 'bg-blue-500' : config.bg}`}>
+          <IconComponent className={`h-2.5 w-2.5 ${config.text}`} />
+        </div>
         <span>{config.label}</span>
       </div>
     );
@@ -1982,8 +1994,10 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                 </button>
                                 {currentPageName === 'pricing' && (
                                   <button
-                                    onClick={(e) => {
+                                    onClick={async (e) => {
                                       e.stopPropagation();
+                                      // Save first, then send for review
+                                      await handleSave(true); // Force save all parts
                                       handleSendForReview(quote.id);
                                     }}
                                     disabled={sendForReviewLoading === quote.id}
@@ -2023,16 +2037,16 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                               <div className="hidden lg:block">
                                 <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
                                   <table className="w-full">
-                                    <thead className="bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200">
-                                      <tr>
-                                        <th className="px-4 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider w-1/5">Part & Variants</th>
-                                        <th className="px-4 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider w-1/5">Part Number</th>
-                                        <th className="px-4 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider w-1/6">List Price</th>
-                                        <th className="px-4 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider w-1/6">Price</th>
-                                        <th className="px-4 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider w-1/12">AM</th>
-                                        <th className="px-4 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider w-1/4">Notes</th>
-                                      </tr>
-                                    </thead>
+                                     <thead className="bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200">
+                                       <tr>
+                                         <th className="px-4 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider w-1/5">Part & Variants</th>
+                                         <th className="px-4 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider w-1/5">Part Number</th>
+                                         <th className="px-4 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider w-1/10">List Price</th>
+                                         <th className="px-4 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider w-1/10">Price</th>
+                                         <th className="px-4 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider w-1/12">AM</th>
+                                         <th className="px-4 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider w-2/5">Notes</th>
+                                       </tr>
+                                     </thead>
                                     <tbody className="divide-y divide-gray-200">
                                       {quoteParts.map((part) => {
                                         const isPartEditing = editingParts === quote.id;
@@ -2074,7 +2088,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                           <React.Fragment key={`part_${part.id}`}>
                                             {/* Primary Variant Row */}
                                             {variants.map((variant: any, index: number) => (
-                                              <tr key={`${part.id}_${variant.id}`} className={`${index === 0 ? 'bg-white border-b border-gray-100' : 'bg-gray-50/50 border-b border-gray-100/50'}`}>
+                                              <tr key={`${part.id}_${variant.id}`} className={`${index === 0 ? (variant.final_price && variant.final_price < 10 ? 'bg-red-50 border-b border-red-100' : 'bg-white border-b border-gray-100') : (variant.final_price && variant.final_price < 10 ? 'bg-red-50/50 border-b border-red-100/50' : 'bg-gray-50/50 border-b border-gray-100/50')}`}>
                                                 <td className="px-4 py-1">
                                                   <div className="flex items-center space-x-3">
                                                     {index === 0 ? (
@@ -2166,7 +2180,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                                     {isPartEditing ? (
                                                       <input
                                                         type="number"
-                                                        value={partEditData[part.id]?.[variant.id]?.list_price ?? variant.list_price ?? ''}
+                                                        value={partEditData[part.id]?.[variant.id]?.list_price !== undefined ? partEditData[part.id][variant.id].list_price : (variant.list_price ?? '')}
                                                         onChange={(e) => handleVariantEditChange(part.id, variant.id, 'list_price', e.target.value ? Number(e.target.value) : null)}
                                                         className={`w-full px-2 py-1 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 ${index === 0 ? 'bg-white' : 'bg-gray-50'}`}
                                                         placeholder="Enter list price"
@@ -2198,7 +2212,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                                     {isPartEditing ? (
                                                       <input
                                                         type="number"
-                                                        value={partEditData[part.id]?.[variant.id]?.final_price ?? variant.final_price ?? ''}
+                                                        value={partEditData[part.id]?.[variant.id]?.final_price !== undefined ? partEditData[part.id][variant.id].final_price : (variant.final_price ?? '')}
                                                         onChange={(e) => handleVariantEditChange(part.id, variant.id, 'final_price', e.target.value ? Number(e.target.value) : null)}
                                                         className={`w-full px-2 py-1 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 ${index === 0 ? 'bg-white' : 'bg-gray-50'}`}
                                                         placeholder="Enter price"
@@ -2631,8 +2645,10 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                               </button>
                               {currentPageName === 'pricing' && (
                                 <button
-                                  onClick={(e) => {
+                                  onClick={async (e) => {
                                     e.stopPropagation();
+                                    // Save first, then send for review
+                                    await handleSave(true); // Force save all parts
                                     handleSendForReview(quote.id);
                                   }}
                                   disabled={sendForReviewLoading === quote.id}
@@ -2672,7 +2688,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                               const isPartEditing = editingParts === quote.id;
 
                               return (
-                                <div key={part.id} className="bg-white rounded-lg border border-gray-200 p-3 shadow-sm">
+                                <div key={part.id} className={`${part.price && part.price < 10 ? 'bg-red-50 border-red-200' : 'bg-white border-gray-200'} rounded-lg border p-3 shadow-sm`}>
                                   <div className="relative">
                                     {getPartIcon(part.name) && (
                                       <div className="absolute top-2 right-2 bg-white rounded-full p-2 shadow-md border border-gray-200 hover:border-gray-300 transition-all duration-200">
@@ -2749,7 +2765,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                             {isPartEditing ? (
                                               <input
                                                 type="number"
-                                                value={partEditData[part.id]?.list_price ?? ''}
+                                                value={partEditData[part.id]?.list_price !== undefined ? partEditData[part.id].list_price : ''}
                                                 onChange={(e) => handlePartEditChange(part.id, 'list_price', e.target.value ? Number(e.target.value) : null)}
                                                 className="flex-1 px-2 py-1 border border-gray-300 rounded-md text-sm focus:ring-1 focus:ring-red-500 focus:border-transparent"
                                               />

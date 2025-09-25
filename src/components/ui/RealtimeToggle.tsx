@@ -27,6 +27,9 @@ export default function RealtimeToggle({ className = '' }: RealtimeToggleProps) 
     window.dispatchEvent(new CustomEvent('realtime-toggle', { 
       detail: { enabled } 
     }));
+    
+    // Dispatch event to refresh quote data when toggled
+    window.dispatchEvent(new CustomEvent('refresh-quotes-data'));
   };
 
   return (

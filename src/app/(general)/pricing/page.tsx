@@ -141,6 +141,7 @@ export default function PricingPage() {
       // Invalidate queries to refresh the UI
       queryClient.invalidateQueries({ queryKey: queryKeys.quotesBase });
       
+      
       return { error: null };
     } catch (error) {
       console.error('Error marking quote as completed:', error);
@@ -176,6 +177,7 @@ export default function PricingPage() {
       // Invalidate queries to refresh the UI
       queryClient.invalidateQueries({ queryKey: queryKeys.quotesBase });
       
+      
       return { error: null };
     } catch (error) {
       console.error('Error marking quote as wrong:', error);
@@ -205,6 +207,7 @@ export default function PricingPage() {
       throw error; // Re-throw to maintain error handling
     }
   };
+
 
   return (
     <ProtectedRoute allowedRoles={['price_manager', 'quality_controller', 'admin']}>

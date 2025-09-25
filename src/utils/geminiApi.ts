@@ -335,13 +335,18 @@ function fallbackExtraction(ocrText: string): AIPartExtraction[] {
     } else if (line.toLowerCase().includes('corner') || line.toLowerCase().includes('rear corner radar') || 
                line.toLowerCase().includes('rear corner') || line.toLowerCase().includes('lh - rear corner radar') || 
                line.toLowerCase().includes('rh - rear corner radar')) {
-      // Handle blindspot sensor detection
+      // Handle blindspot sensor detection with proper side detection
       if (/\b(rh|r\b|right)\b/i.test(line)) {
         context = 'RH';
+        partName = 'Right Blindspot Sensor';
       } else if (/\b(lh|l\b|left)\b/i.test(line)) {
         context = 'LH';
+        partName = 'Left Blindspot Sensor';
+      } else {
+        // Default to Left if no side context is specified (same as headlamp logic)
+        context = 'LH';
+        partName = 'Left Blindspot Sensor';
       }
-      partName = 'Blindspot Sensor';
     } else if (line.toLowerCase().includes('radar') || line.toLowerCase().includes('sensor') || 
                line.toLowerCase().includes('fwd collision mitigation') || line.toLowerCase().includes('forward collision mitigation') ||
                line.toLowerCase().includes('collision mitigation system') || line.toLowerCase().includes('fcms') ||

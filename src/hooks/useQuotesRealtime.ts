@@ -1,12 +1,39 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import supabase from '@/utils/supabase';
 import { queryKeys } from '@/hooks/queries/useQuotesQuery';
 
 export const useQuotesRealtime = () => {
   const queryClient = useQueryClient();
+  const [isRealtimeEnabled, setIsRealtimeEnabled] = useState(true);
+
+  // Load initial state from localStorage
+  useEffect(() => {
+    const saved = localStorage.getItem('realtime-enabled');
+    if (saved !== null) {
+      setIsRealtimeEnabled(JSON.parse(saved));
+    }
+  }, []);
+
+  // Listen for toggle events
+  useEffect(() => {
+    const handleToggle = (event: CustomEvent) => {
+      setIsRealtimeEnabled(event.detail.enabled);
+      console.log(`🔄 Realtime ${event.detail.enabled ? 'enabled' : 'disabled'}`);
+    };
+
+    window.addEventListener('realtime-toggle', handleToggle as EventListener);
+    return () => {
+      window.removeEventListener('realtime-toggle', handleToggle as EventListener);
+    };
+  }, []);
 
   useEffect(() => {
+    if (!isRealtimeEnabled) {
+      console.log('🚫 Realtime disabled - skipping subscription setup');
+      return;
+    }
+
     console.log('🔌 Setting up realtime subscriptions...');
 
     // Subscribe to quotes table changes
@@ -101,5 +128,5 @@ export const useQuotesRealtime = () => {
       partsChannel.unsubscribe();
       vehiclesChannel.unsubscribe();
     };
-  }, [queryClient]);
+  }, [queryClient, isRealtimeEnabled]);
 };

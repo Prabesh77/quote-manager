@@ -72,8 +72,9 @@ const fetchQuotes = async (page: number = 1, limit: number = 20, filters?: { sta
     const endIndex = startIndex + limit - 1; // Supabase range is inclusive
     query = query.range(startIndex, endIndex);
 
-    // Order by creation date (newest first)
-    query = query.order('created_at', { ascending: false });
+    // Order by required_by (deadline) in ascending order (closest deadline first)
+    // Use nullsFirst: false to put quotes without deadlines at the end
+    query = query.order('required_by', { ascending: true, nullsFirst: false });
 
     // Execute the query
     const { data: normalizedQuotes, error: quotesError, count } = await query;

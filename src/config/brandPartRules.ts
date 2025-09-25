@@ -25,11 +25,11 @@ export const BRAND_PART_RULES: Record<string, BrandPartRule> = {
     description: 'Only required for Nissan and Mitsubishi'
   },
   'Left Blindspot Sensor': {
-    requiredFor: ['Kia', 'Hyundai', 'BMW', 'Audi', 'Volkswagen', 'Mercedes', 'Porsche', 'Volvo', 'Jaguar', 'Land Rover'],
+    requiredFor: ['Kia', 'Hyundai', 'BMW', 'Audi', 'Volkswagen', 'Skoda', 'Seat', 'Cupra'],
     description: 'Required for Korean, European, and premium brands'
   },
   'Right Blindspot Sensor': {
-    requiredFor: ['Kia', 'Hyundai', 'BMW', 'Audi', 'Volkswagen', 'Mercedes', 'Porsche', 'Volvo', 'Jaguar', 'Land Rover'],
+    requiredFor: ['Kia', 'Hyundai', 'BMW', 'Audi', 'Volkswagen', 'Skoda', 'Seat', 'Cupra'],
     description: 'Required for Korean, European, and premium brands'
   },
   'Camera': {
@@ -37,7 +37,7 @@ export const BRAND_PART_RULES: Record<string, BrandPartRule> = {
     description: 'Required for European and Chinese brands'
   },
   'Auxiliary Radiator': {
-    requiredFor: ['Land Rover', 'Mercedes', 'Audi', 'BMW', 'Volkswagen', 'Porsche', 'Volvo', 'Jaguar'],
+    requiredFor: ['Land Rover', 'Range Rover', 'Mercedes', 'Audi', 'BMW', 'Volkswagen', 'Porsche', 'Volvo', 'Jaguar'],
     description: 'Required for European luxury brands'
   },
   'Left Intercooler': {
@@ -72,16 +72,32 @@ export function isPartAvailableForBrand(partName: string, brand: string): boolea
   }
   
   // Normalize brand name for case-insensitive comparison
-  const normalizedBrand = brand.trim();
+  const normalizedBrand = brand.trim().toLowerCase();
+  
+  // Handle rover brands (Land Rover, Range Rover, etc.) - treat all as "land rover"
+  const isRoverBrand = normalizedBrand.includes('rover');
+  const brandForComparison = isRoverBrand ? 'land rover' : normalizedBrand;
   
   // Check if brand is in the notRequiredFor list (case-insensitive)
-  if (rule.notRequiredFor && rule.notRequiredFor.some(b => b.toLowerCase() === normalizedBrand.toLowerCase())) {
+  if (rule.notRequiredFor && rule.notRequiredFor.some(b => {
+    const ruleBrand = b.toLowerCase();
+    // Handle rover brands in rules too
+    const isRuleRover = ruleBrand.includes('rover');
+    const ruleBrandForComparison = isRuleRover ? 'land rover' : ruleBrand;
+    return ruleBrandForComparison === brandForComparison;
+  })) {
     return false;
   }
   
   // Check if brand is in the requiredFor list (case-insensitive)
   if (rule.requiredFor && rule.requiredFor.length > 0) {
-    return rule.requiredFor.some(b => b.toLowerCase() === normalizedBrand.toLowerCase());
+    return rule.requiredFor.some(b => {
+      const ruleBrand = b.toLowerCase();
+      // Handle rover brands in rules too
+      const isRuleRover = ruleBrand.includes('rover');
+      const ruleBrandForComparison = isRuleRover ? 'land rover' : ruleBrand;
+      return ruleBrandForComparison === brandForComparison;
+    });
   }
   
   // If only notRequiredFor is specified and brand is not in it, part is available
@@ -104,11 +120,30 @@ export function getPartDescriptionForBrand(partName: string, brand: string): str
   const rule = BRAND_PART_RULES[partName];
   if (!rule) return null;
   
-  if (rule.notRequiredFor && rule.notRequiredFor.includes(brand)) {
+  // Normalize brand name for case-insensitive comparison
+  const normalizedBrand = brand.trim().toLowerCase();
+  
+  // Handle rover brands (Land Rover, Range Rover, etc.) - treat all as "land rover"
+  const isRoverBrand = normalizedBrand.includes('rover');
+  const brandForComparison = isRoverBrand ? 'land rover' : normalizedBrand;
+  
+  // Check notRequiredFor list with rover brand handling
+  if (rule.notRequiredFor && rule.notRequiredFor.some(b => {
+    const ruleBrand = b.toLowerCase();
+    const isRuleRover = ruleBrand.includes('rover');
+    const ruleBrandForComparison = isRuleRover ? 'land rover' : ruleBrand;
+    return ruleBrandForComparison === brandForComparison;
+  })) {
     return `Not required for ${brand}`;
   }
   
-  if (rule.requiredFor && rule.requiredFor.includes(brand)) {
+  // Check requiredFor list with rover brand handling
+  if (rule.requiredFor && rule.requiredFor.some(b => {
+    const ruleBrand = b.toLowerCase();
+    const isRuleRover = ruleBrand.includes('rover');
+    const ruleBrandForComparison = isRuleRover ? 'land rover' : ruleBrand;
+    return ruleBrandForComparison === brandForComparison;
+  })) {
     return `Required for ${brand}`;
   }
   

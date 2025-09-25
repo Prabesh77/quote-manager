@@ -1368,41 +1368,27 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
     );
   };
 
-  // Function to calculate deadline priority (lower number = higher priority)
-  const getDeadlinePriority = (quote: Quote) => {
-    if (!quote.requiredBy) return Infinity; // No deadline = lowest priority
-    
-    try {
-      const deadline = new Date(quote.requiredBy);
-      const now = new Date();
-      const diffMs = deadline.getTime() - now.getTime();
-      const diffMins = Math.floor(diffMs / (1000 * 60));
-      
-      // Overdue items get highest priority (negative values)
-      if (diffMins < 0) return diffMins; // Negative values for overdue
-      
-      // Items due soon get higher priority
-      return diffMins;
-    } catch (error) {
-      return Infinity; // Invalid date = lowest priority
-    }
-  };
 
   // Function to check if quote ref contains special characters
   const hasSpecialCharacters = (quoteRef: string) => {
     return quoteRef && (quoteRef.includes('.') || quoteRef.includes('/') || quoteRef.includes('#'));
   };
 
-  // Sort quotes by deadline priority (least time remaining = highest priority)
+  // Quotes are now sorted by the database (required_by ascending)
+  // For completed quotes, we still need client-side sorting by creation date
   const sortedQuotes = useMemo(() => {
-    return [...quotes].sort((a, b) => {
-      const priorityA = getDeadlinePriority(a);
-      const priorityB = getDeadlinePriority(b);
-      
-      // Lower priority number = higher priority (appears first)
-      return priorityA - priorityB;
-    });
-  }, [quotes]);
+    if (showCompleted) {
+      // For completed quotes, sort by creation date (newest first)
+      return [...quotes].sort((a, b) => {
+        const dateA = new Date(a.createdAt).getTime();
+        const dateB = new Date(b.createdAt).getTime();
+        return dateB - dateA;
+      });
+    }
+    
+    // For active quotes, database already sorts by deadline, so use as-is
+    return quotes;
+  }, [quotes, showCompleted]);
 
   const filteredQuotes = sortedQuotes.filter(quote => {
     const quoteParts = getQuotePartsWithNotesSync(quote.id);
@@ -1429,27 +1415,6 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
       quote.make?.toLowerCase().includes(effectiveSearchTerm.toLowerCase());
     
     return matchesSearch;
-  }).sort((a, b) => {
-    // For completed quotes, sort by creation date (newest first)
-    if (showCompleted) {
-      const dateA = new Date(a.createdAt).getTime();
-      const dateB = new Date(b.createdAt).getTime();
-      return dateB - dateA;
-    }
-    
-    // For active quotes, sort by deadline priority
-    const priorityA = getDeadlinePriority(a);
-    const priorityB = getDeadlinePriority(b);
-    
-    // Lower priority number = higher priority (shows first)
-    if (priorityA !== priorityB) {
-      return priorityA - priorityB;
-    }
-    
-    // If same priority, sort by creation date (oldest first for active quotes)
-    const dateA = new Date(a.createdAt).getTime();
-    const dateB = new Date(b.createdAt).getTime();
-    return dateA - dateB;
   });
 
   // Memoize the array of IDs so it doesn't change on every render

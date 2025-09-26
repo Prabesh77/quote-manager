@@ -15,14 +15,21 @@ import { useDebouncedSearchWithPageReset } from '@/hooks/useDebouncedSearch';
 export default function HomePage() {
   // Server-side pagination state
   const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('single-quote-mode');
+      return saved && JSON.parse(saved) ? 1 : 10;
+    }
+    return 10;
+  });
   
   // Search state with debouncing and page reset
   const { searchTerm, debouncedSearchTerm, setSearchTerm } = useDebouncedSearchWithPageReset(
     () => setCurrentPage(1)
   );
 
-  // Get quotes for display (server-side pagination: 10 per page) - only show unpriced quotes
-  const { data: quotesData, isLoading: quotesLoading } = useQuotesQuery(currentPage, 10, { 
+  // Get quotes for display (server-side pagination) - only show unpriced quotes
+  const { data: quotesData, isLoading: quotesLoading } = useQuotesQuery(currentPage, pageSize, { 
     status: 'unpriced',
     search: debouncedSearchTerm 
   });
@@ -220,6 +227,11 @@ export default function HomePage() {
     }
   };
 
+  // Handle page size change from Single/Multiple toggle
+  const handlePageSizeChange = (newPageSize: number) => {
+    setPageSize(newPageSize);
+    setCurrentPage(1); // Reset to first page when changing page size
+  };
 
   const onMarkAsOrdered = async (id: string, taxInvoiceNumber: string) => {
     try {
@@ -303,8 +315,9 @@ export default function HomePage() {
             currentPage={currentPage}
             totalPages={quotesData?.totalPages || 1}
             total={quotesData?.total || 0}
-            pageSize={10}
+            pageSize={pageSize}
             onPageChange={setCurrentPage}
+            onPageSizeChange={handlePageSizeChange}
             // Server-side search props
             searchTerm={searchTerm}
             onSearchChange={setSearchTerm}

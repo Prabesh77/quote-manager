@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { ChevronDown, Edit, Save, X, Search, Eye, Copy, CheckCircle, AlertTriangle, ShoppingCart, Package, Plus, Info, MapPin, Send, Loader2, Clock, LayoutGrid, List } from 'lucide-react';
+import { ChevronDown, Edit, Save, X, Search, Copy, CheckCircle, AlertTriangle, ShoppingCart, Package, Plus, Info, MapPin, Send, Loader2, LayoutGrid, List, Eye } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Quote, Part } from './useQuotes';
 
@@ -43,6 +43,7 @@ interface QuoteTableProps {
   totalPages?: number;
   pageSize?: number;
   onPageChange?: (page: number) => void;
+  onPageSizeChange?: (pageSize: number) => void;
   // Server-side search props
   searchTerm?: string;
   onSearchChange?: (searchTerm: string) => void;
@@ -55,7 +56,7 @@ type FilterType = 'all' | 'unpriced' | 'priced';
 
 type QuoteStatus = 'unpriced' | 'priced' | 'completed' | 'ordered' | 'delivered' | 'waiting_verification' | 'wrong';
 
-export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote, onUpdatePart, onUpdateMultipleParts, onMarkCompleted, onMarkAsOrdered, onMarkAsOrderedWithParts, onMarkAsWrong, showCompleted = false, defaultFilter = 'all', isLoading = false, itemsPerPage = 10, showPagination = true, currentPage: externalCurrentPage, total: externalTotal, totalPages: externalTotalPages, pageSize: externalPageSize, onPageChange, searchTerm: externalSearchTerm, onSearchChange, useServerSideSearch = false, currentPageName }: QuoteTableProps) {
+export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote, onUpdatePart, onUpdateMultipleParts, onMarkCompleted, onMarkAsOrdered, onMarkAsOrderedWithParts, onMarkAsWrong, showCompleted = false, defaultFilter = 'all', isLoading = false, itemsPerPage = 10, showPagination = true, currentPage: externalCurrentPage, total: externalTotal, totalPages: externalTotalPages, pageSize: externalPageSize, onPageChange, onPageSizeChange, searchTerm: externalSearchTerm, onSearchChange, useServerSideSearch = false, currentPageName }: QuoteTableProps) {
   const { showSnackbar } = useSnackbar();
   const queryClient = useQueryClient();
 
@@ -73,8 +74,13 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
   const [filter, setFilter] = useState<FilterType>(defaultFilter);
   const [searchTerm, setSearchTerm] = useState('');
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
-  const [viewMode, setViewMode] = useState<'all' | 'urgent'>('all');
-  const [singleQuoteMode, setSingleQuoteMode] = useState(false);
+  const [singleQuoteMode, setSingleQuoteMode] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('single-quote-mode');
+      return saved ? JSON.parse(saved) : false;
+    }
+    return false;
+  });
 
   // Use external search term when server-side search is enabled
   const effectiveSearchTerm = useServerSideSearch ? externalSearchTerm || '' : searchTerm;
@@ -1398,31 +1404,12 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
     return quoteRef && (quoteRef.includes('.') || quoteRef.includes('/') || quoteRef.includes('#'));
   };
 
-  // Helper function to check if quote has deadline within next 30 minutes
-  const isUrgentQuote = (quote: Quote) => {
-    if (!quote.required_by) return false;
-    
-    const now = new Date();
-    const deadline = new Date(quote.required_by);
-    const timeDiff = deadline.getTime() - now.getTime();
-    const minutesLeft = timeDiff / (1000 * 60);
-    
-    return minutesLeft > 0 && minutesLeft <= 30;
-  };
-
   // Quotes are now sorted by the database (required_by ascending)
   // For completed quotes, we still need client-side sorting by creation date
   const sortedQuotes = useMemo(() => {
-    let filteredQuotes = quotes;
-    
-    // Apply view mode filtering
-    if (viewMode === 'urgent') {
-      filteredQuotes = quotes.filter(isUrgentQuote);
-    }
-    
     if (showCompleted) {
       // For completed quotes, sort by creation date (newest first)
-      return [...filteredQuotes].sort((a, b) => {
+      return [...quotes].sort((a, b) => {
         const dateA = new Date(a.createdAt).getTime();
         const dateB = new Date(b.createdAt).getTime();
         return dateB - dateA;
@@ -1430,8 +1417,8 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
     }
 
     // For active quotes, database already sorts by deadline, so use as-is
-    return filteredQuotes;
-  }, [quotes, showCompleted, viewMode]);
+    return quotes;
+  }, [quotes, showCompleted]);
 
   const filteredQuotes = sortedQuotes.filter(quote => {
     const quoteParts = getQuotePartsWithNotesSync(quote.id);
@@ -1622,58 +1609,37 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
         
         {/* View Options and Realtime Toggle */}
         <div className="flex items-center space-x-3">
-          {/* View Mode Toggle */}
-          <div className="flex items-center space-x-2">
-            <button
-              onClick={() => setViewMode('all')}
-              className={`flex items-center space-x-1 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                viewMode === 'all'
-                  ? 'bg-blue-100 text-blue-700'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
-              title="View all quotes"
-            >
-              <Eye className="w-4 h-4" />
-              <span>All</span>
-            </button>
-            <button
-              onClick={() => setViewMode('urgent')}
-              className={`flex items-center space-x-1 px-3 py-1.5 rounded-md text-sm font-medium transition-colors relative ${
-                viewMode === 'urgent'
-                  ? 'bg-red-100 text-red-700'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
-              title="View urgent quotes (deadline within 30 minutes)"
-            >
-              <Clock className="w-4 h-4" />
-              <span>Urgent</span>
-              {quotes.filter(isUrgentQuote).length > 0 && (
-                <span className={`absolute -top-1 -right-1 w-5 h-5 rounded-full text-xs font-bold flex items-center justify-center ${
-                  viewMode === 'urgent' ? 'bg-red-500 text-white' : 'bg-red-500 text-white'
-                }`}>
-                  {quotes.filter(isUrgentQuote).length}
-                </span>
-              )}
-            </button>
-            
-            {/* Single Quote Toggle */}
-            <button
-              onClick={() => setSingleQuoteMode(!singleQuoteMode)}
-              className={`flex items-center space-x-1 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                singleQuoteMode
-                  ? 'bg-purple-100 text-purple-700'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
-              title={singleQuoteMode ? "Show multiple quotes (10 per page)" : "Show one quote at a time"}
-            >
-              {singleQuoteMode ? (
-                <LayoutGrid className="w-4 h-4" />
-              ) : (
-                <List className="w-4 h-4" />
-              )}
-              <span>{singleQuoteMode ? 'Multiple' : 'Single'}</span>
-            </button>
-          </div>
+          {/* Single Quote Toggle */}
+          <button
+            onClick={() => {
+              const newSingleMode = !singleQuoteMode;
+              setSingleQuoteMode(newSingleMode);
+              
+              // Persist the setting to localStorage
+              localStorage.setItem('single-quote-mode', JSON.stringify(newSingleMode));
+              
+              // Notify parent component to change page size
+              if (onPageSizeChange) {
+                onPageSizeChange(newSingleMode ? 1 : 10);
+              }
+              
+              // Dispatch event to refresh quote data (same as RealtimeToggle)
+              window.dispatchEvent(new CustomEvent('refresh-quotes-data'));
+            }}
+            className={`flex items-center space-x-1 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+              singleQuoteMode
+                ? 'bg-purple-100 text-purple-700'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            }`}
+            title={singleQuoteMode ? "Show multiple quotes (10 per page)" : "Show one quote at a time"}
+          >
+            {singleQuoteMode ? (
+              <LayoutGrid className="w-4 h-4" />
+            ) : (
+              <List className="w-4 h-4" />
+            )}
+            <span>{singleQuoteMode ? 'Multiple' : 'Single'}</span>
+          </button>
 
           {/* Realtime Toggle */}
           <RealtimeToggle />
@@ -1743,7 +1709,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                 const status = getQuoteStatus(quoteParts, quote.status);
 
                 return (
-                  <AccordionItem key={quote.id} value={quote.id} className={`border-b border-gray-100 last:border-b-0 relative transition-all duration-300 ${expandedRows.has(quote.id) ? 'shadow-md bg-white z-10' : ''}`}>
+                  <AccordionItem key={quote.id} value={quote.id} className={`border-b border-gray-100 last:border-b-0 relative transition-all duration-300 ${expandedRows.has(quote.id) ? 'bg-white z-10' : ''}`}>
                 {/* Deadline Indicator - Only for unpriced and priced quotes */}
                 {quote.status !== 'completed' && quote.status !== 'ordered' && quote.status !== 'delivered' && (() => {
                   const deadlineInfo = getDeadlineIndicator(quote.requiredBy);

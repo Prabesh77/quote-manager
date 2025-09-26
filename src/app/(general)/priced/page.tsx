@@ -11,6 +11,13 @@ import { useDebouncedSearchWithPageReset } from '@/hooks/useDebouncedSearch';
 export default function PricedPage() {
   // Server-side pagination state
   const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('single-quote-mode');
+      return saved && JSON.parse(saved) ? 1 : 10;
+    }
+    return 10;
+  });
   const queryClient = useQueryClient();
   
   // Search state with debouncing and page reset
@@ -18,8 +25,8 @@ export default function PricedPage() {
     () => setCurrentPage(1)
   );
 
-  // Get quotes for priced page with server-side pagination (10 per page)
-  const { data: quotesData, isLoading: quotesLoading } = useQuotesQuery(currentPage, 10, { 
+  // Get quotes for priced page with server-side pagination
+  const { data: quotesData, isLoading: quotesLoading } = useQuotesQuery(currentPage, pageSize, { 
     status: 'priced',
     search: debouncedSearchTerm 
   });
@@ -206,6 +213,12 @@ export default function PricedPage() {
     }
   };
 
+  // Handle page size change from Single/Multiple toggle
+  const handlePageSizeChange = (newPageSize: number) => {
+    setPageSize(newPageSize);
+    setCurrentPage(1); // Reset to first page when changing page size
+  };
+
   return (
     <ProtectedRoute allowedRoles={['quote_creator', 'price_manager', 'quality_controller', 'admin']}>
       <div className="py-6">
@@ -228,8 +241,9 @@ export default function PricedPage() {
           currentPage={currentPage}
           totalPages={quotesData?.totalPages || 1}
           total={quotesData?.total || 0}
-          pageSize={10}
+          pageSize={pageSize}
           onPageChange={setCurrentPage}
+          onPageSizeChange={handlePageSizeChange}
           // Server-side search props
           searchTerm={searchTerm}
           onSearchChange={setSearchTerm}

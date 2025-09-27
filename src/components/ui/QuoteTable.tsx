@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef, forwardRef, useImperativeHandle } from 'react';
 import { ChevronDown, Edit, Save, X, Search, Copy, CheckCircle, AlertTriangle, ShoppingCart, Package, Plus, Info, MapPin, Send, Loader2, LayoutGrid, List, Eye } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Quote, Part } from './useQuotes';
@@ -124,6 +124,8 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
   const [editData, setEditData] = useState<Record<string, any>>({});
   const [partEditData, setPartEditData] = useState<Record<string, Record<string, any>>>({});
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
+  const [focusField, setFocusField] = useState<string | null>(null);
+  const focusRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const [sendForReviewLoading, setSendForReviewLoading] = useState<string | null>(null);
   const [showOrderConfirm, setShowOrderConfirm] = useState<string | null>(null);
   const [taxInvoiceNumber, setTaxInvoiceNumber] = useState('');
@@ -424,6 +426,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
       if (e.key === 'Escape') {
         setEditingQuote(null);
         setEditingParts(null);
+        setFocusField(null);
       }
 
       if (e.key === 'Enter' && (editingQuote || editingParts)) {
@@ -554,6 +557,8 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
       if (editingParts === quoteId) {
         setEditingParts(null);
         setPartEditData({});
+        // Clear the focus field
+        (window as any).__focusField = null;
       }
 
       showSnackbar('Quote sent for review successfully!', 'success');
@@ -564,6 +569,33 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
       setSendForReviewLoading(null);
     }
   };
+
+  // Handle direct click to start editing
+  const handleDirectEdit = (quoteId: string, fieldToFocus?: string) => {
+    if (editingParts !== quoteId) {
+      setEditingParts(quoteId);
+      setPartEditData({});
+    }
+    
+    // Set focus field for the specific input that was clicked
+    if (fieldToFocus) {
+      setFocusField(fieldToFocus);
+    }
+  };
+
+  // Focus the appropriate field when focusField changes
+  useEffect(() => {
+    if (focusField && editingParts) {
+      const timeoutId = setTimeout(() => {
+        const element = focusRefs.current[focusField];
+        if (element) {
+          element.focus();
+        }
+      }, 10);
+      
+      return () => clearTimeout(timeoutId);
+    }
+  }, [focusField, editingParts]);
 
   const handleSend = async () => {
     if (editingQuote) {
@@ -739,6 +771,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
             updateLocalState();
             setEditingParts(null);
             setPartEditData({});
+            setFocusField(null);
           } catch (error) {
             console.error('Error saving parts:', error);
           }
@@ -746,6 +779,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
           // No updates to save, just close editing mode
           setEditingParts(null);
           setPartEditData({});
+          setFocusField(null);
         }
       }
     }
@@ -951,6 +985,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
 
       setEditingParts(null);
       setPartEditData({});
+      setFocusField(null);
     }
   };
 
@@ -1646,8 +1681,8 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
 
       </div>
 
-        {/* Quotes Accordion */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden hidden md:block relative">
+      {/* Quotes Accordion */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden hidden md:block relative">
 
 
         {quotesLoading && paginatedQuotes.length === 0 ? (
@@ -1743,31 +1778,21 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                             );
                           })()}
                           <div className="flex items-center space-x-2">
-                            {editingQuote === quote.id ? (
-                              <input
-                                type="text"
-                                value={editData.quoteRef || quote.quoteRef || ''}
-                                onChange={(e) => handleQuoteEditChange('quoteRef', e.target.value)}
-                                className="px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                onClick={(e) => e.stopPropagation()}
-                              />
-                            ) : (
-                              <>
-                                <span className={`text-sm font-bold ${hasSpecialCharacters(quote.quoteRef || '') ? 'text-blue-600 bg-blue-50 px-2 py-0 rounded border border-blue-200 shadow-sm' : 'text-gray-900'}`}>
-                                  {quote.quoteRef}
-                                </span>
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    copyToClipboard(quote.quoteRef || '');
-                                  }}
-                                  className="p-1 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
-                                  title="Copy quote ref"
-                                >
-                                  <Copy className="h-4 w-4" />
-                                </button>
-                              </>
-                            )}
+                            <>
+                              <span className={`text-sm font-bold ${hasSpecialCharacters(quote.quoteRef || '') ? 'text-blue-600 bg-blue-50 px-2 py-0 rounded border border-blue-200 shadow-sm' : 'text-gray-900'}`}>
+                                {quote.quoteRef}
+                              </span>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  copyToClipboard(quote.quoteRef || '');
+                                }}
+                                className="p-1 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
+                                title="Copy quote ref"
+                              >
+                                <Copy className="h-4 w-4" />
+                              </button>
+                            </>
                           </div>
 
 
@@ -1775,19 +1800,19 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
 
                         {/* VIN below Quote Ref */}
                         <div className="flex items-center space-x-2">
-                            <>
-                              <span className="font-mono text-sm text-gray-600">{quote.vin || '-'}</span>
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  copyToClipboard(quote.vin || '');
-                                }}
-                                className="p-1 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
-                                title="Copy VIN"
-                              >
-                                <Copy className="h-3 w-3" />
-                              </button>
-                            </>
+                          <>
+                            <span className="font-mono text-sm text-gray-600">{quote.vin || '-'}</span>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                copyToClipboard(quote.vin || '');
+                              }}
+                              className="p-1 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
+                              title="Copy VIN"
+                            >
+                              <Copy className="h-3 w-3" />
+                            </button>
+                          </>
                         </div>
 
                         {/* Tax Invoice Number for Ordered Quotes */}
@@ -2038,6 +2063,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                     e.stopPropagation();
                                     setEditingParts(null);
                                     setPartEditData({});
+                                    setFocusField(null);
                                   }}
                                   className="px-3 py-1 text-xs bg-gray-600 text-white rounded hover:bg-gray-700 transition-colors cursor-pointer flex items-center space-x-1"
                                   title="Cancel editing and discard changes"
@@ -2059,8 +2085,8 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                       <tr>
                                         <th className="px-4 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider w-1/5">Part & Variants</th>
                                         <th className="px-4 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider w-1/5">Part Number</th>
-                                        <th className="px-4 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider w-1/10">List Price</th>
-                                        <th className="px-4 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider w-1/10">Price</th>
+                                        <th className="px-4 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider sm:w-1/8 lg:w-1/10">List Price</th>
+                                        <th className="px-4 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider sm:w-1/8 lg:w-1/10">Price</th>
                                         <th className="px-4 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider w-1/12">AM</th>
                                         <th className="px-4 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider w-2/5">Notes</th>
                                       </tr>
@@ -2143,7 +2169,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                                           type="text"
                                                           value={partEditData[part.id]?.[variant.id]?.number ?? part.number ?? ''}
                                                           onChange={(e) => handleVariantEditChange(part.id, variant.id, 'number', e.target.value)}
-                                                          className="w-full px-2 py-1 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                                                          className="w-full px-2 py-1 border border-gray-300 rounded-sm text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
                                                         />
                                                       ) : (
                                                         <>
@@ -2197,15 +2223,20 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                                   <div className="flex items-center space-x-1">
                                                     {isPartEditing ? (
                                                       <input
+                                                        ref={(el) => { focusRefs.current['list_price'] = el; }}
                                                         type="number"
                                                         value={partEditData[part.id]?.[variant.id]?.list_price !== undefined ? partEditData[part.id][variant.id].list_price : (variant.list_price ?? '')}
                                                         onChange={(e) => handleVariantEditChange(part.id, variant.id, 'list_price', e.target.value ? Number(e.target.value) : null)}
-                                                        className={`w-full px-2 py-1 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 ${index === 0 ? 'bg-white' : 'bg-gray-50'}`}
-                                                        placeholder="Enter list price"
+                                                        className={`w-full px-2 py-1 border border-gray-300 rounded-sm text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 ${index === 0 ? 'bg-white' : 'bg-gray-50'}`}
+                                                        placeholder="$"
                                                       />
                                                     ) : (
                                                       <>
-                                                        <span className={`text-sm font-medium ${variant.list_price ? 'text-gray-900' : 'text-gray-400'}`}>
+                                                        <span 
+                                                          className={`text-sm font-medium cursor-pointer hover:bg-gray-100 px-1 py-0.5 rounded transition-colors ${variant.list_price ? 'text-gray-900' : 'text-gray-400'}`}
+                                                          onClick={() => handleDirectEdit(quote.id, 'list_price')}
+                                                          title="Click to edit"
+                                                        >
                                                           {variant.list_price ? `$${variant.list_price.toFixed(2)}` : 'Not set'}
                                                         </span>
                                                         {variant.list_price && (
@@ -2229,16 +2260,20 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                                   <div className="flex items-center space-x-1">
                                                     {isPartEditing ? (
                                                       <input
+                                                        ref={(el) => { focusRefs.current['final_price'] = el; }}
                                                         type="number"
                                                         value={partEditData[part.id]?.[variant.id]?.final_price !== undefined ? partEditData[part.id][variant.id].final_price : (variant.final_price ?? '')}
                                                         onChange={(e) => handleVariantEditChange(part.id, variant.id, 'final_price', e.target.value ? Number(e.target.value) : null)}
-                                                        className={`w-full px-2 py-1 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 ${index === 0 ? 'bg-white' : 'bg-gray-50'}`}
-                                                        placeholder="Enter price"
-                                                        autoFocus={index === 0 && quoteParts.indexOf(part) === 0}
+                                                        className={`w-full px-2 py-1 border border-gray-300 rounded-sm text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 ${index === 0 ? 'bg-white' : 'bg-gray-50'}`}
+                                                        placeholder="$"
                                                       />
                                                     ) : (
                                                       <>
-                                                        <span className={`text-sm font-medium ${variant.final_price ? 'text-gray-900' : 'text-gray-400'}`}>
+                                                        <span 
+                                                          className={`text-sm font-medium cursor-pointer hover:bg-gray-100 px-1 py-0.5 rounded transition-colors ${variant.final_price ? 'text-gray-900' : 'text-gray-400'}`}
+                                                          onClick={() => handleDirectEdit(quote.id, 'final_price')}
+                                                          title="Click to edit"
+                                                        >
                                                           {variant.final_price ? `$${variant.final_price.toFixed(2)}` : 'Not set'}
                                                         </span>
                                                         {variant.final_price && (
@@ -2262,14 +2297,19 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                                   <div className="flex items-start justify-start">
                                                     {isPartEditing ? (
                                                       <input
+                                                        ref={(el) => { focusRefs.current['af'] = el; }}
                                                         type="checkbox"
                                                         checked={partEditData[part.id]?.[variant.id]?.af ?? variant.af ?? false}
                                                         onChange={(e) => handleVariantEditChange(part.id, variant.id, 'af', e.target.checked)}
-                                                        className={`w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2 ${index === 0 ? 'bg-white' : 'bg-gray-50'}`}
+                                                        className={`w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded-sm focus:ring-blue-500 focus:ring-2 ${index === 0 ? 'bg-white' : 'bg-gray-50'}`}
                                                         title="Aftermarket Flag"
                                                       />
                                                     ) : (
-                                                      <span className={`text-sm ${variant.af ? 'text-green-600 font-medium' : 'text-gray-400'}`}>
+                                                      <span 
+                                                        className={`text-sm cursor-pointer hover:bg-gray-100 px-1 py-0.5 rounded transition-colors ${variant.af ? 'text-green-600 font-medium' : 'text-gray-400'}`}
+                                                        onClick={() => handleDirectEdit(quote.id, 'af')}
+                                                        title="Click to edit"
+                                                      >
                                                         {variant.af ? (
                                                           <span className='bg-green-500 text-white rounded-full px-2 py-1 text-xs font-bold shadow-md border-2 border-green-600'>
                                                             ✓ AM
@@ -2286,6 +2326,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                                     <div className="flex items-center space-x-1 flex-1 min-w-0">
                                                       {isPartEditing ? (
                                                         <QuickFillInput
+                                                          ref={(el) => { focusRefs.current['note'] = el; }}
                                                           value={partEditData[part.id]?.[variant.id]?.note ?? variant.note ?? ''}
                                                           onChange={(value) => handleVariantEditChange(part.id, variant.id, 'note', value)}
                                                           placeholder="Add notes..."
@@ -2293,7 +2334,11 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                                         />
                                                       ) : (
                                                         <>
-                                                          <span className={`text-sm ${variant.note ? 'text-gray-700' : 'text-gray-400'}`}>
+                                                          <span 
+                                                            className={`text-sm cursor-pointer hover:bg-gray-100 px-1 py-0.5 rounded transition-colors ${variant.note ? 'text-gray-700' : 'text-gray-400'}`}
+                                                            onClick={() => handleDirectEdit(quote.id, 'note')}
+                                                            title="Click to edit"
+                                                          >
                                                             {variant.note || 'No notes'}
                                                           </span>
                                                           {variant.note && (
@@ -2403,7 +2448,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                         {/* Quote Details */}
                         <div className="flex flex-col space-y-2">
                           <div className="flex items-center w-full">
-                            
+
                             {/* Time Indicator on the left side for mobile */}
                             {quote.status !== 'completed' && quote.status !== 'ordered' && quote.status !== 'delivered' && (() => {
                               const deadlineInfo = getDeadlineIndicator(quote.requiredBy);
@@ -2419,7 +2464,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                 </div>
                               );
                             })()}
-                            
+
                             <div className="flex items-center space-x-2">
                               <div className="flex flex-col">
                                 <span className="text-xs font-medium text-gray-500 text-left">Quote Ref</span>
@@ -2508,7 +2553,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                             <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
                               {quoteParts.length} {quoteParts.length === 1 ? 'part' : 'parts'}
                             </span>
-                            
+
                             {/* Status */}
                             <div className="flex justify-end">
                               {getStatusChip(status)}
@@ -2679,6 +2724,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                   e.stopPropagation();
                                   setEditingParts(null);
                                   setPartEditData({});
+                                  setFocusField(null);
                                 }}
                                 className="px-3 py-1 text-xs bg-gray-600 text-white rounded hover:bg-gray-700 transition-colors cursor-pointer flex items-center space-x-1"
                                 title="Cancel editing and discard changes"
@@ -2772,6 +2818,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                           <div className="flex items-center space-x-1">
                                             {isPartEditing ? (
                                               <input
+                                                ref={(el) => { focusRefs.current['list_price_mobile'] = el; }}
                                                 type="number"
                                                 value={partEditData[part.id]?.list_price !== undefined ? partEditData[part.id].list_price : ''}
                                                 onChange={(e) => handlePartEditChange(part.id, 'list_price', e.target.value ? Number(e.target.value) : null)}
@@ -2779,7 +2826,11 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                               />
                                             ) : (
                                               <>
-                                                <span className="text-sm font-medium text-gray-900">
+                                                <span 
+                                                  className="text-sm font-medium text-gray-900 cursor-pointer hover:bg-gray-100 px-1 py-0.5 rounded transition-colors"
+                                                  onClick={() => handleDirectEdit(quote.id, 'list_price_mobile')}
+                                                  title="Click to edit"
+                                                >
                                                   {part.list_price ? `$${part.list_price.toFixed(2)}` : '-'}
                                                 </span>
                                                 <button
@@ -2803,15 +2854,19 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                           <div className="flex items-center space-x-1">
                                             {isPartEditing ? (
                                               <input
+                                                ref={(el) => { focusRefs.current['price_mobile'] = el; }}
                                                 type="number"
                                                 value={partEditData[part.id]?.price ?? ''}
                                                 onChange={(e) => handlePartEditChange(part.id, 'price', e.target.value ? Number(e.target.value) : null)}
                                                 className="flex-1 px-2 py-1 border border-gray-300 rounded-md text-sm focus:ring-1 focus:ring-red-500 focus:border-transparent"
-                                                autoFocus
                                               />
                                             ) : (
                                               <>
-                                                <span className="text-sm font-medium text-gray-900">
+                                                <span 
+                                                  className="text-sm font-medium text-gray-900 cursor-pointer hover:bg-gray-100 px-1 py-0.5 rounded transition-colors"
+                                                  onClick={() => handleDirectEdit(quote.id, 'price_mobile')}
+                                                  title="Click to edit"
+                                                >
                                                   {part.price ? `$${part.price.toFixed(2)}` : '-'}
                                                 </span>
                                                 <button
@@ -2837,6 +2892,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                           <div className="flex items-center space-x-1">
                                             {isPartEditing ? (
                                               <input
+                                                ref={(el) => { focusRefs.current['af_mobile'] = el; }}
                                                 type="checkbox"
                                                 checked={partEditData[part.id]?.af || false}
                                                 onChange={(e) => handlePartEditChange(part.id, 'af', e.target.checked)}
@@ -2844,7 +2900,11 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                                 title="Aftermarket Flag"
                                               />
                                             ) : (
-                                              <span className={`text-sm ${part.af ? 'text-green-600 font-medium' : 'text-gray-400'}`}>
+                                              <span 
+                                                className={`text-sm cursor-pointer hover:bg-gray-100 px-1 py-0.5 rounded transition-colors ${part.af ? 'text-green-600 font-medium' : 'text-gray-400'}`}
+                                                onClick={() => handleDirectEdit(quote.id, 'af_mobile')}
+                                                title="Click to edit"
+                                              >
                                                 {part.af ? (
                                                   <span className='bg-green-500 text-white rounded-full px-2 py-1 text-xs font-bold shadow-md border-2 border-green-600'>
                                                     ✓ AM
@@ -2862,13 +2922,20 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                           <div className="flex items-center space-x-1 min-w-0">
                                             {isPartEditing ? (
                                               <QuickFillInput
+                                                ref={(el) => { focusRefs.current['note_mobile'] = el; }}
                                                 value={partEditData[part.id]?.note ?? ''}
                                                 onChange={(value) => handlePartEditChange(part.id, 'note', value)}
                                                 className="flex-1"
                                               />
                                             ) : (
                                               <>
-                                                <span className="text-sm text-gray-600">{part.note || '-'}</span>
+                                                <span 
+                                                  className="text-sm text-gray-600 cursor-pointer hover:bg-gray-100 px-1 py-0.5 rounded transition-colors"
+                                                  onClick={() => handleDirectEdit(quote.id, 'note_mobile')}
+                                                  title="Click to edit"
+                                                >
+                                                  {part.note || '-'}
+                                                </span>
                                                 <button
                                                   onClick={() => copyToClipboard(part.note || '')}
                                                   className="p-1 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"

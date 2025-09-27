@@ -9,6 +9,7 @@ interface QuickFillInputProps {
   className?: string;
   label?: string;
   disabled?: boolean;
+  autoFocus?: boolean;
 }
 
 const QuickFillInput = forwardRef<HTMLInputElement, QuickFillInputProps>(({
@@ -17,7 +18,8 @@ const QuickFillInput = forwardRef<HTMLInputElement, QuickFillInputProps>(({
   placeholder = "Enter notes...",
   className = "",
   label,
-  disabled = false
+  disabled = false,
+  autoFocus = false
 }, ref) => {
   const { isOpen, triggerRef, open, close } = useQuickFillNotes();
 
@@ -57,7 +59,8 @@ const QuickFillInput = forwardRef<HTMLInputElement, QuickFillInputProps>(({
         onClick={handleInputClick}
         placeholder={placeholder}
         disabled={disabled}
-        className={`w-full px-3 py-1 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+        autoFocus={autoFocus}
+        className={`w-full px-3 py-1 border border-gray-300 rounded-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
           disabled ? 'bg-gray-50 cursor-not-allowed' : 'bg-white cursor-text'
         }`}
       />

@@ -1855,7 +1855,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
           <>
             {/* Table Header */}
             <div className="bg-white border-b border-gray-200 sticky top-0 z-10">
-              <div className="grid grid-cols-4 gap-4 px-6 py-4" style={{ gridTemplateColumns: '1fr 1fr 1fr 1fr' }}>
+              <div className="grid grid-cols-4 px-6 py-4" style={{ gridTemplateColumns: '1fr 1fr 1fr 1fr' }}>
                 <div className="font-semibold text-gray-900">Quote</div>
                 <div className="font-semibold text-gray-900">Customer</div>
                 <div className="font-semibold text-gray-900">Vehicle</div>
@@ -1887,7 +1887,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
         <>
           {/* Table Header */}
           <div className="bg-white border-b border-gray-200 sticky top-0 z-10">
-              <div className="grid grid-cols-4 gap-4 px-6 py-4" style={{ gridTemplateColumns: '1fr 1fr 1fr 1fr' }}>
+              <div className="grid grid-cols-4 px-6 py-4" style={{ gridTemplateColumns: '1fr 1fr 1fr 1fr' }}>
                 <div className="font-semibold text-gray-900">Quote</div>
                 <div className="font-semibold text-gray-900">Customer</div>
               <div className="font-semibold text-gray-900">Vehicle</div>
@@ -2139,7 +2139,6 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                     <div className="space-y-4">
                       <div className="flex items-center justify-between">
                         <h4 className="text-sm font-semibold text-gray-900 flex items-center space-x-2">
-                          <Eye className="h-4 w-4" />
                           <span>Parts Details ({quoteParts.length})</span>
                         </h4>
                         {quoteParts.length === 0 && (
@@ -2770,8 +2769,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                             <div className="space-y-4">
                               <div className="flex items-center justify-between">
                                 <h4 className="text-sm font-semibold text-gray-900 flex items-center space-x-2">
-                                  <Eye className="h-4 w-4" />
-                                  <span>Parts Details ({quoteParts.length})</span>
+                                  <span>Parts ({quoteParts.length})</span>
                                 </h4>
                                 {quoteParts.length === 0 && (
                                   <span className="text-sm text-gray-500">No parts linked to this quote</span>

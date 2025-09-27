@@ -1844,7 +1844,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
           {/* Realtime Toggle */}
           <RealtimeToggle />
         </div>
-
+        
       </div>
 
       {/* Quotes Accordion */}
@@ -2299,7 +2299,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                                           </div>
                                                 )}
                                                 <div className="flex-1">
-                                                          <span className="text-sm font-semibold text-gray-900">{part.name}</span>
+                                                          <span className={`text-sm font-semibold ${variant.final_price && variant.final_price < 10 ? 'text-red-600 line-through' : 'text-gray-900'}`}>{part.name}</span>
 
                                                         </div>
                                                       </>
@@ -2379,13 +2379,13 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                                 ) : (
                                                   <>
                                                         <span 
-                                                          className={`text-sm font-medium cursor-pointer hover:bg-gray-100 px-1 py-0.5 rounded transition-colors ${variant.list_price ? 'text-gray-900' : 'text-gray-400'}`}
+                                                          className={`text-sm font-medium cursor-pointer hover:bg-gray-100 px-1 py-0.5 rounded transition-colors ${variant.list_price ? (variant.list_price < 10 ? 'text-red-600 line-through' : 'text-gray-900') : 'text-gray-400'}`}
                                                           onClick={() => handleDirectEdit(quote.id, 'list_price')}
-                                                          title="Click to edit"
+                                                          title={variant.list_price && variant.list_price < 10 ? "Part not available" : "Click to edit"}
                                                         >
-                                                          {variant.list_price ? `$${variant.list_price.toFixed(2)}` : 'Not set'}
+                                                          {variant.list_price ? (variant.list_price < 10 ? 'N/A' : `$${variant.list_price.toFixed(2)}`) : 'Not set'}
                                                     </span>
-                                                        {variant.list_price && (
+                                                        {variant.list_price && variant.list_price >= 10 && (
                                                           <CopyButton
                                                             text={variant.list_price.toString()}
                                                       title="Copy to clipboard"
@@ -2412,13 +2412,13 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                                 ) : (
                                                   <>
                                                         <span 
-                                                          className={`text-sm font-medium cursor-pointer hover:bg-gray-100 px-1 py-0.5 rounded transition-colors ${variant.final_price ? 'text-gray-900' : 'text-gray-400'}`}
+                                                          className={`text-sm font-medium cursor-pointer hover:bg-gray-100 px-1 py-0.5 rounded transition-colors ${variant.final_price ? (variant.final_price < 10 ? 'text-red-600 line-through' : 'text-gray-900') : 'text-gray-400'}`}
                                                           onClick={() => handleDirectEdit(quote.id, 'final_price')}
-                                                          title="Click to edit"
+                                                          title={variant.final_price && variant.final_price < 10 ? "Part not available" : "Click to edit"}
                                                         >
-                                                          {variant.final_price ? `$${variant.final_price.toFixed(2)}` : 'Not set'}
+                                                          {variant.final_price ? (variant.final_price < 10 ? 'N/A' : `$${variant.final_price.toFixed(2)}`) : 'Not set'}
                                                         </span>
-                                                        {variant.final_price && (
+                                                        {variant.final_price && variant.final_price >= 10 && (
                                                           <CopyButton
                                                             text={variant.final_price.toString()}
                                                             title="Copy to clipboard"
@@ -2879,7 +2879,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                             <div>
                                               <label className="block text-xs font-medium text-gray-500 mb-1">Part Name</label>
                                               {/* Part name is always non-editable */}
-                                              <span className="text-sm font-medium text-gray-900">{part.name}</span>
+                                              <span className={`text-sm font-medium ${part.price && part.price < 10 ? 'text-red-600 line-through' : 'text-gray-900'}`}>{part.name}</span>
                                             </div>
                                             
                                             <div>
@@ -2944,18 +2944,20 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                             ) : (
                                               <>
                                                 <span 
-                                                  className="text-sm font-medium text-gray-900 cursor-pointer hover:bg-gray-100 px-1 py-0.5 rounded transition-colors"
+                                                  className={`text-sm font-medium cursor-pointer hover:bg-gray-100 px-1 py-0.5 rounded transition-colors ${part.list_price ? (part.list_price < 10 ? 'text-red-600 line-through' : 'text-gray-900') : 'text-gray-400'}`}
                                                   onClick={() => handleDirectEdit(quote.id, 'list_price_mobile')}
-                                                  title="Click to edit"
+                                                  title={part.list_price && part.list_price < 10 ? "Part not available" : "Click to edit"}
                                                 >
-                                                  {part.list_price ? `$${part.list_price.toFixed(2)}` : '-'}
+                                                  {part.list_price ? (part.list_price < 10 ? 'N/A' : `$${part.list_price.toFixed(2)}`) : '-'}
                                                 </span>
-                                                <CopyButton
-                                                  text={part.list_price ? part.list_price.toString() : ''}
-                                                  title="Copy to clipboard"
-                                                  size="sm"
-                                                  className="text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
-                                                />
+                                                {part.list_price && part.list_price >= 10 && (
+                                                  <CopyButton
+                                                    text={part.list_price ? part.list_price.toString() : ''}
+                                                    title="Copy to clipboard"
+                                                    size="sm"
+                                                    className="text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
+                                                  />
+                                                )}
                                               </>
                                             )}
                                           </div>
@@ -2975,18 +2977,20 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                                 ) : (
                                                   <>
                                                 <span 
-                                                  className="text-sm font-medium text-gray-900 cursor-pointer hover:bg-gray-100 px-1 py-0.5 rounded transition-colors"
+                                                  className={`text-sm font-medium cursor-pointer hover:bg-gray-100 px-1 py-0.5 rounded transition-colors ${part.price ? (part.price < 10 ? 'text-red-600 line-through' : 'text-gray-900') : 'text-gray-400'}`}
                                                   onClick={() => handleDirectEdit(quote.id, 'price_mobile')}
-                                                  title="Click to edit"
+                                                  title={part.price && part.price < 10 ? "Part not available" : "Click to edit"}
                                                 >
-                                                      {part.price ? `$${part.price.toFixed(2)}` : '-'}
+                                                      {part.price ? (part.price < 10 ? 'N/A' : `$${part.price.toFixed(2)}`) : '-'}
                                                     </span>
-                                                <CopyButton
-                                                  text={part.price ? part.price.toString() : ''}
-                                                      title="Copy to clipboard"
-                                                  size="sm"
-                                                  className="text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
-                                                />
+                                                {part.price && part.price >= 10 && (
+                                                  <CopyButton
+                                                    text={part.price ? part.price.toString() : ''}
+                                                        title="Copy to clipboard"
+                                                    size="sm"
+                                                    className="text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
+                                                  />
+                                                )}
                                                   </>
                                                 )}
                                           </div>
@@ -3199,9 +3203,9 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                           className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded"
                         />
                         <div className="flex-1">
-                          <div className="font-medium text-gray-900">{part.name}</div>
+                          <div className={`font-medium ${part.price && part.price < 10 ? 'text-red-600 line-through' : 'text-gray-900'}`}>{part.name}</div>
                           <div className="text-sm text-gray-500">
-                            {part.number} • ${part.price?.toFixed(2) || 0}
+                            {part.number} • {part.price && part.price < 10 ? <span className="text-red-600 line-through">N/A</span> : `$${part.price?.toFixed(2) || 0}`}
                           </div>
                         </div>
                       </label>
@@ -3223,7 +3227,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                         {nonOrderableParts.map((part) => (
                           <div key={part.id} className="flex items-center space-x-2">
                             <span>•</span>
-                            <span>{part.name} ({part.number})</span>
+                            <span className={`${part.price && part.price < 10 ? 'text-red-600 line-through' : ''}`}>{part.name} ({part.number})</span>
                             <span className="text-yellow-600">
                               {!part.price ? 'No price set' : 'Price is $0'}
                             </span>

@@ -524,31 +524,114 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
     const quote = localQuotes.find(q => q.id === quoteId);
     if (!quote) return;
 
-    // Check if there are any parts with prices
-    const quoteParts = getQuotePartsWithNotesSync(quoteId);
-    const hasAnyPrice = quoteParts.some(part => part.price && part.price > 0);
-
-    if (!hasAnyPrice) {
-      showSnackbar('Please add prices to at least one part before sending for review', 'warning');
-      return;
-    }
-
     setSendForReviewLoading(quoteId);
 
     try {
-      // Always save all parts with status change (both editing and non-editing states)
-      const quoteParts = getQuotePartsWithNotesSync(quoteId);
-      const updates = quoteParts.map(part => ({
-        id: part.id,
-        updates: {
-          variantId: 'default',
-          note: part.note || '',
-          price: part.price || null,
-          list_price: part.list_price || null,
-          af: part.af || false,
-          number: part.number || ''
+      let updates: Array<{ id: string; updates: Partial<Part> }> = [];
+      
+      if (editingParts === quoteId) {
+        // We're in editing mode, use the current edit data
+        const quoteParts = getQuotePartsWithNotesSync(quoteId);
+        
+        // Check if there are any prices in the current edit data
+        const hasAnyPriceInEditData = quoteParts.some(part => {
+          const editData = partEditData[part.id];
+          if (editData) {
+            // Check both variant and part-level prices
+            const hasVariantPrice = Object.values(editData).some((variantData: any) => 
+              (variantData.final_price && variantData.final_price > 0) || 
+              (variantData.list_price && variantData.list_price > 0)
+            );
+            const hasPartPrice = (editData.price && editData.price > 0) || 
+                                (editData.list_price && editData.list_price > 0);
+            return hasVariantPrice || hasPartPrice;
+          }
+          return part.price && part.price > 0;
+        });
+
+        if (!hasAnyPriceInEditData) {
+          showSnackbar('Please add prices to at least one part before sending for review', 'warning');
+          setSendForReviewLoading(null);
+          return;
         }
-      }));
+
+        // Build updates from edit data
+        updates = quoteParts.map(part => {
+          const editData = partEditData[part.id];
+          if (editData) {
+            // Check if editData has variant structure (object with variant IDs as keys)
+            const hasVariantStructure = Object.keys(editData).some(key => 
+              key !== 'note' && key !== 'price' && key !== 'list_price' && key !== 'af' && key !== 'number'
+            );
+            
+            if (hasVariantStructure) {
+              // For parts with variants, use the first variant's data
+              const variantId = Object.keys(editData).find(key => 
+                key !== 'note' && key !== 'price' && key !== 'list_price' && key !== 'af' && key !== 'number'
+              );
+              const variantData = variantId ? editData[variantId] : {};
+              
+              return {
+                id: part.id,
+                updates: {
+                  variantId: variantId || 'default',
+                  note: (variantData.note ?? part.note) || '',
+                  price: (variantData.final_price ?? part.price) || null,
+                  list_price: (variantData.list_price ?? part.list_price) || null,
+                  af: (variantData.af ?? part.af) || false,
+                  number: part.number || ''
+                }
+              };
+            } else {
+              // For parts without variants, use part-level data
+              return {
+                id: part.id,
+                updates: {
+                  note: (editData.note ?? part.note) || '',
+                  price: (editData.price ?? part.price) || null,
+                  list_price: (editData.list_price ?? part.list_price) || null,
+                  af: (editData.af ?? part.af) || false,
+                  number: (editData.number ?? part.number) || ''
+                }
+              };
+            }
+          }
+          
+          // No edit data, use existing part data
+          return {
+            id: part.id,
+            updates: {
+              note: part.note || '',
+              price: part.price || null,
+              list_price: part.list_price || null,
+              af: part.af || false,
+              number: part.number || ''
+            }
+          };
+        });
+      } else {
+        // Not in editing mode, use existing data
+        const quoteParts = getQuotePartsWithNotesSync(quoteId);
+        const hasAnyPrice = quoteParts.some(part => part.price && part.price > 0);
+
+        if (!hasAnyPrice) {
+          showSnackbar('Please add prices to at least one part before sending for review', 'warning');
+          setSendForReviewLoading(null);
+          return;
+        }
+
+        updates = quoteParts.map(part => ({
+          id: part.id,
+          updates: {
+            variantId: 'default',
+            note: part.note || '',
+            price: part.price || null,
+            list_price: part.list_price || null,
+            af: part.af || false,
+            number: part.number || ''
+          }
+        }));
+      }
 
       // Use the comprehensive batch mutation that handles both parts and status
       await onUpdateMultipleParts(updates, quoteId, true); // Pass true to change status
@@ -557,8 +640,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
       if (editingParts === quoteId) {
         setEditingParts(null);
         setPartEditData({});
-        // Clear the focus field
-        (window as any).__focusField = null;
+        setFocusField(null);
       }
 
       showSnackbar('Quote sent for review successfully!', 'success');
@@ -1360,17 +1442,93 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
   // Function to handle quote verification confirmation
   const handleVerifyQuote = async (quoteId: string) => {
     try {
+      let updates: Array<{ id: string; updates: Partial<Part> }> = [];
+      
+      if (editingParts === quoteId) {
+        // We're in editing mode, use the current edit data
+        const quoteParts = getQuotePartsWithNotesSync(quoteId);
+        
+        // Build updates from edit data
+        updates = quoteParts.map(part => {
+          const editData = partEditData[part.id];
+          if (editData) {
+            // Check if editData has variant structure (object with variant IDs as keys)
+            const hasVariantStructure = Object.keys(editData).some(key => 
+              key !== 'note' && key !== 'price' && key !== 'list_price' && key !== 'af' && key !== 'number'
+            );
+            
+            if (hasVariantStructure) {
+              // For parts with variants, use the first variant's data
+              const variantId = Object.keys(editData).find(key => 
+                key !== 'note' && key !== 'price' && key !== 'list_price' && key !== 'af' && key !== 'number'
+              );
+              const variantData = variantId ? editData[variantId] : {};
+              
+              return {
+                id: part.id,
+                updates: {
+                  variantId: variantId || 'default',
+                  note: (variantData.note ?? part.note) || '',
+                  price: (variantData.final_price ?? part.price) || null,
+                  list_price: (variantData.list_price ?? part.list_price) || null,
+                  af: (variantData.af ?? part.af) || false,
+                  number: part.number || ''
+                }
+              };
+            } else {
+              // For parts without variants, use part-level data
+              return {
+                id: part.id,
+                updates: {
+                  note: (editData.note ?? part.note) || '',
+                  price: (editData.price ?? part.price) || null,
+                  list_price: (editData.list_price ?? part.list_price) || null,
+                  af: (editData.af ?? part.af) || false,
+                  number: (editData.number ?? part.number) || ''
+                }
+              };
+            }
+          }
+          
+          // No edit data, use existing part data
+          return {
+            id: part.id,
+            updates: {
+              note: part.note || '',
+              price: part.price || null,
+              list_price: part.list_price || null,
+              af: part.af || false,
+              number: part.number || ''
+            }
+          };
+        });
+      }
+
+      // If we have updates to save, save them first
+      if (updates.length > 0) {
+        await onUpdateMultipleParts(updates, quoteId, false); // Don't change status yet
+      }
+
+      // Now update the quote status to 'priced'
       const result = await onUpdateQuote(quoteId, { status: 'priced' });
 
       if (result.error) {
         console.error('❌ Error verifying quote:', result.error);
-        // You could show a snackbar or error message here
+        showSnackbar('Error verifying quote', 'error');
         return;
       }
 
-      // The UI will automatically refresh due to query invalidation
+      // If we were in editing mode, exit it
+      if (editingParts === quoteId) {
+        setEditingParts(null);
+        setPartEditData({});
+        setFocusField(null);
+      }
+
+      showSnackbar('Quote verified successfully!', 'success');
     } catch (error) {
       console.error('❌ Error verifying quote:', error);
+      showSnackbar('Error verifying quote', 'error');
     }
   };
 
@@ -1887,8 +2045,9 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
 
                       {/* Column 4: Status & Parts Count */}
                       <div className="flex flex-col space-y-2">
-                        <div className="flex items-center space-x-2">
+                        <div className="flex items-center justify-between pr-4">
                           {/* Parts Count below Status */}
+                          <div className="flex items-center space-x-2 ">
                           <div className="flex items-center justify-between">
                             <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
                               {quoteParts.length}
@@ -1896,6 +2055,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                           </div>
                           <div className="flex space-y-1">
                             {getStatusChip(status)}
+                          </div>
                           </div>
 
                           {/* Action buttons */}
@@ -1947,10 +2107,10 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                     e.stopPropagation();
                                     onMarkCompleted(quote.id);
                                   }}
-                                  className="p-1 bg-green-600 hover:bg-green-700 text-white rounded-full transition-colors cursor-pointer"
+                                  className="p-1 ml-4 bg-green-600 hover:bg-green-700 text-white rounded-full transition-colors cursor-pointer"
                                   title="Mark as completed"
                                 >
-                                  <CheckCircle className="h-4 w-4" />
+                                  <CheckCircle className="h-5 w-5" />
                                 </button>
                               )}
 
@@ -2037,10 +2197,8 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                 </button>
                                 {currentPageName === 'pricing' && (
                                   <button
-                                    onClick={async (e) => {
+                                    onClick={(e) => {
                                       e.stopPropagation();
-                                      // Save first, then send for review
-                                      await handleSave(true); // Force save all parts
                                       handleSendForReview(quote.id);
                                     }}
                                     disabled={sendForReviewLoading === quote.id}
@@ -2312,7 +2470,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                                       >
                                                         {variant.af ? (
                                                           <span className='bg-green-500 text-white rounded-full px-2 py-1 text-xs font-bold shadow-md border-2 border-green-600'>
-                                                            ✓ AM
+                                                            AM
                                                           </span>
                                                         ) : (
                                                           <span className='text-gray-400 text-sm'>OEM</span>
@@ -2611,7 +2769,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                     className="p-1 text-green-600 hover:text-green-700 hover:bg-green-100 rounded transition-colors cursor-pointer"
                                     title="Mark as completed"
                                   >
-                                    <CheckCircle className="h-3 w-3" />
+                                    <CheckCircle className="h-4 w-4" />
                                   </button>
                                 )}
 
@@ -2698,10 +2856,8 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                               </button>
                               {currentPageName === 'pricing' && (
                                 <button
-                                  onClick={async (e) => {
+                                  onClick={(e) => {
                                     e.stopPropagation();
-                                    // Save first, then send for review
-                                    await handleSave(true); // Force save all parts
                                     handleSendForReview(quote.id);
                                   }}
                                   disabled={sendForReviewLoading === quote.id}

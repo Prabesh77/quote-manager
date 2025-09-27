@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
-import { ChevronDown, Edit, Save, X, Search, Eye, Copy, CheckCircle, AlertTriangle, ShoppingCart, Package, Plus, Info, MapPin, Send, Loader2, Clock, LayoutGrid, List } from 'lucide-react';
+import React, { useState, useEffect, useMemo, useCallback, useRef, forwardRef, useImperativeHandle } from 'react';
+import { ChevronDown, Edit, Save, X, Search, Copy, CheckCircle, AlertTriangle, ShoppingCart, Package, Plus, Info, MapPin, Send, Loader2, LayoutGrid, List, Eye } from 'lucide-react';
+import CopyButton from './CopyButton';
 import { useQueryClient } from '@tanstack/react-query';
 import { Quote, Part } from './useQuotes';
 
@@ -43,6 +44,7 @@ interface QuoteTableProps {
   totalPages?: number;
   pageSize?: number;
   onPageChange?: (page: number) => void;
+  onPageSizeChange?: (pageSize: number) => void;
   // Server-side search props
   searchTerm?: string;
   onSearchChange?: (searchTerm: string) => void;
@@ -55,7 +57,7 @@ type FilterType = 'all' | 'unpriced' | 'priced';
 
 type QuoteStatus = 'unpriced' | 'priced' | 'completed' | 'ordered' | 'delivered' | 'waiting_verification' | 'wrong';
 
-export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote, onUpdatePart, onUpdateMultipleParts, onMarkCompleted, onMarkAsOrdered, onMarkAsOrderedWithParts, onMarkAsWrong, showCompleted = false, defaultFilter = 'all', isLoading = false, itemsPerPage = 10, showPagination = true, currentPage: externalCurrentPage, total: externalTotal, totalPages: externalTotalPages, pageSize: externalPageSize, onPageChange, searchTerm: externalSearchTerm, onSearchChange, useServerSideSearch = false, currentPageName }: QuoteTableProps) {
+export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote, onUpdatePart, onUpdateMultipleParts, onMarkCompleted, onMarkAsOrdered, onMarkAsOrderedWithParts, onMarkAsWrong, showCompleted = false, defaultFilter = 'all', isLoading = false, itemsPerPage = 10, showPagination = true, currentPage: externalCurrentPage, total: externalTotal, totalPages: externalTotalPages, pageSize: externalPageSize, onPageChange, onPageSizeChange, searchTerm: externalSearchTerm, onSearchChange, useServerSideSearch = false, currentPageName }: QuoteTableProps) {
   const { showSnackbar } = useSnackbar();
   const queryClient = useQueryClient();
 
@@ -73,8 +75,13 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
   const [filter, setFilter] = useState<FilterType>(defaultFilter);
   const [searchTerm, setSearchTerm] = useState('');
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
-  const [viewMode, setViewMode] = useState<'all' | 'urgent'>('all');
-  const [singleQuoteMode, setSingleQuoteMode] = useState(false);
+  const [singleQuoteMode, setSingleQuoteMode] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('single-quote-mode');
+      return saved ? JSON.parse(saved) : false;
+    }
+    return false;
+  });
 
   // Use external search term when server-side search is enabled
   const effectiveSearchTerm = useServerSideSearch ? externalSearchTerm || '' : searchTerm;
@@ -108,7 +115,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
     };
 
     window.addEventListener('refresh-quotes-data', handleRefreshQuotes);
-    
+
     return () => {
       window.removeEventListener('refresh-quotes-data', handleRefreshQuotes);
     };
@@ -118,13 +125,14 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
   const [editData, setEditData] = useState<Record<string, any>>({});
   const [partEditData, setPartEditData] = useState<Record<string, Record<string, any>>>({});
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
+  const [focusField, setFocusField] = useState<string | null>(null);
+  const focusRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const [sendForReviewLoading, setSendForReviewLoading] = useState<string | null>(null);
   const [showOrderConfirm, setShowOrderConfirm] = useState<string | null>(null);
   const [taxInvoiceNumber, setTaxInvoiceNumber] = useState('');
   const [selectedPartIds, setSelectedPartIds] = useState<string[]>([]);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [quotePartsWithNotes, setQuotePartsWithNotes] = useState<Record<string, Part[]>>({});
-  const [copiedItems, setCopiedItems] = useState<Set<string>>(new Set());
 
   // Quote edit modal state
   const [editModalOpen, setEditModalOpen] = useState(false);
@@ -418,6 +426,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
       if (e.key === 'Escape') {
         setEditingQuote(null);
         setEditingParts(null);
+        setFocusField(null);
       }
       
       if (e.key === 'Enter' && (editingQuote || editingParts)) {
@@ -515,31 +524,114 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
     const quote = localQuotes.find(q => q.id === quoteId);
     if (!quote) return;
 
-    // Check if there are any parts with prices
-    const quoteParts = getQuotePartsWithNotesSync(quoteId);
-    const hasAnyPrice = quoteParts.some(part => part.price && part.price > 0);
-
-    if (!hasAnyPrice) {
-      showSnackbar('Please add prices to at least one part before sending for review', 'warning');
-      return;
-    }
-
     setSendForReviewLoading(quoteId);
 
     try {
-      // Always save all parts with status change (both editing and non-editing states)
-      const quoteParts = getQuotePartsWithNotesSync(quoteId);
-      const updates = quoteParts.map(part => ({
-        id: part.id,
-        updates: {
-          variantId: 'default',
-          note: part.note || '',
-          price: part.price || null,
-          list_price: part.list_price || null,
-          af: part.af || false,
-          number: part.number || ''
+      let updates: Array<{ id: string; updates: Partial<Part> }> = [];
+      
+      if (editingParts === quoteId) {
+        // We're in editing mode, use the current edit data
+        const quoteParts = getQuotePartsWithNotesSync(quoteId);
+        
+        // Check if there are any prices in the current edit data
+        const hasAnyPriceInEditData = quoteParts.some(part => {
+          const editData = partEditData[part.id];
+          if (editData) {
+            // Check both variant and part-level prices
+            const hasVariantPrice = Object.values(editData).some((variantData: any) => 
+              (variantData.final_price && variantData.final_price > 0) || 
+              (variantData.list_price && variantData.list_price > 0)
+            );
+            const hasPartPrice = (editData.price && editData.price > 0) || 
+                                (editData.list_price && editData.list_price > 0);
+            return hasVariantPrice || hasPartPrice;
+          }
+          return part.price && part.price > 0;
+        });
+
+        if (!hasAnyPriceInEditData) {
+          showSnackbar('Please add prices to at least one part before sending for review', 'warning');
+          setSendForReviewLoading(null);
+          return;
         }
-      }));
+
+        // Build updates from edit data
+        updates = quoteParts.map(part => {
+          const editData = partEditData[part.id];
+          if (editData) {
+            // Check if editData has variant structure (object with variant IDs as keys)
+            const hasVariantStructure = Object.keys(editData).some(key => 
+              key !== 'note' && key !== 'price' && key !== 'list_price' && key !== 'af' && key !== 'number'
+            );
+            
+            if (hasVariantStructure) {
+              // For parts with variants, use the first variant's data
+              const variantId = Object.keys(editData).find(key => 
+                key !== 'note' && key !== 'price' && key !== 'list_price' && key !== 'af' && key !== 'number'
+              );
+              const variantData = variantId ? editData[variantId] : {};
+              
+              return {
+                id: part.id,
+                updates: {
+                  variantId: variantId || 'default',
+                  note: (variantData.note ?? part.note) || '',
+                  price: (variantData.final_price ?? part.price) || null,
+                  list_price: (variantData.list_price ?? part.list_price) || null,
+                  af: (variantData.af ?? part.af) || false,
+                  number: part.number || ''
+                }
+              };
+            } else {
+              // For parts without variants, use part-level data
+              return {
+                id: part.id,
+                updates: {
+                  note: (editData.note ?? part.note) || '',
+                  price: (editData.price ?? part.price) || null,
+                  list_price: (editData.list_price ?? part.list_price) || null,
+                  af: (editData.af ?? part.af) || false,
+                  number: (editData.number ?? part.number) || ''
+                }
+              };
+            }
+          }
+          
+          // No edit data, use existing part data
+          return {
+            id: part.id,
+            updates: {
+              note: part.note || '',
+              price: part.price || null,
+              list_price: part.list_price || null,
+              af: part.af || false,
+              number: part.number || ''
+            }
+          };
+        });
+      } else {
+        // Not in editing mode, use existing data
+        const quoteParts = getQuotePartsWithNotesSync(quoteId);
+        const hasAnyPrice = quoteParts.some(part => part.price && part.price > 0);
+
+        if (!hasAnyPrice) {
+          showSnackbar('Please add prices to at least one part before sending for review', 'warning');
+          setSendForReviewLoading(null);
+          return;
+        }
+
+        updates = quoteParts.map(part => ({
+          id: part.id,
+          updates: {
+            variantId: 'default',
+            note: part.note || '',
+            price: part.price || null,
+            list_price: part.list_price || null,
+            af: part.af || false,
+            number: part.number || ''
+          }
+        }));
+      }
 
       // Use the comprehensive batch mutation that handles both parts and status
       await onUpdateMultipleParts(updates, quoteId, true); // Pass true to change status
@@ -548,6 +640,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
       if (editingParts === quoteId) {
         setEditingParts(null);
         setPartEditData({});
+        setFocusField(null);
       }
 
       showSnackbar('Quote sent for review successfully!', 'success');
@@ -558,6 +651,33 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
       setSendForReviewLoading(null);
     }
   };
+
+  // Handle direct click to start editing
+  const handleDirectEdit = (quoteId: string, fieldToFocus?: string) => {
+    if (editingParts !== quoteId) {
+      setEditingParts(quoteId);
+      setPartEditData({});
+    }
+    
+    // Set focus field for the specific input that was clicked
+    if (fieldToFocus) {
+      setFocusField(fieldToFocus);
+    }
+  };
+
+  // Focus the appropriate field when focusField changes
+  useEffect(() => {
+    if (focusField && editingParts) {
+      const timeoutId = setTimeout(() => {
+        const element = focusRefs.current[focusField];
+        if (element) {
+          element.focus();
+        }
+      }, 10);
+      
+      return () => clearTimeout(timeoutId);
+    }
+  }, [focusField, editingParts]);
 
   const handleSend = async () => {
     if (editingQuote) {
@@ -622,7 +742,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
         };
         
         // Then, save the default variant to the backend (for compatibility with current schema)
-        const updates: Array<{ id: string; updates: Partial<Part> & { variantId?: string; list_price?: number | null; af?: boolean } }> = [];
+        const updates: Array<{ id: string; updates: Partial<Part> & { variantId?: string; list_price?: number | null; af?: boolean; _removedVariantIds?: string[]; _currentVariants?: any[] } }> = [];
         
         // Only process parts that have actual changes to avoid unnecessary updates
         Object.keys(partEditData).forEach(partId => {
@@ -733,6 +853,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
             updateLocalState();
             setEditingParts(null);
             setPartEditData({});
+            setFocusField(null);
           } catch (error) {
             console.error('Error saving parts:', error);
               }
@@ -740,6 +861,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
           // No updates to save, just close editing mode
           setEditingParts(null);
           setPartEditData({});
+          setFocusField(null);
         }
       }
     }
@@ -795,7 +917,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
         };
 
         // Then, save the default variant to the backend (for compatibility with current schema)
-        const updates: Array<{ id: string; updates: Partial<Part> & { variantId?: string; list_price?: number | null; af?: boolean } }> = [];
+        const updates: Array<{ id: string; updates: Partial<Part> & { variantId?: string; list_price?: number | null; af?: boolean; _removedVariantIds?: string[]; _currentVariants?: any[] } }> = [];
 
         // Only process parts that have actual changes to avoid unnecessary updates
         Object.keys(partEditData).forEach(partId => {
@@ -898,6 +1020,40 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
             });
           }
         });
+
+        // Check for variant removals - compare current state with original database state
+        quote.partsRequested?.forEach(partItem => {
+          const partId = partItem.part_id;
+          const currentVariants = partItem.variants || [];
+          
+          // Find the original quote from the database (not local state)
+          const originalQuote = quotes.find(q => q.id === editingParts);
+          const originalPart = originalQuote?.partsRequested?.find(qp => qp.part_id === partId);
+          const originalVariants = originalPart?.variants || [];
+          
+          // Check if any variants were removed
+          const removedVariants = originalVariants.filter(originalVariant => 
+            !currentVariants.some(currentVariant => currentVariant.id === originalVariant.id)
+          );
+          
+          if (removedVariants.length > 0) {
+            // Send an update to remove the variants from the database
+            updates.push({
+              id: partId,
+              updates: {
+                variantId: 'variant-removal',
+                _removedVariantIds: removedVariants.map(v => v.id),
+                _currentVariants: currentVariants,
+                // Include variant data to ensure the update is processed
+                note: currentVariants.length > 0 ? currentVariants[0].note : '',
+                price: currentVariants.length > 0 ? currentVariants[0].final_price : null,
+                list_price: currentVariants.length > 0 ? currentVariants[0].list_price : null,
+                af: currentVariants.length > 0 ? currentVariants[0].af : false,
+                number: parts.find(p => p.id === partId)?.number || ''
+              }
+            });
+          }
+        });
         
         // Debug: Log the current state of all variants for this quote
         const currentQuote = localQuotes.find(q => q.id === editingParts);
@@ -945,6 +1101,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
       
       setEditingParts(null);
       setPartEditData({});
+      setFocusField(null);
     }
   };
 
@@ -1033,32 +1190,6 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
     return 'unpriced';
   };
 
-  const copyToClipboard = async (text: string) => {
-    try {
-      await navigator.clipboard.writeText(text);
-
-      // Create a unique key for this copied item
-      const copiedKey = `${text}_${Date.now()}`;
-      setCopiedItems(prev => new Set([...prev, copiedKey]));
-
-      // Remove the copied indicator after 1.5 seconds
-      setTimeout(() => {
-        setCopiedItems(prev => {
-          const newSet = new Set(prev);
-          newSet.delete(copiedKey);
-          return newSet;
-        });
-      }, 1500);
-
-    } catch (err) {
-      console.error('Failed to copy text: ', err);
-    }
-  };
-
-  // Helper function to check if an item was recently copied
-  const isRecentlyCopied = (text: string) => {
-    return Array.from(copiedItems).some(key => key.startsWith(text + '_'));
-  };
 
   const getVehicleLogo = (make: string) => {
     const logos: Record<string, string> = {
@@ -1128,24 +1259,24 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
         const diffMs = deadline.getTime() - now.getTime();
         const diffMins = Math.floor(diffMs / (1000 * 60));
         
-        let color = 'bg-green-500';
+        let color = 'border-green-500 text-green-600 bg-green-50';
         let animation = '';
         
         if (diffMins < 0) {
           // Overdue
-          color = 'bg-red-500';
+          color = 'border-red-500 text-red-600 bg-red-50';
           animation = '';
         } else if (diffMins < 15) {
           // Less than 15 minutes
-          color = 'bg-red-500';
+          color = 'border-red-500 text-red-600 bg-red-50';
           animation = '';
         } else if (diffMins < 30) {
           // Less than 30 minutes
-          color = 'bg-yellow-500';
+          color = 'border-yellow-500 text-yellow-600 bg-yellow-50';
           animation = '';
         } else {
           // More than 30 minutes
-          color = 'bg-green-500';
+          color = 'border-green-500 text-green-600 bg-green-50';
         }
         
         // Format the time display
@@ -1242,24 +1373,24 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
       const diffMs = deadline.getTime() - now.getTime();
       const diffMins = Math.floor(diffMs / (1000 * 60));
       
-      let color = 'bg-green-500';
+      let color = 'border-green-500 text-green-600 bg-green-50';
       let animation = '';
       
       if (diffMins < 0) {
         // Overdue
-        color = 'bg-red-500';
+        color = 'border-red-500 text-red-600 bg-red-50';
         animation = '';
       } else if (diffMins < 15) {
         // Less than 15 minutes
-        color = 'bg-red-500';
+        color = 'border-red-500 text-red-600 bg-red-50';
         animation = '';
       } else if (diffMins < 30) {
         // Less than 30 minutes
-        color = 'bg-yellow-500';
+        color = 'border-yellow-500 text-yellow-600 bg-yellow-50';
         animation = '';
       } else {
         // More than 30 minutes
-        color = 'bg-green-500';
+        color = 'border-green-500 text-green-600 bg-green-50';
       }
       
       // Format the time display
@@ -1319,17 +1450,93 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
   // Function to handle quote verification confirmation
   const handleVerifyQuote = async (quoteId: string) => {
     try {
+      let updates: Array<{ id: string; updates: Partial<Part> }> = [];
+      
+      if (editingParts === quoteId) {
+        // We're in editing mode, use the current edit data
+        const quoteParts = getQuotePartsWithNotesSync(quoteId);
+        
+        // Build updates from edit data
+        updates = quoteParts.map(part => {
+          const editData = partEditData[part.id];
+          if (editData) {
+            // Check if editData has variant structure (object with variant IDs as keys)
+            const hasVariantStructure = Object.keys(editData).some(key => 
+              key !== 'note' && key !== 'price' && key !== 'list_price' && key !== 'af' && key !== 'number'
+            );
+            
+            if (hasVariantStructure) {
+              // For parts with variants, use the first variant's data
+              const variantId = Object.keys(editData).find(key => 
+                key !== 'note' && key !== 'price' && key !== 'list_price' && key !== 'af' && key !== 'number'
+              );
+              const variantData = variantId ? editData[variantId] : {};
+              
+              return {
+                id: part.id,
+                updates: {
+                  variantId: variantId || 'default',
+                  note: (variantData.note ?? part.note) || '',
+                  price: (variantData.final_price ?? part.price) || null,
+                  list_price: (variantData.list_price ?? part.list_price) || null,
+                  af: (variantData.af ?? part.af) || false,
+                  number: part.number || ''
+                }
+              };
+            } else {
+              // For parts without variants, use part-level data
+              return {
+                id: part.id,
+                updates: {
+                  note: (editData.note ?? part.note) || '',
+                  price: (editData.price ?? part.price) || null,
+                  list_price: (editData.list_price ?? part.list_price) || null,
+                  af: (editData.af ?? part.af) || false,
+                  number: (editData.number ?? part.number) || ''
+                }
+              };
+            }
+          }
+          
+          // No edit data, use existing part data
+          return {
+            id: part.id,
+            updates: {
+              note: part.note || '',
+              price: part.price || null,
+              list_price: part.list_price || null,
+              af: part.af || false,
+              number: part.number || ''
+            }
+          };
+        });
+      }
+
+      // If we have updates to save, save them first
+      if (updates.length > 0) {
+        await onUpdateMultipleParts(updates, quoteId, false); // Don't change status yet
+      }
+
+      // Now update the quote status to 'priced'
       const result = await onUpdateQuote(quoteId, { status: 'priced' });
 
       if (result.error) {
         console.error('❌ Error verifying quote:', result.error);
-        // You could show a snackbar or error message here
+        showSnackbar('Error verifying quote', 'error');
         return;
       }
 
-      // The UI will automatically refresh due to query invalidation
+      // If we were in editing mode, exit it
+      if (editingParts === quoteId) {
+        setEditingParts(null);
+        setPartEditData({});
+        setFocusField(null);
+      }
+
+      showSnackbar('Quote verified successfully!', 'success');
     } catch (error) {
       console.error('❌ Error verifying quote:', error);
+      showSnackbar('Error verifying quote', 'error');
     }
   };
 
@@ -1398,31 +1605,12 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
     return quoteRef && (quoteRef.includes('.') || quoteRef.includes('/') || quoteRef.includes('#'));
   };
 
-  // Helper function to check if quote has deadline within next 30 minutes
-  const isUrgentQuote = (quote: Quote) => {
-    if (!quote.required_by) return false;
-    
-    const now = new Date();
-    const deadline = new Date(quote.required_by);
-    const timeDiff = deadline.getTime() - now.getTime();
-    const minutesLeft = timeDiff / (1000 * 60);
-    
-    return minutesLeft > 0 && minutesLeft <= 30;
-  };
-
   // Quotes are now sorted by the database (required_by ascending)
   // For completed quotes, we still need client-side sorting by creation date
   const sortedQuotes = useMemo(() => {
-    let filteredQuotes = quotes;
-    
-    // Apply view mode filtering
-    if (viewMode === 'urgent') {
-      filteredQuotes = quotes.filter(isUrgentQuote);
-    }
-    
     if (showCompleted) {
       // For completed quotes, sort by creation date (newest first)
-      return [...filteredQuotes].sort((a, b) => {
+      return [...quotes].sort((a, b) => {
         const dateA = new Date(a.createdAt).getTime();
         const dateB = new Date(b.createdAt).getTime();
         return dateB - dateA;
@@ -1430,8 +1618,8 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
     }
 
     // For active quotes, database already sorts by deadline, so use as-is
-    return filteredQuotes;
-  }, [quotes, showCompleted, viewMode]);
+    return quotes;
+  }, [quotes, showCompleted]);
 
   const filteredQuotes = sortedQuotes.filter(quote => {
     const quoteParts = getQuotePartsWithNotesSync(quote.id);
@@ -1622,58 +1810,36 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
         
         {/* View Options and Realtime Toggle */}
         <div className="flex items-center space-x-3">
-          {/* View Mode Toggle */}
-          <div className="flex items-center space-x-2">
-            <button
-              onClick={() => setViewMode('all')}
-              className={`flex items-center space-x-1 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                viewMode === 'all'
-                  ? 'bg-blue-100 text-blue-700'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+          {/* Single Quote Toggle */}
+          <button
+            onClick={() => {
+              const newSingleMode = !singleQuoteMode;
+              setSingleQuoteMode(newSingleMode);
+
+              // Persist the setting to localStorage
+              localStorage.setItem('single-quote-mode', JSON.stringify(newSingleMode));
+
+              // Notify parent component to change page size
+              if (onPageSizeChange) {
+                onPageSizeChange(newSingleMode ? 1 : 10);
+              }
+
+              // Dispatch event to refresh quote data (same as RealtimeToggle)
+              window.dispatchEvent(new CustomEvent('refresh-quotes-data'));
+            }}
+            className={`flex items-center space-x-1 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${singleQuoteMode
+              ? 'bg-purple-100 text-purple-700'
+              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
               }`}
-              title="View all quotes"
-            >
-              <Eye className="w-4 h-4" />
-              <span>All</span>
-            </button>
-            <button
-              onClick={() => setViewMode('urgent')}
-              className={`flex items-center space-x-1 px-3 py-1.5 rounded-md text-sm font-medium transition-colors relative ${
-                viewMode === 'urgent'
-                  ? 'bg-red-100 text-red-700'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
-              title="View urgent quotes (deadline within 30 minutes)"
-            >
-              <Clock className="w-4 h-4" />
-              <span>Urgent</span>
-              {quotes.filter(isUrgentQuote).length > 0 && (
-                <span className={`absolute -top-1 -right-1 w-5 h-5 rounded-full text-xs font-bold flex items-center justify-center ${
-                  viewMode === 'urgent' ? 'bg-red-500 text-white' : 'bg-red-500 text-white'
-                }`}>
-                  {quotes.filter(isUrgentQuote).length}
-                </span>
-              )}
-            </button>
-            
-            {/* Single Quote Toggle */}
-            <button
-              onClick={() => setSingleQuoteMode(!singleQuoteMode)}
-              className={`flex items-center space-x-1 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                singleQuoteMode
-                  ? 'bg-purple-100 text-purple-700'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
-              title={singleQuoteMode ? "Show multiple quotes (10 per page)" : "Show one quote at a time"}
-            >
-              {singleQuoteMode ? (
-                <LayoutGrid className="w-4 h-4" />
-              ) : (
-                <List className="w-4 h-4" />
-              )}
-              <span>{singleQuoteMode ? 'Multiple' : 'Single'}</span>
-            </button>
-          </div>
+            title={singleQuoteMode ? "Show multiple quotes (10 per page)" : "Show one quote at a time"}
+          >
+            {singleQuoteMode ? (
+              <LayoutGrid className="w-4 h-4" />
+            ) : (
+              <List className="w-4 h-4" />
+            )}
+            <span>{singleQuoteMode ? 'Multiple' : 'Single'}</span>
+          </button>
 
           {/* Realtime Toggle */}
           <RealtimeToggle />
@@ -1682,19 +1848,18 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
       </div>
 
       {/* Quotes Accordion */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden hidden lg:block relative">
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden hidden md:block relative">
 
         
         {quotesLoading && paginatedQuotes.length === 0 ? (
           <>
             {/* Table Header */}
             <div className="bg-white border-b border-gray-200 sticky top-0 z-10">
-              <div className="grid grid-cols-5 gap-4 px-6 py-4" style={{ gridTemplateColumns: '1fr 1fr 1fr 1fr 1fr' }}>
-                <div className="font-semibold text-gray-900 min-w-[150px]">Quote Ref</div>
-                <div className="font-semibold text-gray-900 min-w-[180px]">VIN</div>
+              <div className="grid grid-cols-4 gap-4 px-6 py-4" style={{ gridTemplateColumns: '1fr 1fr 1fr 1fr' }}>
+                <div className="font-semibold text-gray-900">Quote</div>
+                <div className="font-semibold text-gray-900">Customer</div>
                 <div className="font-semibold text-gray-900">Vehicle</div>
                 <div className="font-semibold text-gray-900">Status</div>
-                <div className="font-semibold text-gray-900">Parts</div>
               </div>
             </div>
             <SkeletonLoader count={5} />
@@ -1722,12 +1887,11 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
         <>
           {/* Table Header */}
           <div className="bg-white border-b border-gray-200 sticky top-0 z-10">
-              <div className="grid grid-cols-5 gap-4 px-6 py-4" style={{ gridTemplateColumns: '1fr 1fr 1fr 1fr 1fr' }}>
-              <div className="font-semibold text-gray-900 min-w-[150px]">Quote Ref</div>
-              <div className="font-semibold text-gray-900 min-w-[180px]">VIN</div>
+              <div className="grid grid-cols-4 gap-4 px-6 py-4" style={{ gridTemplateColumns: '1fr 1fr 1fr 1fr' }}>
+                <div className="font-semibold text-gray-900">Quote</div>
+                <div className="font-semibold text-gray-900">Customer</div>
               <div className="font-semibold text-gray-900">Vehicle</div>
               <div className="font-semibold text-gray-900">Status</div>
-              <div className="font-semibold text-gray-900">Parts</div>
         </div>
       </div>
 
@@ -1743,62 +1907,9 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                 const status = getQuoteStatus(quoteParts, quote.status);
 
                 return (
-                  <AccordionItem key={quote.id} value={quote.id} className={`border-b border-gray-100 last:border-b-0 relative transition-all duration-300 ${expandedRows.has(quote.id) ? 'shadow-md bg-white z-10' : ''}`}>
-                {/* Deadline Indicator - Only for unpriced and priced quotes */}
-                {quote.status !== 'completed' && quote.status !== 'ordered' && quote.status !== 'delivered' && (() => {
-                  const deadlineInfo = getDeadlineIndicator(quote.requiredBy);
-                  if (!deadlineInfo) return null;
-                  
-                  return (
-                    <>
-                      {/* Desktop: Full left border and indicator */}
-                      <div className={`absolute left-0 top-0 bottom-0 w-1 ${deadlineInfo.color} hidden sm:block`}></div>
-                      <div className="absolute left-0 top-[11px] transform -translate-y-1/2 z-10 flex items-center space-x-2 hidden sm:flex">
-                        <div className={`px-2 py-[2px] text-[12px] font-semibold text-white shadow-sm ${deadlineInfo.color} relative`}>
-                          {deadlineInfo.timeDisplay}
-                          {/* Small ping circle in top-right corner */}
-                          {deadlineInfo.animation === '' && (deadlineInfo.color === 'bg-red-500' || deadlineInfo.color === 'bg-yellow-500') && (
-                            <div className="absolute -top-2 -right-2 w-4 h-4 bg-red-300 rounded-full animate-ping shadow-lg border border-red-600"></div>
-                          )}
-                        </div>
-                        {quote.customer && (
-                              <div className="px-2 py-[2px] text-[10px] text-orange-600 font-medium border-b border-gray-100">
-                                <div className="flex items-center space-x-1">
-                                  <span className="font-semibold text-[12px]">
-                            {quote.customer}
-                                    {quote.settlement !== undefined && quote.settlement > 0 && (
-                                      <span className="text-blue-600 font-bold text-[13px]"> ({quote.settlement}%)</span>
-                                    )}
-                                  </span>
-                                  {quote.address && (
-                                    <>
-                                      <span className="text-gray-400">•</span>
-                                      <MapPin className="h-4 w-4 text-red-500" />
-                                      <span className="text-[12px] text-gray-800">
-                                        {quote.address}
-                                      </span>
-                                    </>
-                                  )}
-                                </div>
-                          </div>
-                        )}
-                      </div>
-                      
-                      {/* Mobile: Small rectangle indicator at top-left */}
-                      <div className={`absolute top-0 left-0 w-6 h-6 ${deadlineInfo.color} block sm:hidden z-50`}></div>
-                      <div className="absolute top-0 left-0 z-50 block sm:hidden">
-                        <div className={`px-1 py-[1px] text-[8px] font-semibold text-white ${deadlineInfo.color} rounded-sm shadow-sm relative`}>
-                          {deadlineInfo.timeDisplay}
-                          {/* Small ping circle in top-right corner for mobile */}
-                          {deadlineInfo.animation === '' && (deadlineInfo.color === 'bg-red-500' || deadlineInfo.color === 'bg-yellow-500') && (
-                            <div className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 bg-lime-400 rounded-full animate-ping shadow-lg border border-lime-300"></div>
-                          )}
-                        </div>
-                      </div>
-                    </>
-                  );
-                })()}
-                
+                  <AccordionItem key={quote.id} value={quote.id} className={`border-b border-gray-100 last:border-b-0 relative transition-all duration-300 ${expandedRows.has(quote.id) ? 'bg-white z-10' : ''}`}>
+
+
                     {/* Info Icon - Top Right Corner */}
                     <button
                       onClick={(e) => {
@@ -1812,100 +1923,104 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                       <Info className="h-4 w-4" />
                     </button>
 
-                    <AccordionTrigger className="grid grid-cols-5 gap-4 w-full px-3 hover:bg-gray-50 transition-colors cursor-pointer" style={{ gridTemplateColumns: '1fr 1fr 1fr 1fr 1fr' }}>
-                  {/* Quote Ref */}
-                  <div>
-                  <div className="flex items-center space-x-2 w-[160px]">
-                    <ChevronDown className="h-4 w-4 text-gray-400 flex-shrink-0" />
-                    {editingQuote === quote.id ? (
-                          <input
-                            type="text"
-                        value={editData.quoteRef || quote.quoteRef || ''}
-                            onChange={(e) => handleQuoteEditChange('quoteRef', e.target.value)}
-                        className="px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        onClick={(e) => e.stopPropagation()}
-                          />
-                        ) : (
-                      <>
-                              <span className={`font-medium ${hasSpecialCharacters(quote.quoteRef || '') ? 'text-blue-600 bg-blue-50 px-2 py-1 rounded-md border border-blue-200 shadow-sm' : 'text-gray-900'}`}>
+                    <AccordionTrigger className="py-2 grid grid-cols-4 gap-4 w-full px-3 hover:bg-gray-50 transition-colors cursor-pointer" style={{ gridTemplateColumns: '1fr 1fr 1fr 1fr' }}>
+                      {/* Column 1: Quote Details (Ref + VIN) */}
+                      <div className="flex flex-col space-y-2 ml-4">
+
+                        <div className="flex items-center  w-full space-x-2">
+                          {/* Time Indicator on the right side */}
+                {quote.status !== 'completed' && quote.status !== 'ordered' && quote.status !== 'delivered' && (() => {
+                  const deadlineInfo = getDeadlineIndicator(quote.requiredBy);
+                  if (!deadlineInfo) return null;
+                  
+                  return (
+                              <div className={`px-1 py-0.5 text-xs font-semibold border shadow-sm rounded ${deadlineInfo.color} relative`}>
+                          {deadlineInfo.timeDisplay}
+                          {/* Small ping circle in top-right corner */}
+                                {deadlineInfo.animation === '' && (deadlineInfo.color.includes('red') || deadlineInfo.color.includes('yellow')) && (
+                                  <div className="absolute -top-1 -right-1 w-2 h-2 bg-red-300 rounded-full animate-ping shadow-lg border border-red-600"></div>
+                          )}
+                        </div>
+                            );
+                          })()}
+                          <div className="flex items-center space-x-2">
+                            <>
+                              <span className={`text-sm font-bold ${hasSpecialCharacters(quote.quoteRef || '') ? 'text-blue-600 bg-blue-50 px-2 py-0 rounded border border-blue-200 shadow-sm' : 'text-gray-900'}`}>
                                 {quote.quoteRef}
                               </span>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                copyToClipboard(quote.quoteRef || '');
-                              }}
-                          className="p-1 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
-                              title="Copy quote ref"
-                            >
-                          <Copy className="h-4 w-4" />
-                            </button>
-                        
-                      </>
-                    )}
+                              <CopyButton
+                                text={quote.quoteRef || ''}
+                                title="Copy quote ref"
+                                size="md"
+                                className="text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
+                                onClick={(e) => e.stopPropagation()}
+                              />
+                            </>
+                      </div>
+                      
+
+                        </div>
+
+                        {/* VIN below Quote Ref */}
+                        <div className="flex items-center space-x-2">
+                          <>
+                            <span className="font-mono text-sm text-gray-600">{quote.vin || '-'}</span>
+                            <CopyButton
+                              text={quote.vin || ''}
+                              title="Copy VIN"
+                              size="sm"
+                              className="text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
+                        onClick={(e) => e.stopPropagation()}
+                          />
+                          </>
                   </div>
-                   {/* Tax Invoice Number for Ordered Quotes - Main Row Display */}
+
+                        {/* Tax Invoice Number for Ordered Quotes */}
                    {quote.status === 'ordered' && quote.taxInvoiceNumber && (
-                        <div className="flex items-center space-x-1 border-t border-gray-100 pt-1">
+                          <div className="flex items-center space-x-1 ml-6">
                           <div className="flex items-center space-x-1 px-2 py-1 bg-purple-100 border border-purple-200 rounded text-xs">
                             <span className="text-purple-800 font-medium text-xs">Invoice:</span>
-                            <span className="text-purple-900 font-mono text-[14px]">{quote.taxInvoiceNumber}</span>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                copyToClipboard(quote.taxInvoiceNumber || '');
-                              }}
-                              className="p-0.5 text-purple-600 hover:text-purple-700 hover:bg-purple-200 rounded transition-colors cursor-pointer"
+                              <span className="text-purple-900 font-mono text-[12px]">{quote.taxInvoiceNumber}</span>
+                              <CopyButton
+                                text={quote.taxInvoiceNumber || ''}
                               title="Copy tax invoice number"
-                            >
-                              <Copy className="h-3.5 w-3.5" />
-                            </button>
+                                size="sm"
+                                className="p-0.5 text-purple-600 hover:text-purple-700 hover:bg-purple-200 rounded transition-colors cursor-pointer"
+                                onClick={(e) => e.stopPropagation()}
+                              />
                           </div>
                           </div>
                         )}
                   </div>
 
-                  {/* VIN */}
-                  <div className="flex items-center space-x-2">
-                    {editingQuote === quote.id ? (
-                          <input
-                            type="text"
-                        value={editData.vin || quote.vin || ''}
-                            onChange={(e) => handleQuoteEditChange('vin', e.target.value)}
-                        className="px-2 py-1 text-sm font-mono border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        onClick={(e) => e.stopPropagation()}
-                        placeholder="Enter VIN"
-                          />
-                        ) : (
-                      <>
-                        <span className="font-mono text-sm text-gray-900">{quote.vin || '-'}</span>
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  copyToClipboard(quote.vin || '');
-                                }}
-                          className="p-1 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
-                                title="Copy VIN"
-                              >
-                          <Copy className="h-4 w-4" />
-                              </button>
-                      </>
+                      {/* Column 2: Customer Details */}
+                      <div className="flex flex-col space-y-1">
+                        {/* Customer Name and Address */}
+                        <div className="flex items-center space-x-1 text-sm">
+
+                          <span className="font-medium text-gray-900">
+                            {quote.customer || 'Unknown Customer'}
+                            {quote.settlement && quote.settlement > 0 && (
+                              <span className="text-blue-600 font-medium"> ({quote.settlement}%)</span>
                             )}
+                          </span>
+                          </div>
+                        {quote.address && (
+                          <div className="flex items-center space-x-1 text-xs">
+                            <MapPin className="h-3 w-3 text-gray-400 flex-shrink-0" />
+                            <span className="text-gray-600 truncate " title={quote.address}>
+                              {quote.address}
+                    </span>
+                          </div>
+                        )}
                           </div>
 
-                  {/* Vehicle */}
-                  <div className="flex items-center space-x-2">
-                    <span className="text-lg">
-                      <img 
-                        src={getVehicleLogo(editingQuote === quote.id ? (editData.make || quote.make) : quote.make)} 
-                        alt={editingQuote === quote.id ? (editData.make || quote.make) : quote.make} 
-                        className="h-8 w-8 object-contain" 
-                      />
-                    </span>
-                      <div className="flex flex-col space-y-1">
+                      {/* Column 3: Vehicle Details */}
+                      <div className="flex flex-col space-y-2">
                         <div className="flex items-center space-x-2">
-                            <span className="font-medium text-gray-900 text-left">{quote?.make} • {quote.model?.split(' ')[0]}</span>
-                        </div>
+
+                      <div className="flex flex-col space-y-1">
+                            <span className="font-medium text-gray-900 text-sm text-left">{quote?.make} • {quote.model?.split(' ')[0]}</span>
                         <div className="flex items-center space-x-1 text-xs text-gray-600">
                           <span>{quote.mthyr || '-'}</span>
                           {quote.series && (
@@ -1914,7 +2029,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                               <span>{quote.series}</span>
                             </>
                           )}
-                            <span>•</span>
+                              <span>•</span>
                           <span>{quote.body || '-'}</span>
                           {quote.auto !== undefined && (
                             <>
@@ -1923,28 +2038,30 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                             </>
                           )}
                         </div>
-
                       </div>
+                        </div>
                   </div>
 
-                  {/* Status */}
-                  <div>
+                      {/* Column 4: Status & Parts Count */}
+                      <div className="flex flex-col space-y-2">
+                        <div className="flex items-center justify-between pr-4">
+                          {/* Parts Count below Status */}
+                          <div className="flex items-center space-x-2 ">
+                          <div className="flex items-center justify-between">
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                              {quoteParts.length}
+                            </span>
+                          </div>
                     <div className="flex space-y-1">
                       {getStatusChip(status)}
                     </div>
                   </div>
 
-                  {/* Parts Count */}
-                      <div className="flex items-center justify-between pr-4">
-                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                      {quoteParts.length} {quoteParts.length === 1 ? 'part' : 'parts'}
-                    </span>
-
-                        {/* Action buttons */}
+                          {/* Action buttons */}
                     {(quote.status !== 'completed' || showCompleted) && (
-                      <>
+                            <div className="flex items-center space-x-1">
                         {editingQuote === quote.id ? (
-                              <>
+                                <>
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
@@ -1955,10 +2072,6 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                           >
                             <Save className="h-4 w-4" />
                           </button>
-                              </>
-                            ) : null}
-                        
-                        {editingQuote === quote.id ? (
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
@@ -1970,7 +2083,8 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                           >
                             <X className="h-4 w-4" />
                           </button>
-                            ) : null}
+                                </>
+                              ) : null}
                         
                         {/* Confirmation button for waiting_verification status */}
                         {status === 'waiting_verification' && (
@@ -1992,13 +2106,12 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                               e.stopPropagation();
                               onMarkCompleted(quote.id);
                             }}
-                                className="p-1 bg-green-600 hover:bg-green-700 text-white rounded-full transition-colors cursor-pointer"
+                                  className="p-1 ml-4 bg-green-600 hover:bg-green-700 text-white rounded-full transition-colors cursor-pointer"
                             title="Mark as completed"
                           >
-                            <CheckCircle className="h-4 w-4" />
+                                  <CheckCircle className="h-5 w-5" />
                           </button>
                         )}
-
                         
                         {status === 'completed' && (onMarkAsOrdered || onMarkAsOrderedWithParts) && (
                           <button
@@ -2012,9 +2125,12 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                             <ShoppingCart className="h-4 w-4" />
                           </button>
                         )}
-                      </>
+                            </div>
                     )}
                   </div>
+
+
+                      </div>
 
                 </AccordionTrigger>
 
@@ -2050,8 +2166,8 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                     }}
                                     disabled={sendForReviewLoading === quote.id}
                                     className={`px-3 py-1 text-xs rounded transition-colors flex items-center space-x-1 ${sendForReviewLoading === quote.id
-                                        ? 'bg-green-500 text-white cursor-not-allowed opacity-70'
-                                        : 'bg-green-600 text-white hover:bg-green-700 cursor-pointer'
+                                      ? 'bg-green-500 text-white cursor-not-allowed opacity-70'
+                                      : 'bg-green-600 text-white hover:bg-green-700 cursor-pointer'
                                       }`}
                                     title="Send for review"
                                   >
@@ -2080,16 +2196,14 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                             </button>
                                 {currentPageName === 'pricing' && (
                                   <button
-                                    onClick={async (e) => {
+                                    onClick={(e) => {
                                       e.stopPropagation();
-                                      // Save first, then send for review
-                                      await handleSave(true); // Force save all parts
                                       handleSendForReview(quote.id);
                                     }}
                                     disabled={sendForReviewLoading === quote.id}
                                     className={`px-3 py-1 text-xs rounded transition-colors flex items-center space-x-1 ${sendForReviewLoading === quote.id
-                                        ? 'bg-blue-500 text-white cursor-not-allowed opacity-70'
-                                        : 'bg-blue-600 text-white hover:bg-blue-700 cursor-pointer'
+                                      ? 'bg-blue-500 text-white cursor-not-allowed opacity-70'
+                                      : 'bg-blue-600 text-white hover:bg-blue-700 cursor-pointer'
                                       }`}
                                     title="Save and send for review"
                                   >
@@ -2106,6 +2220,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                 e.stopPropagation();
                                 setEditingParts(null);
                                 setPartEditData({});
+                                    setFocusField(null);
                               }}
                               className="px-3 py-1 text-xs bg-gray-600 text-white rounded hover:bg-gray-700 transition-colors cursor-pointer flex items-center space-x-1"
                               title="Cancel editing and discard changes"
@@ -2120,17 +2235,17 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                       {quoteParts.length > 0 && (
                         <>
                           {/* Desktop Table View */}
-                          <div className="hidden lg:block">
+                              <div className="hidden md:block">
                             <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
                               <table className="w-full">
-                                     <thead className="bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200">
-                                       <tr>
-                                         <th className="px-4 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider w-1/5">Part & Variants</th>
-                                         <th className="px-4 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider w-1/5">Part Number</th>
-                                         <th className="px-4 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider w-1/10">List Price</th>
-                                         <th className="px-4 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider w-1/10">Price</th>
-                                         <th className="px-4 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider w-1/12">AM</th>
-                                         <th className="px-4 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider w-2/5">Notes</th>
+                                    <thead className="bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200">
+                                      <tr>
+                                        <th className="px-4 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider w-1/5">Part & Variants</th>
+                                        <th className="px-4 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider w-1/5">Part Number</th>
+                                        <th className="px-4 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider sm:w-1/8 lg:w-1/10">List Price</th>
+                                        <th className="px-4 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider sm:w-1/8 lg:w-1/10">Price</th>
+                                        <th className="px-4 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider w-1/12">AM</th>
+                                        <th className="px-4 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider w-2/5">Notes</th>
                                   </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-200">
@@ -2211,7 +2326,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                                     type="text"
                                                           value={partEditData[part.id]?.[variant.id]?.number ?? part.number ?? ''}
                                                           onChange={(e) => handleVariantEditChange(part.id, variant.id, 'number', e.target.value)}
-                                                          className="w-full px-2 py-1 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                                                          className="w-full px-2 py-1 border border-gray-300 rounded-sm text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
                                                   />
                                                 ) : (
                                                   <>
@@ -2221,35 +2336,25 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                                               {part.number.split(',').map((pn, pnIndex) => (
                                                                 <div key={pnIndex} className="flex items-center space-x-1 bg-gray-50 px-2 py-1 rounded-md border border-gray-200">
                                                                   <span className="text-sm font-medium text-gray-900 font-mono">{pn.trim()}</span>
-                                                    <button
-                                                                    onClick={() => copyToClipboard(pn.trim())}
-                                                                    className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-all duration-200 cursor-pointer"
+                                                                  <CopyButton
+                                                                    text={pn.trim()}
                                                                     title={`Copy ${pn.trim()} to clipboard`}
-                                                                  >
-                                                                    {isRecentlyCopied(pn.trim()) ? (
-                                                                      <CheckCircle className="h-3 w-3 text-green-500" />
-                                                                    ) : (
-                                                      <Copy className="h-3 w-3" />
-                                                )}
-                                                                  </button>
-                                              </div>
+                                                                    size="sm"
+                                                                    className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-all duration-200 cursor-pointer"
+                                                                  />
+                                                                </div>
                                                               ))}
                                                             </div>
                                                           ) : (
                                                             // Single part number - show with same box styling as multiple
                                                             <div className="flex items-center space-x-1 bg-gray-50 px-2 py-1 rounded-md border border-gray-200">
                                                               <span className="text-sm font-medium text-gray-900 font-mono">{part.number || '-'}</span>
-                                                    <button
-                                                                onClick={() => copyToClipboard(part.number || '')}
-                                                                className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-all duration-200 cursor-pointer"
+                                                              <CopyButton
+                                                                text={part.number || ''}
                                                       title="Copy to clipboard"
-                                                    >
-                                                                {isRecentlyCopied(part.number || '') ? (
-                                                                  <CheckCircle className="h-3 w-3 text-green-500" />
-                                                                ) : (
-                                                      <Copy className="h-3 w-3" />
-                                                                )}
-                                                    </button>
+                                                                size="sm"
+                                                                className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-all duration-200 cursor-pointer"
+                                                              />
                                                             </div>
                                                           )}
                                                   </>
@@ -2265,64 +2370,65 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                               <div className="flex items-center space-x-1">
                                                 {isPartEditing ? (
                                                   <input
-                                                        type="number"
+                                                        ref={(el) => { focusRefs.current['list_price'] = el; }}
+                                                    type="number"
                                                         value={partEditData[part.id]?.[variant.id]?.list_price !== undefined ? partEditData[part.id][variant.id].list_price : (variant.list_price ?? '')}
                                                         onChange={(e) => handleVariantEditChange(part.id, variant.id, 'list_price', e.target.value ? Number(e.target.value) : null)}
-                                                        className={`w-full px-2 py-1 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 ${index === 0 ? 'bg-white' : 'bg-gray-50'}`}
-                                                        placeholder="Enter list price"
+                                                        className={`w-full px-2 py-1 border border-gray-300 rounded-sm text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 ${index === 0 ? 'bg-white' : 'bg-gray-50'}`}
+                                                        placeholder="$"
                                                   />
                                                 ) : (
                                                   <>
-                                                        <span className={`text-sm font-medium ${variant.list_price ? 'text-gray-900' : 'text-gray-400'}`}>
+                                                        <span 
+                                                          className={`text-sm font-medium cursor-pointer hover:bg-gray-100 px-1 py-0.5 rounded transition-colors ${variant.list_price ? 'text-gray-900' : 'text-gray-400'}`}
+                                                          onClick={() => handleDirectEdit(quote.id, 'list_price')}
+                                                          title="Click to edit"
+                                                        >
                                                           {variant.list_price ? `$${variant.list_price.toFixed(2)}` : 'Not set'}
-                                                        </span>
+                                                    </span>
                                                         {variant.list_price && (
-                                                    <button
-                                                            onClick={() => copyToClipboard(variant.list_price ? variant.list_price.toString() : '')}
-                                                            className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-md transition-all duration-200 cursor-pointer"
+                                                          <CopyButton
+                                                            text={variant.list_price.toString()}
                                                       title="Copy to clipboard"
-                                                    >
-                                                            {isRecentlyCopied(variant.list_price ? variant.list_price.toString() : '') ? (
-                                                              <CheckCircle className="h-3.5 w-3.5 text-green-500" />
-                                                            ) : (
-                                                              <Copy className="h-3.5 w-3.5" />
-                                                            )}
-                                                  </button>
+                                                            size="md"
+                                                            className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-md transition-all duration-200 cursor-pointer"
+                                                            iconClassName="h-3.5 w-3.5"
+                                                          />
                                                         )}
-                                                      </>
+                                                  </>
                                                 )}
                                               </div>
-                                                </td>
+                                            </td>
                                                 <td className="px-4 py-1">
                                               <div className="flex items-center space-x-1">
                                                 {isPartEditing ? (
                                                   <input
+                                                        ref={(el) => { focusRefs.current['final_price'] = el; }}
                                                         type="number"
                                                         value={partEditData[part.id]?.[variant.id]?.final_price !== undefined ? partEditData[part.id][variant.id].final_price : (variant.final_price ?? '')}
                                                         onChange={(e) => handleVariantEditChange(part.id, variant.id, 'final_price', e.target.value ? Number(e.target.value) : null)}
-                                                        className={`w-full px-2 py-1 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 ${index === 0 ? 'bg-white' : 'bg-gray-50'}`}
-                                                        placeholder="Enter price"
-                                                        autoFocus={index === 0 && quoteParts.indexOf(part) === 0}
+                                                        className={`w-full px-2 py-1 border border-gray-300 rounded-sm text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 ${index === 0 ? 'bg-white' : 'bg-gray-50'}`}
+                                                        placeholder="$"
                                                   />
                                                 ) : (
                                                   <>
-                                                        <span className={`text-sm font-medium ${variant.final_price ? 'text-gray-900' : 'text-gray-400'}`}>
+                                                        <span 
+                                                          className={`text-sm font-medium cursor-pointer hover:bg-gray-100 px-1 py-0.5 rounded transition-colors ${variant.final_price ? 'text-gray-900' : 'text-gray-400'}`}
+                                                          onClick={() => handleDirectEdit(quote.id, 'final_price')}
+                                                          title="Click to edit"
+                                                        >
                                                           {variant.final_price ? `$${variant.final_price.toFixed(2)}` : 'Not set'}
                                                         </span>
                                                         {variant.final_price && (
-                                                    <button
-                                                            onClick={() => copyToClipboard(variant.final_price ? variant.final_price.toString() : '')}
+                                                          <CopyButton
+                                                            text={variant.final_price.toString()}
+                                                            title="Copy to clipboard"
+                                                            size="md"
                                                             className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-md transition-all duration-200 cursor-pointer"
-                                                      title="Copy to clipboard"
-                                                    >
-                                                            {isRecentlyCopied(variant.final_price ? variant.final_price.toString() : '') ? (
-                                                              <CheckCircle className="h-3.5 w-3.5 text-green-500" />
-                                                            ) : (
-                                                              <Copy className="h-3.5 w-3.5" />
-                                                            )}
-                                                    </button>
+                                                            iconClassName="h-3.5 w-3.5"
+                                                          />
                                                         )}
-                                                  </>
+                                                      </>
                                                 )}
                                               </div>
                                                 </td>
@@ -2330,20 +2436,25 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                                   <div className="flex items-start justify-start">
                                                 {isPartEditing ? (
                                                   <input
+                                                        ref={(el) => { focusRefs.current['af'] = el; }}
                                                         type="checkbox"
                                                         checked={partEditData[part.id]?.[variant.id]?.af ?? variant.af ?? false}
                                                         onChange={(e) => handleVariantEditChange(part.id, variant.id, 'af', e.target.checked)}
-                                                        className={`w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2 ${index === 0 ? 'bg-white' : 'bg-gray-50'}`}
+                                                        className={`w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded-sm focus:ring-blue-500 focus:ring-2 ${index === 0 ? 'bg-white' : 'bg-gray-50'}`}
                                                         title="Aftermarket Flag"
                                                   />
                                                 ) : (
-                                                      <span className={`text-sm ${variant.af ? 'text-green-600 font-medium' : 'text-gray-400'}`}>
+                                                      <span 
+                                                        className={`text-sm cursor-pointer hover:bg-gray-100 px-1 py-0.5 rounded transition-colors ${variant.af ? 'text-green-600 font-medium' : 'text-gray-400'}`}
+                                                        onClick={() => handleDirectEdit(quote.id, 'af')}
+                                                        title="Click to edit"
+                                                      >
                                                         {variant.af ? (
                                                           <span className='bg-green-500 text-white rounded-full px-2 py-1 text-xs font-bold shadow-md border-2 border-green-600'>
-                                                            ✓ AM
-                                                    </span>
+                                                            AM
+                                                          </span>
                                                         ) : (
-                                                          <span className='text-gray-400 text-sm'>○ OEM</span>
+                                                          <span className='text-gray-400 text-sm'>OEM</span>
                                                         )}
                                                       </span>
                                                 )}
@@ -2354,6 +2465,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                                     <div className="flex items-center space-x-1 flex-1 min-w-0">
                                                 {isPartEditing ? (
                                                         <QuickFillInput
+                                                          ref={(el) => { focusRefs.current['note'] = el; }}
                                                           value={partEditData[part.id]?.[variant.id]?.note ?? variant.note ?? ''}
                                                           onChange={(value) => handleVariantEditChange(part.id, variant.id, 'note', value)}
                                                           placeholder="Add notes..."
@@ -2361,47 +2473,47 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                                   />
                                                 ) : (
                                                   <>
-                                                          <span className={`text-sm ${variant.note ? 'text-gray-700' : 'text-gray-400'}`}>
+                                                          <span 
+                                                            className={`text-sm cursor-pointer hover:bg-gray-100 px-1 py-0.5 rounded transition-colors ${variant.note ? 'text-gray-700' : 'text-gray-400'}`}
+                                                            onClick={() => handleDirectEdit(quote.id, 'note')}
+                                                            title="Click to edit"
+                                                          >
                                                             {variant.note || 'No notes'}
-                                                          </span>
+                                                    </span>
                                                           {variant.note && (
-                                                    <button
-                                                      onClick={() => copyToClipboard(variant.note || '')}
-                                                              className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-md transition-all duration-200 cursor-pointer"
+                                                            <CopyButton
+                                                              text={variant.note || ''}
                                                       title="Copy to clipboard"
-                                                    >
-                                                              {isRecentlyCopied(variant.note || '') ? (
-                                                                <CheckCircle className="h-3.5 w-3.5 text-green-500" />
-                                                              ) : (
-                                                                <Copy className="h-3.5 w-3.5" />
-                                                              )}
-                                                    </button>
+                                                              size="md"
+                                                              className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-md transition-all duration-200 cursor-pointer"
+                                                              iconClassName="h-3.5 w-3.5"
+                                                            />
                                                           )}
                                                   </>
                                                 )}
-                                          </div>
-                                          
+                                            </div>
+                                            
                                                     {/* Action Buttons */}
                                                     <div className="flex items-center space-x-1 ml-2">
-                                                      {isPartEditing ? (
+                                                {isPartEditing ? (
                                                         <>
                                                           {index === 0 ? (
-                                              <button
-                                                onClick={() => addVariantToPart(quote.id, part.id)}
+                                                    <button
+                                                              onClick={() => addVariantToPart(quote.id, part.id)}
                                                               className="w-8 h-8 bg-gradient-to-r from-blue-50 to-blue-100 rounded-full flex items-center justify-center hover:from-blue-100 hover:to-blue-200 transition-all duration-200 cursor-pointer shadow-sm hover:shadow-md border border-blue-200"
-                                                title="Add variant"
-                                              >
+                                                              title="Add variant"
+                                                            >
                                                               <Plus className="h-4 w-4 text-blue-600" />
-                                              </button>
+                                                    </button>
                                                           ) : (
-                                                            <button
+                                              <button
                                                               onClick={() => removeVariantFromPart(quote.id, part.id, variant.id)}
                                                               className="w-8 h-8 bg-gradient-to-r from-red-50 to-red-100 rounded-full flex items-center justify-center hover:from-red-100 hover:to-red-200 transition-all duration-200 cursor-pointer shadow-sm hover:shadow-md border border-red-200"
                                                               title="Remove variant"
                                                             >
                                                               <X className="h-4 w-4 text-red-600" />
-                                                            </button>
-                                                          )}
+                                              </button>
+                                          )}
                                                         </>
                                                       ) : null}
                                         </div>
@@ -2431,7 +2543,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
       </div>
 
 
-      <div className="lg:hidden space-y-4 p-1">
+      <div className="md:hidden space-y-4 p-1">
         {filteredQuotes.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 px-4">
             <div className="w-24 h-24 bg-gradient-to-br from-blue-100 to-purple-100 rounded-full flex items-center justify-center mb-6">
@@ -2464,58 +2576,121 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
               
               return (
                 <AccordionItem key={quote.id} value={quote.id} className={`bg-white rounded-lg border border-gray-200 shadow-sm transition-all duration-300 ${expandedRows.has(quote.id) ? 'shadow-lg z-10' : ''}`}>
-                  <AccordionTrigger className="p-4 hover:bg-gray-50 transition-colors cursor-pointer">
-                    <div className="grid grid-rows-2 gap-3 w-full">
-                      {/* Row 1: Quote Ref VIN Status */}
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-3">
-                          <ChevronDown className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                  <AccordionTrigger className="py-2 p-4 hover:bg-gray-50 transition-colors cursor-pointer">
+                    <div className="grid grid-cols-2 gap-4 w-full">
+                      {/* Column 1: Quote & Customer Details */}
+                      <div className="flex flex-col space-y-3">
+                        {/* Quote Details */}
+                        <div className="flex flex-col space-y-2">
+                          <div className="flex items-center w-full">
+
+                            {/* Time Indicator on the left side for mobile */}
+                            {quote.status !== 'completed' && quote.status !== 'ordered' && quote.status !== 'delivered' && (() => {
+                              const deadlineInfo = getDeadlineIndicator(quote.requiredBy);
+                              if (!deadlineInfo) return null;
+
+                              return (
+                                <div className={`px-1 py-0.5 text-xs font-semibold border shadow-sm rounded ${deadlineInfo.color} relative mr-2`}>
+                                  {deadlineInfo.timeDisplay}
+                                  {/* Small ping circle in top-right corner */}
+                                  {deadlineInfo.animation === '' && (deadlineInfo.color.includes('red') || deadlineInfo.color.includes('yellow')) && (
+                                    <div className="absolute -top-1 -right-1 w-2 h-2 bg-red-300 rounded-full animate-ping shadow-lg border border-red-600"></div>
+                                  )}
+                                </div>
+                              );
+                            })()}
+
                           <div className="flex items-center space-x-2">
                             <div className="flex flex-col">
-                              <span className="text-xs font-medium text-gray-500">Quote Ref</span>
-                              <span className={`font-semibold ${hasSpecialCharacters(quote.quoteRef || '') ? 'text-blue-600 bg-blue-50 px-2 py-1 rounded-md border border-blue-200 shadow-sm' : 'text-gray-900'}`}>
-                                {quote.quoteRef}
-                              </span>
+                                <span className="text-xs font-medium text-gray-500 text-left">Quote Ref</span>
+                                <span className={`text-sm font-bold text-left ${hasSpecialCharacters(quote.quoteRef || '') ? 'text-blue-600 bg-blue-50 px-2 py-0 rounded border border-blue-200 shadow-sm' : 'text-gray-900'}`}>
+                                  {quote.quoteRef}
+                                </span>
                             </div>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                copyToClipboard(quote.quoteRef || '');
-                              }}
-                              className="p-1 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
+                              <CopyButton
+                                text={quote.quoteRef || ''}
                               title="Copy quote ref"
-                            >
-                              <Copy className="h-4 w-4" />
-                            </button>
+                                size="sm"
+                                className="text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
+                                onClick={(e) => e.stopPropagation()}
+                              />
                           </div>
-                          <div className="flex items-center space-x-2">
+                          </div>
+                          <div className="flex items-center space-x-2 md:ml-6">
                             <div className="flex flex-col">
-                              <span className="text-xs font-medium text-gray-500">VIN</span>
-                              <span className="text-sm font-mono text-gray-900">{quote.vin || '-'}</span>
+                              <span className="text-xs font-medium text-gray-500 text-left">VIN</span>
+                              <span className="text-xs font-mono text-gray-600 text-left">{quote.vin || '-'}</span>
                             </div>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                copyToClipboard(quote.vin || '');
-                              }}
-                              className="p-1 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
+                            <CopyButton
+                              text={quote.vin || ''}
                               title="Copy VIN"
-                            >
-                              <Copy className="h-4 w-4" />
-                            </button>
+                              size="sm"
+                              className="text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
+                              onClick={(e) => e.stopPropagation()}
+                            />
                           </div>
                         </div>
-                        <div className="flex flex-col items-end space-y-1">
-                          {getStatusChip(status)}
 
-                          <div className="flex items-center space-x-1">
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                            {quoteParts.length} {quoteParts.length === 1 ? 'part' : 'parts'}
+                        {/* Customer Details */}
+                        <div className="flex flex-col space-y-1">
+                          <div className="flex items-center space-x-1 text-xs">
+                            <span className="font-medium text-gray-900 text-left">
+                              {quote.customer || 'Unknown Customer'}
+                              {quote.settlement && quote.settlement > 0 && (
+                                <span className="text-blue-600 font-medium"> ({quote.settlement}%)</span>
+                              )}
                           </span>
+                          </div>
+                          {quote.address && (
+                            <div className="flex items-center space-x-1 text-xs">
+                              <MapPin className="h-3 w-3 text-gray-400 flex-shrink-0" />
+                              <span className="text-gray-600 truncate text-left" title={quote.address}>
+                                {quote.address}
+                            </span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      
+                      {/* Column 2: Vehicle & Status Details */}
+                      <div className="flex flex-col space-y-3">
+                        {/* Vehicle Details */}
+                        <div className="flex flex-col space-y-2">
+                        <div className="flex items-center space-x-2">
+                          <div className="flex flex-col space-y-1">
+                              <span className="text-xs font-medium text-gray-500 text-left">Vehicle</span>
+                              <span className="font-medium text-gray-900 text-sm text-left">{quote?.make} • {quote.model?.split(' ')[0]}</span>
+                            </div>
+                          </div>
+                          <div className="flex items-center space-x-1 text-xs">
+                            <span className="text-left">{quote.mthyr || '-'}</span>
+                              {quote.series && (
+                                <>
+                                  <span>•</span>
+                                <span className="text-left">{quote.series}</span>
+                                </>
+                              )}
+                                  <span>•</span>
+                            <span className="text-left">{quote.body || '-'}</span>
+                            </div>
+                          </div>
 
+                        {/* Status & Parts */}
+                        <div className="flex flex-col space-y-2">
+                          <div className="flex flex-col items-end space-y-2">
+                            {/* Parts Count */}
+                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                              {quoteParts.length} {quoteParts.length === 1 ? 'part' : 'parts'}
+                            </span>
+
+                            {/* Status */}
+                            <div className="flex justify-end">
+                              {getStatusChip(status)}
+                      </div>
+                      
                             {/* Action buttons for mobile */}
-                            {(quote.status !== 'completed' || showCompleted) && (
-                              <>
+                      {(quote.status !== 'completed' || showCompleted) && (
+                              <div className="flex items-center space-x-1">
                                 {editingQuote === quote.id ? (
                                   <>
                           <button
@@ -2528,21 +2703,18 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                           >
                                       <Save className="h-3 w-3" />
                           </button>
-                                  </>
-                                ) : null}
-                          
-                                {editingQuote === quote.id ? (
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                                      setEditingQuote(null);
-                                      setEditData({});
+                                        setEditingQuote(null);
+                                        setEditData({});
                             }}
-                                    className="p-1 text-gray-600 hover:text-gray-700 hover:bg-gray-100 rounded transition-colors cursor-pointer"
-                                    title="Cancel editing"
+                                      className="p-1 text-gray-600 hover:text-gray-700 hover:bg-gray-100 rounded transition-colors cursor-pointer"
+                                      title="Cancel editing"
                           >
-                                    <X className="h-3 w-3" />
+                                      <X className="h-3 w-3" />
                           </button>
+                                  </>
                                 ) : null}
                           
                           {/* Confirmation button for waiting_verification status */}
@@ -2568,11 +2740,10 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                     className="p-1 text-green-600 hover:text-green-700 hover:bg-green-100 rounded transition-colors cursor-pointer"
                               title="Mark as completed"
                                   >
-                                    <CheckCircle className="h-3 w-3" />
+                                    <CheckCircle className="h-4 w-4" />
                                   </button>
                                 )}
                           
-
                           {status === 'completed' && (onMarkAsOrdered || onMarkAsOrderedWithParts) && (
                                 <button
                                   onClick={(e) => {
@@ -2584,88 +2755,13 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                 >
                                     <ShoppingCart className="h-3 w-3" />
                                 </button>
-                                )}
-                              </>
                             )}
                           </div>
-
-                          {quote.customer && (
-                            <div className="flex items-center space-x-1">
-                              <span className="text-[10px] text-orange-600 font-semibold">
-                                {quote.customer}
-                                {quote.settlement !== undefined && quote.settlement > 0 && (
-                                  <span className="text-blue-600 font-medium"> ({quote.settlement}%)</span>
-                                )}
-                              </span>
-                              {quote.address && (
-                                <>
-                                  <span className="text-gray-400">•</span>
-                                  <MapPin className="h-2.5 w-2.5 text-gray-500" />
-                                  <span className="text-[9px] text-gray-600">
-                                    {quote.address}
-                                  </span>
-                                </>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Row 2: Vehicle Info Actions */}
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-2">
-                          <span className="text-lg">
-                            <img
-                              src={getVehicleLogo(quote.make)}
-                              alt={quote.make}
-                              className="h-8 w-8 object-contain"
-                            />
-                          </span>
-                          <div className="flex flex-col space-y-1">
-                            <div className="flex items-center space-x-2">
-                              <span className="text-sm font-medium text-gray-900">{quote.make} - {quote.model}</span>
-                            </div>
-                            <div className="flex items-center space-x-2 text-xs text-gray-600">
-                              <span>{quote.mthyr || '-'}</span>
-                              {quote.series && (
-                                <>
-                                  <span>•</span>
-                                  <span>{quote.series}</span>
-                                </>
-                              )}
-                            </div>
-                            <div className="flex items-center space-x-2 text-xs text-gray-600">
-                              <span>{quote.body || '-'}</span>
-                              {quote.auto !== undefined && (
-                                <>
-                                  <span>•</span>
-                                  <span>{quote.auto ? 'Auto' : 'Manual'}</span>
-                                </>
-                              )}
-                            </div>
+                        )}
                           </div>
                         </div>
-
-                      
-                      {quote.status === 'ordered' && quote.taxInvoiceNumber && (
-                        <div className="flex items-center justify-between p-2 bg-purple-50 border border-purple-200 rounded">
-                          <div className="flex items-center space-x-2">
-                            <span className="text-xs font-medium text-purple-800">Invoice:</span>
-                            <span className="text-sm font-mono text-purple-900">{quote.taxInvoiceNumber}</span>
-                          </div>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              copyToClipboard(quote.taxInvoiceNumber || '');
-                            }}
-                            className="p-1 text-purple-600 hover:text-purple-700 hover:bg-purple-200 rounded transition-colors cursor-pointer"
-                            title="Copy tax invoice number"
-                          >
-                            <Copy className="h-3 w-3" />
-                          </button>
-                        </div>
-                      )}
                     </div>
+
                     </div>
                   </AccordionTrigger>
                   
@@ -2701,8 +2797,8 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                   }}
                                   disabled={sendForReviewLoading === quote.id}
                                   className={`px-3 py-1 text-xs rounded transition-colors flex items-center space-x-1 ${sendForReviewLoading === quote.id
-                                      ? 'bg-green-500 text-white cursor-not-allowed opacity-70'
-                                      : 'bg-green-600 text-white hover:bg-green-700 cursor-pointer'
+                                    ? 'bg-green-500 text-white cursor-not-allowed opacity-70'
+                                    : 'bg-green-600 text-white hover:bg-green-700 cursor-pointer'
                                     }`}
                                   title="Send for review"
                                 >
@@ -2731,16 +2827,14 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                     </button>
                               {currentPageName === 'pricing' && (
                                 <button
-                                  onClick={async (e) => {
+                                  onClick={(e) => {
                                     e.stopPropagation();
-                                    // Save first, then send for review
-                                    await handleSave(true); // Force save all parts
                                     handleSendForReview(quote.id);
                                   }}
                                   disabled={sendForReviewLoading === quote.id}
                                   className={`px-3 py-1 text-xs rounded transition-colors flex items-center space-x-1 ${sendForReviewLoading === quote.id
-                                      ? 'bg-blue-500 text-white cursor-not-allowed opacity-70'
-                                      : 'bg-blue-600 text-white hover:bg-blue-700 cursor-pointer'
+                                    ? 'bg-blue-500 text-white cursor-not-allowed opacity-70'
+                                    : 'bg-blue-600 text-white hover:bg-blue-700 cursor-pointer'
                                     }`}
                                   title="Save and send for review"
                                 >
@@ -2757,6 +2851,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                   e.stopPropagation();
                                   setEditingParts(null);
                                         setPartEditData({});
+                                  setFocusField(null);
                                       }}
                                 className="px-3 py-1 text-xs bg-gray-600 text-white rounded hover:bg-gray-700 transition-colors cursor-pointer flex items-center space-x-1"
                                 title="Cancel editing and discard changes"
@@ -2807,17 +2902,13 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                                     {part.number.split(',').map((pn, pnIndex) => (
                                                       <div key={pnIndex} className="flex items-center space-x-1 bg-gray-50 px-1.5 py-0.5 rounded border border-gray-200">
                                                         <span className="text-xs text-gray-600 font-mono">{pn.trim()}</span>
-                                                        <button
-                                                          onClick={() => copyToClipboard(pn.trim())}
-                                                          className="p-0.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors cursor-pointer"
+                                                        <CopyButton
+                                                          text={pn.trim()}
                                                           title={`Copy ${pn.trim()} to clipboard`}
-                                                        >
-                                                          {isRecentlyCopied(pn.trim()) ? (
-                                                            <CheckCircle className="h-2.5 w-2.5 text-green-500" />
-                                                          ) : (
-                                                            <Copy className="h-2.5 w-2.5" />
-                                                          )}
-                                                        </button>
+                                                          size="sm"
+                                                          className="p-0.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors cursor-pointer"
+                                                          iconClassName="h-2.5 w-2.5"
+                                                        />
                                                       </div>
                                                     ))}
                                                   </div>
@@ -2825,17 +2916,13 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                                   // Single part number - show with same box styling as multiple
                                                   <div className="flex items-center space-x-1 bg-gray-50 px-1.5 py-0.5 rounded border border-gray-200">
                                                     <span className="text-xs text-gray-600 font-mono">{part.number || '-'}</span>
-                                                    <button
-                                                      onClick={() => copyToClipboard(part.number || '')}
-                                                      className="p-0.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors cursor-pointer"
+                                                    <CopyButton
+                                                      text={part.number || ''}
                                                       title="Copy to clipboard"
-                                                    >
-                                                      {isRecentlyCopied(part.number || '') ? (
-                                                        <CheckCircle className="h-2.5 w-2.5 text-green-500" />
-                                                      ) : (
-                                                        <Copy className="h-2.5 w-2.5" />
-                                                      )}
-                                                    </button>
+                                                      size="sm"
+                                                      className="p-0.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors cursor-pointer"
+                                                      iconClassName="h-2.5 w-2.5"
+                                                    />
                                                   </div>
                                                 )}
                                                   </>
@@ -2850,6 +2937,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                           <div className="flex items-center space-x-1">
                                             {isPartEditing ? (
                                               <input
+                                                ref={(el) => { focusRefs.current['list_price_mobile'] = el; }}
                                                 type="number"
                                                 value={partEditData[part.id]?.list_price !== undefined ? partEditData[part.id].list_price : ''}
                                                 onChange={(e) => handlePartEditChange(part.id, 'list_price', e.target.value ? Number(e.target.value) : null)}
@@ -2857,20 +2945,19 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                               />
                                             ) : (
                                               <>
-                                                <span className="text-sm font-medium text-gray-900">
+                                                <span 
+                                                  className="text-sm font-medium text-gray-900 cursor-pointer hover:bg-gray-100 px-1 py-0.5 rounded transition-colors"
+                                                  onClick={() => handleDirectEdit(quote.id, 'list_price_mobile')}
+                                                  title="Click to edit"
+                                                >
                                                   {part.list_price ? `$${part.list_price.toFixed(2)}` : '-'}
                                                 </span>
-                                                <button
-                                                  onClick={() => copyToClipboard(part.list_price ? part.list_price.toString() : '')}
-                                                  className="p-1 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
+                                                <CopyButton
+                                                  text={part.list_price ? part.list_price.toString() : ''}
                                                   title="Copy to clipboard"
-                                                >
-                                                  {isRecentlyCopied(part.list_price ? part.list_price.toString() : '') ? (
-                                                    <CheckCircle className="h-3 w-3 text-green-500" />
-                                                  ) : (
-                                                    <Copy className="h-3 w-3" />
-                                                  )}
-                                                </button>
+                                                  size="sm"
+                                                  className="text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
+                                                />
                                               </>
                                             )}
                                           </div>
@@ -2881,28 +2968,27 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                               <div className="flex items-center space-x-1">
                                                 {isPartEditing ? (
                                                   <input
+                                                ref={(el) => { focusRefs.current['price_mobile'] = el; }}
                                                     type="number"
                                                 value={partEditData[part.id]?.price ?? ''}
                                                     onChange={(e) => handlePartEditChange(part.id, 'price', e.target.value ? Number(e.target.value) : null)}
                                                 className="flex-1 px-2 py-1 border border-gray-300 rounded-md text-sm focus:ring-1 focus:ring-red-500 focus:border-transparent"
-                                                    autoFocus
                                                   />
                                                 ) : (
                                                   <>
-                                                    <span className="text-sm font-medium text-gray-900">
+                                                <span 
+                                                  className="text-sm font-medium text-gray-900 cursor-pointer hover:bg-gray-100 px-1 py-0.5 rounded transition-colors"
+                                                  onClick={() => handleDirectEdit(quote.id, 'price_mobile')}
+                                                  title="Click to edit"
+                                                >
                                                       {part.price ? `$${part.price.toFixed(2)}` : '-'}
                                                     </span>
-                                                    <button
-                                                      onClick={() => copyToClipboard(part.price ? part.price.toString() : '')}
-                                                  className="p-1 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
+                                                <CopyButton
+                                                  text={part.price ? part.price.toString() : ''}
                                                       title="Copy to clipboard"
-                                                    >
-                                                  {isRecentlyCopied(part.price ? part.price.toString() : '') ? (
-                                                    <CheckCircle className="h-3 w-3 text-green-500" />
-                                                  ) : (
-                                                      <Copy className="h-3 w-3" />
-                                                  )}
-                                                    </button>
+                                                  size="sm"
+                                                  className="text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
+                                                />
                                                   </>
                                                 )}
                                           </div>
@@ -2915,6 +3001,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                               <div className="flex items-center space-x-1">
                                                 {isPartEditing ? (
                                                   <input
+                                                ref={(el) => { focusRefs.current['af_mobile'] = el; }}
                                                 type="checkbox"
                                                 checked={partEditData[part.id]?.af || false}
                                                 onChange={(e) => handlePartEditChange(part.id, 'af', e.target.checked)}
@@ -2922,7 +3009,11 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                                 title="Aftermarket Flag"
                                               />
                                             ) : (
-                                              <span className={`text-sm ${part.af ? 'text-green-600 font-medium' : 'text-gray-400'}`}>
+                                              <span 
+                                                className={`text-sm cursor-pointer hover:bg-gray-100 px-1 py-0.5 rounded transition-colors ${part.af ? 'text-green-600 font-medium' : 'text-gray-400'}`}
+                                                onClick={() => handleDirectEdit(quote.id, 'af_mobile')}
+                                                title="Click to edit"
+                                              >
                                                 {part.af ? (
                                                   <span className='bg-green-500 text-white rounded-full px-2 py-1 text-xs font-bold shadow-md border-2 border-green-600'>
                                                     ✓ AM
@@ -2940,24 +3031,26 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                           <div className="flex items-center space-x-1 min-w-0">
                                             {isPartEditing ? (
                                               <QuickFillInput
+                                                ref={(el) => { focusRefs.current['note_mobile'] = el; }}
                                                 value={partEditData[part.id]?.note ?? ''}
                                                 onChange={(value) => handlePartEditChange(part.id, 'note', value)}
                                                 className="flex-1"
                                                   />
                                                 ) : (
                                                   <>
-                                                    <span className="text-sm text-gray-600">{part.note || '-'}</span>
-                                                    <button
-                                                      onClick={() => copyToClipboard(part.note || '')}
-                                                  className="p-1 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
-                                                      title="Copy to clipboard"
-                                                    >
-                                                  {isRecentlyCopied(part.note || '') ? (
-                                                    <CheckCircle className="h-3 w-3 text-green-500" />
-                                                  ) : (
-                                                      <Copy className="h-3 w-3" />
-                                                  )}
-                                                    </button>
+                                                <span 
+                                                  className="text-sm text-gray-600 cursor-pointer hover:bg-gray-100 px-1 py-0.5 rounded transition-colors"
+                                                  onClick={() => handleDirectEdit(quote.id, 'note_mobile')}
+                                                  title="Click to edit"
+                                                >
+                                                  {part.note || '-'}
+                                                </span>
+                                                <CopyButton
+                                                  text={part.note || ''}
+                                                  title="Copy to clipboard"
+                                                  size="sm"
+                                                  className="text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
+                                                />
                                                   </>
                                                 )}
                                           </div>
@@ -3181,8 +3274,8 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                 onClick={goToPrevPage}
                 disabled={uiCurrentPage === 1}
                 className={`px-3 py-2 text-sm font-medium rounded-lg border transition-colors ${uiCurrentPage === 1
-                    ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
-                    : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50 hover:border-gray-400'
+                  ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
+                  : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50 hover:border-gray-400'
                   }`}
               >
                 Previous
@@ -3197,8 +3290,8 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                       key={page}
                       onClick={() => goToPage(page)}
                       className={`px-3 py-2 text-sm font-medium rounded-lg border transition-colors ${page === uiCurrentPage
-                          ? 'bg-red-600 text-white border-red-600'
-                          : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50 hover:border-gray-400'
+                        ? 'bg-red-600 text-white border-red-600'
+                        : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50 hover:border-gray-400'
                         }`}
                     >
                       {page}
@@ -3212,8 +3305,8 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                 onClick={goToNextPage}
                 disabled={uiCurrentPage === totalPages}
                 className={`px-3 py-2 text-sm font-medium rounded-lg border transition-colors ${uiCurrentPage === totalPages
-                    ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
-                    : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50 hover:border-gray-400'
+                  ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
+                  : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50 hover:border-gray-400'
                   }`}
               >
                 Next

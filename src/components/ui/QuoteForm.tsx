@@ -83,6 +83,34 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
   // Ref for ImagePasteArea to reset images when form is cleared
   const imagePasteAreaRef = useRef<ImagePasteAreaRef>(null);
 
+  // Check if form has been changed from initial state
+  const hasFormContent = () => {
+    // Check if raw text has been added
+    const hasTextContent = rawText.trim() !== '';
+    
+    // Check if any field has been changed from its initial value
+    const hasChangedFields = fields.quoteRef !== '' ||
+      fields.vin !== '' ||
+      fields.make !== '' ||
+      fields.model !== '' ||
+      fields.series !== '' ||
+      fields.auto !== 'true' ||
+      fields.body !== '' ||
+      fields.mthyr !== '' ||
+      fields.rego !== '' ||
+      fields.requiredBy !== '' ||
+      fields.customer !== '' ||
+      fields.address !== '' ||
+      fields.phone !== '' ||
+      fields.settlement !== '0' ||
+      fields.notes !== '';
+    
+    // Check if images have been uploaded or parts extracted
+    const hasImageContent = extractedParts.length > 0;
+    
+    return hasTextContent || hasChangedFields || hasImageContent;
+  };
+
   const handlePartsExtracted = (parts: ExtractedPartInfo[]) => {
     setExtractedParts(prevParts => [...prevParts, ...parts]);
     setShowPartsSection(true); // Show parts section when parts are extracted
@@ -204,16 +232,16 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
       }
 
       // Populate part details with confidence information
-      setPartDetails(prev => ({
-        ...prev,
+        setPartDetails(prev => ({
+          ...prev,
         [finalPartName]: {
           name: finalPartName,
           number: part.partNumber !== 'Not found' ? cleanPartNumber(part.partNumber) : '',
           price: null,
           list_price: part.list_price || null,
           note: ''
-        }
-      }));
+          }
+        }));
     });
 
 
@@ -287,6 +315,9 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
     imagePasteAreaRef.current?.clearImages(); // Clear images from ImagePasteArea
     setShowPartsSection(false); // Hide parts section
     setIsFormAccordionOpen(false); // Close form accordion
+    
+    // Scroll to top of the page
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const togglePart = (partName: string) => {
@@ -432,7 +463,7 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
     try {
       // Convert part details to array
       const partsArray = selectedParts.map(partName => partDetails[partName]);
-      
+
       await onSubmit({
         quoteRef,
         vin,
@@ -878,16 +909,31 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
 
       {/* Create Quote Button */}
       <div className="mt-6 pt-4 border-t border-gray-200">
+        <div className="flex items-center space-x-3">
         <Button
           onClick={handleSubmit}
           type="submit"
           size="sm"
           disabled={isLoading}
-          className="bg-red-600 hover:bg-red-700 text-white font-medium py-3 px-6 rounded-lg transition-colors duration-200 disabled:bg-gray-400 disabled:cursor-not-allowed"
-        >
-          {isLoading ? 'Creating Quote...' : 'Create Quote'}
+            className="bg-red-600 hover:bg-red-700 text-white font-medium py-5 px-8 rounded-sm transition-colors duration-200 disabled:bg-gray-400 disabled:cursor-not-allowed"
+          >
+            {isLoading ? 'Creating Quote...' : 'Create Quote'}
         </Button>
-      </div>
+          
+          {/* Clear Form Button - Only show when form has content */}
+          {hasFormContent() && (
+            <Button
+              onClick={clearForm}
+              type="button"
+              size="sm"
+              disabled={isLoading}
+              className="border border-gray-300 bg-white hover:bg-gray-50 text-gray-700 font-medium py-5 px-6 rounded-sm transition-colors duration-200 disabled:bg-gray-100 disabled:text-gray-400 disabled:border-gray-200 disabled:cursor-not-allowed"
+            >
+              Clear Form
+            </Button>
+          )}
+              </div>
+            </div>
 
       {/* Validation Popup */}
       {showValidationPopup && (
@@ -896,7 +942,7 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
             <div className="flex items-center space-x-3 mb-4">
               <AlertCircle className="h-6 w-6 text-red-500" />
               <h3 className="text-lg font-semibold text-gray-900">Validation Error</h3>
-                </div>
+                      </div>
             <p className="text-gray-700 mb-6">{validationMessage}</p>
             <div className="flex justify-end">
               <Button

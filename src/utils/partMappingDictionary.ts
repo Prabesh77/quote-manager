@@ -62,6 +62,8 @@ export const PART_MAPPING_DICTIONARY: PartMapping[] = [
       'Headlight assay, l (halogen)',
       'Headlight for curve light and LED daytime driving lights',
       'Unit(L), Head Lamp',
+      'Headlamp(L)',
+      'Headlight(L)',
       'Unit,headlamp, l',
       'Headlamp Assy, LH',
       'Headlamp Assy, L',
@@ -93,6 +95,8 @@ export const PART_MAPPING_DICTIONARY: PartMapping[] = [
       'Lamp assy-head,rh',
       'Headlight assay, r (halogen)',
       'Unit(R), Head Lamp',
+      'Headlamp(R)',
+      'Headlight(R)',
       'Unit,headlamp, r',
       'Headlamp Assy, RH',
       'Headlamp Assy, R',
@@ -455,11 +459,11 @@ function findContextAwareHeadlampMatch(
   let rightIndicator = false;
   let confidence = 0.85; // Base confidence for headlamp
   
-  // Check current line for L/R indicators (including comma-separated)
-  if (/\b(l|left|lh)\b/i.test(normalizedText) || /,?\s*(l|left|lh)\s*$/i.test(normalizedText)) {
+  // Check current line for L/R indicators (including comma-separated and parentheses)
+  if (/\b(l|left|lh)\b/i.test(normalizedText) || /,?\s*(l|left|lh)\s*$/i.test(normalizedText) || /\(l\)/i.test(normalizedText)) {
     leftIndicator = true;
     confidence = 0.98;
-  } else if (/\b(r|right|rh)\b/i.test(normalizedText) || /,?\s*(r|right|rh)\s*$/i.test(normalizedText)) {
+  } else if (/\b(r|right|rh)\b/i.test(normalizedText) || /,?\s*(r|right|rh)\s*$/i.test(normalizedText) || /\(r\)/i.test(normalizedText)) {
     rightIndicator = true;
     confidence = 0.98;
   }
@@ -470,12 +474,12 @@ function findContextAwareHeadlampMatch(
     for (let i = 0; i < allLines.length; i++) {
       const line = allLines[i];
       
-      // Look for L/R indicators (including comma-separated)
-      if (/\b(l|left|lh)\b/i.test(line) || /,?\s*(l|left|lh)\s*$/i.test(line)) {
+      // Look for L/R indicators (including comma-separated and parentheses)
+      if (/\b(l|left|lh)\b/i.test(line) || /,?\s*(l|left|lh)\s*$/i.test(line) || /\(l\)/i.test(line)) {
         leftIndicator = true;
         confidence = 0.95; // Slightly lower for nearby context
         break;
-      } else if (/\b(r|right|rh)\b/i.test(line) || /,?\s*(r|right|rh)\s*$/i.test(line)) {
+      } else if (/\b(r|right|rh)\b/i.test(line) || /,?\s*(r|right|rh)\s*$/i.test(line) || /\(r\)/i.test(line)) {
         rightIndicator = true;
         confidence = 0.95; // Slightly lower for nearby context
         break;

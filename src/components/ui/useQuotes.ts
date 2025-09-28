@@ -113,6 +113,7 @@ export interface Quote {
   address?: string; // Customer address
   phone?: string; // Customer phone
   settlement?: number; // Settlement percentage (default: 0)
+  notes?: string; // Global quote notes
   status: 'active' | 'completed' | 'unpriced' | 'waiting_verification' | 'priced' | 'ordered' | 'delivered'; // Updated status field
   taxInvoiceNumber?: string; // Tax invoice number for orders
   [key: string]: any; // Allow string indexing
@@ -247,6 +248,8 @@ export const useQuotes = () => {
           customer: normalizedQuote.customer?.name || '',
           address: normalizedQuote.customer?.address || '',
           phone: normalizedQuote.customer?.phone || '',
+          settlement: normalizedQuote.settlement || 0,
+          notes: normalizedQuote.notes || undefined,
           status: normalizedQuote.status as Quote['status'],
           taxInvoiceNumber: normalizedQuote.tax_invoice_number || undefined,
         };

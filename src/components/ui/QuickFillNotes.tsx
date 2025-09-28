@@ -42,8 +42,10 @@ const QuickFillNotes: React.FC<QuickFillNotesProps> = ({
           items.info = part.toUpperCase();
         } else if (['GENUINE WITH BRACKET', 'GENUINE WITHOUT BRACKET'].includes(part.toUpperCase())) {
           items.info = part.toUpperCase();
-        } else if (['GENUINE', 'GENUINE WITH LOGO', 'ZILAX', 'CRYOMAX', 'KOYO', 'DELPHI', 'MAHLE', 'DENSO', 'DELANG', 'NRF'].includes(part.toUpperCase())) {
+        } else if (['GENUINE WITH LOGO', 'ZILAX', 'CRYOMAX', 'KOYO', 'DELPHI', 'MAHLE', 'DENSO', 'DELANG', 'NRF'].includes(part.toUpperCase())) {
           items.brand = part.toUpperCase();
+        } else if (part.toUpperCase() === 'GENUINE') {
+          items.brand = 'GENUINE';
         }
       });
       
@@ -148,7 +150,15 @@ const QuickFillNotes: React.FC<QuickFillNotesProps> = ({
         /INVOICE\s+PRICE:\s+\$/g,
         /COMPLETE\s+FAN\s+ASSEMBLY/g,
         /GENUINE\s+WITH\s+LOGO/g,
-        /ZILAX|CRYOMAX|KOYO|DELPHI|MAHLE|DENSO|DELANG|NRF/g
+        /\bGENUINE\b/g,
+        /\bZILAX\b/g,
+        /\bCRYOMAX\b/g,
+        /\bKOYO\b/g,
+        /\bDELPHI\b/g,
+        /\bMAHLE\b/g,
+        /\bDENSO\b/g,
+        /\bDELANG\b/g,
+        /\bNRF\b/g
       ];
       
       let customText = existingText;
@@ -204,7 +214,15 @@ const QuickFillNotes: React.FC<QuickFillNotesProps> = ({
         /INVOICE\s+PRICE:\s+\$/g,
         /COMPLETE\s+FAN\s+ASSEMBLY/g,
         /GENUINE\s+WITH\s+LOGO/g,
-        /ZILAX|CRYOMAX|KOYO|DELPHI|MAHLE|DENSO|DELANG|NRF/g
+        /\bGENUINE\b/g,
+        /\bZILAX\b/g,
+        /\bCRYOMAX\b/g,
+        /\bKOYO\b/g,
+        /\bDELPHI\b/g,
+        /\bMAHLE\b/g,
+        /\bDENSO\b/g,
+        /\bDELANG\b/g,
+        /\bNRF\b/g
       ];
       
       let customText = existingText;

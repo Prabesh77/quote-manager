@@ -124,6 +124,9 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
   const [editingParts, setEditingParts] = useState<string | null>(null);
   const [editData, setEditData] = useState<Record<string, any>>({});
   const [partEditData, setPartEditData] = useState<Record<string, Record<string, any>>>({});
+  const [quoteNotesEditData, setQuoteNotesEditData] = useState<Record<string, string>>({});
+  const [isQuickFillSelecting, setIsQuickFillSelecting] = useState(false);
+  const [quoteNotesLoading, setQuoteNotesLoading] = useState<Record<string, boolean>>({});
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
   const [focusField, setFocusField] = useState<string | null>(null);
   const focusRefs = useRef<Record<string, HTMLInputElement | null>>({});
@@ -426,6 +429,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
       if (e.key === 'Escape') {
         setEditingQuote(null);
         setEditingParts(null);
+        setQuoteNotesEditData({});
         setFocusField(null);
       }
       
@@ -640,6 +644,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
       if (editingParts === quoteId) {
         setEditingParts(null);
         setPartEditData({});
+        setQuoteNotesEditData({});
         setFocusField(null);
       }
 
@@ -1091,6 +1096,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
               // Update local state after successful backend save
               updateLocalState();
 
+
           } catch (error) {
             console.error('Error saving parts to backend:', error);
               // Don't update local state if backend save failed
@@ -1146,6 +1152,61 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
 
   const handleQuoteEditChange = (field: string, value: string | number | boolean) => {
     setEditData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleQuoteNotesChange = (quoteId: string, notes: string) => {
+    // Store notes in local state for immediate UI updates
+    setQuoteNotesEditData(prev => ({
+      ...prev,
+      [quoteId]: notes
+    }));
+  };
+
+
+  const handleQuickFillSelect = () => {
+    // Set flag to prevent blur save when quick fill selection is happening
+    setIsQuickFillSelecting(true);
+    // Reset the flag after a short delay to allow the selection to complete
+    setTimeout(() => {
+      setIsQuickFillSelecting(false);
+    }, 100);
+  };
+
+  const handleQuoteNotesSave = async (quoteId: string) => {
+    // Don't save if quick fill selection is happening
+    if (isQuickFillSelecting) {
+      return;
+    }
+    
+    // Save quote notes when input loses focus
+    if (quoteNotesEditData[quoteId] !== undefined) {
+      try {
+        // Set loading state
+        setQuoteNotesLoading(prev => ({ ...prev, [quoteId]: true }));
+        
+        await onUpdateQuote(quoteId, { notes: quoteNotesEditData[quoteId] });
+        
+        // Update local quotes state with the new notes
+        setLocalQuotes(prev => prev.map(q =>
+          q.id === quoteId
+            ? { ...q, notes: quoteNotesEditData[quoteId] }
+            : q
+        ));
+        
+        // Clear the edit data after successful save
+        setQuoteNotesEditData(prev => {
+          const newData = { ...prev };
+          delete newData[quoteId];
+          return newData;
+        });
+      } catch (error) {
+        console.error('Error saving quote notes:', error);
+        showSnackbar('Failed to save quote notes', 'error');
+      } finally {
+        // Clear loading state
+        setQuoteNotesLoading(prev => ({ ...prev, [quoteId]: false }));
+      }
+    }
   };
 
   const handlePartEditChange = (partId: string, field: string, value: string | number | boolean | null) => {
@@ -1530,6 +1591,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
       if (editingParts === quoteId) {
         setEditingParts(null);
         setPartEditData({});
+        setQuoteNotesEditData({});
         setFocusField(null);
       }
 
@@ -2138,9 +2200,25 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                   <div className="animate-in slide-in-from-top-2 duration-300">
                     <div className="space-y-4">
                       <div className="flex items-center justify-between">
-                        <h4 className="text-sm font-semibold text-gray-900 flex items-center space-x-2">
-                          <span>Parts Details ({quoteParts.length})</span>
-                        </h4>
+                        <div className="flex items-center space-x-4">
+                          <h4 className="text-sm font-semibold text-gray-900 flex items-center space-x-2">
+                            <span>Parts Details ({quoteParts.length})</span>
+                          </h4>
+                          {/* Quote Notes Field */}
+                          <div className="flex items-center space-x-1">
+                            <label className="text-xs font-medium text-gray-500">🗒️</label>
+                            <QuickFillInput
+                              value={quoteNotesEditData[quote.id] !== undefined ? quoteNotesEditData[quote.id] : (quote.notes || '')}
+                              onChange={(value) => handleQuoteNotesChange(quote.id, value)}
+                              onQuickFillSelect={handleQuickFillSelect}
+                              onPopupClose={() => handleQuoteNotesSave(quote.id)}
+                              className="min-w-[200px]"
+                              placeholder="Enter notes for all parts..."
+                              textMode={true}
+                              loading={quoteNotesLoading[quote.id] || false}
+                            />
+                          </div>
+                        </div>
                         {quoteParts.length === 0 && (
                           <span className="text-sm text-gray-500">No parts linked to this quote</span>
                         )}
@@ -2219,6 +2297,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                 e.stopPropagation();
                                 setEditingParts(null);
                                 setPartEditData({});
+                                setQuoteNotesEditData({});
                                     setFocusField(null);
                               }}
                               className="px-3 py-1 text-xs bg-gray-600 text-white rounded hover:bg-gray-700 transition-colors cursor-pointer flex items-center space-x-1"
@@ -2768,9 +2847,25 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                           <div className="animate-in slide-in-from-top-2 duration-300">
                             <div className="space-y-4">
                               <div className="flex items-center justify-between">
-                                <h4 className="text-sm font-semibold text-gray-900 flex items-center space-x-2">
-                                  <span>Parts ({quoteParts.length})</span>
-                                </h4>
+                                <div className="flex flex-col space-y-2">
+                                  <h4 className="text-sm font-semibold text-gray-900 flex items-center space-x-2">
+                                    <span>Parts ({quoteParts.length})</span>
+                                  </h4>
+                                  {/* Quote Notes Field - Mobile */}
+                                  <div className="flex flex-col space-y-1">
+                                    <label className="text-xs font-medium text-gray-500">Quote Notes:</label>
+                                    <QuickFillInput
+                                      value={quoteNotesEditData[quote.id] !== undefined ? quoteNotesEditData[quote.id] : (quote.notes || '')}
+                                      onChange={(value) => handleQuoteNotesChange(quote.id, value)}
+                                      onQuickFillSelect={handleQuickFillSelect}
+                                      onPopupClose={() => handleQuoteNotesSave(quote.id)}
+                                      className="w-full"
+                                      placeholder="Enter notes for all parts..."
+                                      textMode={true}
+                                      loading={quoteNotesLoading[quote.id] || false}
+                                    />
+                                  </div>
+                                </div>
                                 {quoteParts.length === 0 && (
                                   <span className="text-sm text-gray-500">No parts linked to this quote</span>
                                 )}
@@ -2849,6 +2944,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                   e.stopPropagation();
                                   setEditingParts(null);
                                         setPartEditData({});
+                                        setQuoteNotesEditData({});
                                   setFocusField(null);
                                       }}
                                 className="px-3 py-1 text-xs bg-gray-600 text-white rounded hover:bg-gray-700 transition-colors cursor-pointer flex items-center space-x-1"

@@ -641,6 +641,15 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
       // Use the comprehensive batch mutation that handles both parts and status
       await onUpdateMultipleParts(updates, quoteId, true); // Pass true to change status
 
+      // Track PRICED action
+      try {
+        const { QuoteActionsService } = await import('@/services/quoteActions/quoteActionsService');
+        await QuoteActionsService.trackQuoteAction(quoteId, 'PRICED');
+        console.log('✅ PRICED: Successfully tracked pricing action for quote:', quoteId);
+      } catch (trackingError) {
+        console.warn('⚠️ PRICED: Failed to track pricing action:', trackingError);
+      }
+
       // If we were in editing mode, exit it
       if (editingParts === quoteId) {
         setEditingParts(null);
@@ -1581,6 +1590,15 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
         console.error('❌ Error verifying quote:', result.error);
         showSnackbar('Error verifying quote', 'error');
         return;
+      }
+
+      // Track VERIFIED action
+      try {
+        const { QuoteActionsService } = await import('@/services/quoteActions/quoteActionsService');
+        await QuoteActionsService.trackQuoteAction(quoteId, 'VERIFIED');
+        console.log('✅ VERIFIED: Successfully tracked verification action for quote:', quoteId);
+      } catch (trackingError) {
+        console.warn('⚠️ VERIFIED: Failed to track verification action:', trackingError);
       }
 
       // If we were in editing mode, exit it

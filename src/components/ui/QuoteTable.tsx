@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo, useCallback, useRef, forwardRef, useImperativeHandle } from 'react';
-import { ChevronDown, Edit, Save, X, Search, Copy, CheckCircle, AlertTriangle, ShoppingCart, Package, Plus, Info, MapPin, Send, Loader2, LayoutGrid, List, Eye } from 'lucide-react';
+import { ChevronDown, Edit, Save, X, Search, Copy, CheckCircle, AlertTriangle, ShoppingCart, Package, Plus, Info, MapPin, Send, Loader2, LayoutGrid, List, Eye, RefreshCw } from 'lucide-react';
 import CopyButton from './CopyButton';
 import { useQueryClient } from '@tanstack/react-query';
 import { Quote, Part } from './useQuotes';
@@ -136,6 +136,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
   const [selectedPartIds, setSelectedPartIds] = useState<string[]>([]);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [quotePartsWithNotes, setQuotePartsWithNotes] = useState<Record<string, Part[]>>({});
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Quote edit modal state
   const [editModalOpen, setEditModalOpen] = useState(false);
@@ -1846,6 +1847,21 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
     // Modal will close automatically after successful save
   };
 
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      // Trigger a manual refresh of quotes data using TanStack Query
+      await queryClient.invalidateQueries({ queryKey: ['quotes'] });
+      await queryClient.invalidateQueries({ queryKey: ['parts'] });
+      showSnackbar('Data refreshed successfully', 'success');
+    } catch (error) {
+      console.error('Error refreshing data:', error);
+      showSnackbar('Failed to refresh data', 'error');
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
   return (
     <div className="space-y-4">
       {/* Search and Filters */}
@@ -1901,6 +1917,21 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
               <List className="w-4 h-4" />
             )}
             <span>{singleQuoteMode ? 'Multiple' : 'Single'}</span>
+          </button>
+
+          {/* Refresh Button */}
+          <button
+            onClick={handleRefresh}
+            disabled={isRefreshing}
+            className={`flex items-center space-x-1 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+              isRefreshing 
+                ? 'bg-gray-100 text-gray-400 cursor-not-allowed' 
+                : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
+            }`}
+            title="Refresh data"
+          >
+            <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+            <span>{isRefreshing ? 'Refreshing...' : 'Refresh'}</span>
           </button>
 
           {/* Realtime Toggle */}
@@ -2205,8 +2236,11 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                             <span>Parts Details ({quoteParts.length})</span>
                           </h4>
                           {/* Quote Notes Field */}
-                          <div className="flex items-center space-x-1">
-                            <label className="text-xs font-medium text-gray-500">🗒️</label>
+                          <div className="flex items-center">
+                            <label className="flex items-center space-x-1">
+                              <img src="/icons/notepad.png" height={20} width={20} alt="Notes" />
+                              <p>Note:</p>
+                            </label>
                             <QuickFillInput
                               value={quoteNotesEditData[quote.id] !== undefined ? quoteNotesEditData[quote.id] : (quote.notes || '')}
                               onChange={(value) => handleQuoteNotesChange(quote.id, value)}

@@ -141,51 +141,9 @@ export const useOptimizedQuotes = () => {
     }
   }, [cache]);
 
-  // Optimized real-time updates
+  // Initial load (realtime is now handled by RealtimeProvider)
   useEffect(() => {
     let mounted = true;
-
-    const handleQuoteChange = (payload: any) => {
-      if (!mounted) return;
-
-      // Optimistic update instead of full refresh
-      if (payload.eventType === 'INSERT') {
-        setQuotes(prev => [payload.new, ...prev]);
-        cache.invalidate('quotes');
-      } else if (payload.eventType === 'UPDATE') {
-        setQuotes(prev => prev.map(q => q.id === payload.new.id ? payload.new : q));
-        cache.invalidate('quotes');
-      } else if (payload.eventType === 'DELETE') {
-        setQuotes(prev => prev.filter(q => q.id !== payload.old.id));
-        cache.invalidate('quotes');
-      }
-    };
-
-    const handlePartChange = (payload: any) => {
-      if (!mounted) return;
-
-      if (payload.eventType === 'INSERT') {
-        setParts(prev => [payload.new, ...prev]);
-        cache.invalidate('parts');
-      } else if (payload.eventType === 'UPDATE') {
-        setParts(prev => prev.map(p => p.id === payload.new.id ? payload.new : p));
-        cache.invalidate('parts');
-      } else if (payload.eventType === 'DELETE') {
-        setParts(prev => prev.filter(p => p.id !== payload.old.id));
-        cache.invalidate('parts');
-      }
-    };
-
-    // Subscribe to specific events only
-    const quotesSubscription = supabase
-      .channel('quotes-changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'quotes' }, handleQuoteChange)
-      .subscribe();
-
-    const partsSubscription = supabase
-      .channel('parts-changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'parts' }, handlePartChange)
-      .subscribe();
 
     // Initial load
     Promise.all([fetchQuotes(), fetchParts()]).finally(() => {
@@ -194,8 +152,6 @@ export const useOptimizedQuotes = () => {
 
     return () => {
       mounted = false;
-      quotesSubscription.unsubscribe();
-      partsSubscription.unsubscribe();
     };
   }, [fetchQuotes, fetchParts]);
 

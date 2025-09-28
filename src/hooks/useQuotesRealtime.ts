@@ -47,9 +47,9 @@ export const useQuotesRealtime = () => {
           table: 'quotes'
         },
         (payload: any) => {
-          console.log('📡 Quotes realtime event:', payload.eventType, payload.new?.id || payload.old?.id);
           
-          // Invalidate quotes queries to trigger refetch
+          // Invalidate ALL quotes queries to trigger refetch (including navigation counts)
+          // This will invalidate all queries that start with ['quotes']
           queryClient.invalidateQueries({ queryKey: queryKeys.quotesBase });
           
           // If it's a specific quote update, also invalidate that quote's parts
@@ -65,6 +65,12 @@ export const useQuotesRealtime = () => {
           console.log('✅ Quotes realtime subscription active');
         } else if (status === 'CHANNEL_ERROR') {
           console.error('❌ Quotes realtime subscription failed');
+        } else if (status === 'CLOSED') {
+          console.warn('⚠️ Quotes realtime subscription closed');
+        } else if (status === 'TIMED_OUT') {
+          console.error('⏰ Quotes realtime subscription timed out');
+        } else {
+          console.log('📡 Quotes channel status (other):', status);
         }
       });
 
@@ -92,6 +98,12 @@ export const useQuotesRealtime = () => {
           console.log('✅ Parts realtime subscription active');
         } else if (status === 'CHANNEL_ERROR') {
           console.error('❌ Parts realtime subscription failed');
+        } else if (status === 'CLOSED') {
+          console.warn('⚠️ Parts realtime subscription closed');
+        } else if (status === 'TIMED_OUT') {
+          console.error('⏰ Parts realtime subscription timed out');
+        } else {
+          console.log('📡 Parts channel status (other):', status);
         }
       });
 
@@ -128,5 +140,5 @@ export const useQuotesRealtime = () => {
       partsChannel.unsubscribe();
       vehiclesChannel.unsubscribe();
     };
-  }, [queryClient, isRealtimeEnabled]);
+  }, [isRealtimeEnabled]);
 };

@@ -1,6 +1,6 @@
 'use client';
 
-import { useQuotesQuery, useDeleteQuoteMutation, useUpdatePartInQuoteJsonMutation, useUpdatePartsComprehensiveBatchMutation, useCreateQuoteMutation } from '@/hooks/queries/useQuotesQuery';
+import { useQuotesQuery, useDeleteQuoteMutation, useUpdatePartInQuoteJsonMutation, useUpdatePartsComprehensiveBatchMutation, useCreateQuoteMutation, useUpdateQuoteMutation } from '@/hooks/queries/useQuotesQuery';
 import { useQuery } from '@tanstack/react-query';
 import { QuoteForm } from "@/components/ui/QuoteForm";
 import QuoteTable from "@/components/ui/QuoteTable";
@@ -98,6 +98,7 @@ export default function HomePage() {
   const updatePartMutation = useUpdatePartInQuoteJsonMutation();
   const updatePartsComprehensiveBatchMutation = useUpdatePartsComprehensiveBatchMutation();
   const createQuoteMutation = useCreateQuoteMutation();
+  const updateQuoteMutation = useUpdateQuoteMutation();
 
   const handleSubmit = async (fields: Record<string, string>, parts: any[]) => {
     try {
@@ -142,9 +143,10 @@ export default function HomePage() {
     }
   };
 
-  // Placeholder mutation functions for QuoteTable
+  // Wrapper functions to match QuoteTable's expected interface
   const onUpdateQuote = async (id: string, fields: Record<string, any>) => {
     try {
+      const result = await updateQuoteMutation.mutateAsync({ id, fields });
       showSnackbar('Quote updated successfully!', 'success');
       return { error: null };
     } catch (error) {
@@ -326,6 +328,7 @@ export default function HomePage() {
             currentPageName="home"
           />
         </div>
+
       </div>
     </ProtectedRoute>
   );

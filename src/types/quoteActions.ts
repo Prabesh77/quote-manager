@@ -1,4 +1,4 @@
-export type QuoteActionType = 'CREATED' | 'PRICED' | 'COMPLETED' | 'MARKED_WRONG';
+export type QuoteActionType = 'CREATED' | 'PRICED' | 'VERIFIED' | 'COMPLETED' | 'MARKED_WRONG';
 
 export interface QuoteAction {
   id: number;
@@ -33,11 +33,14 @@ export interface UserStats {
   user_email: string;
   user_name?: string;
   quotes_created: number;
+  parts_created: number;
   quotes_priced: number;
+  quotes_verified: number;
   quotes_completed: number;
   total_quotes: number;
   total_value_created: number;
   total_value_priced: number;
+  total_value_verified: number;
   total_value_completed: number;
 }
 

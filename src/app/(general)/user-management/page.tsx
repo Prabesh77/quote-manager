@@ -7,7 +7,7 @@ import supabase from '@/utils/supabase';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useSnackbar } from '@/components/ui/Snackbar';
-import { Plus, X, Edit, Power, PowerOff } from 'lucide-react';
+import { Plus, X, Edit, Power, PowerOff, Trash2 } from 'lucide-react';
 
 interface UserProfile {
   id: string;
@@ -47,6 +47,8 @@ export default function UserManagementPage() {
     role: 'quote_creator' as UserProfile['role'],
     is_active: true
   });
+  const [deletingUser, setDeletingUser] = useState<string | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
   const { showSnackbar } = useSnackbar();
 
   useEffect(() => {
@@ -179,6 +181,35 @@ export default function UserManagementPage() {
     } catch (error) {
       console.error('Error toggling user status:', error);
       showSnackbar('Failed to update user status', 'error');
+    }
+  };
+
+  const handleDeleteUser = async (userId: string) => {
+    try {
+      setDeletingUser(userId);
+      
+      // Call our API endpoint to delete user
+      const response = await fetch(`/api/users/${userId}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to delete user');
+      }
+
+      showSnackbar('User deleted successfully', 'success');
+      setShowDeleteConfirm(null);
+      fetchUsers();
+    } catch (error) {
+      console.error('Error deleting user:', error);
+      showSnackbar(`Failed to delete user: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
+    } finally {
+      setDeletingUser(null);
     }
   };
 
@@ -468,6 +499,15 @@ export default function UserManagementPage() {
                           >
                             {user.is_active ? <PowerOff className="h-4 w-4" /> : <Power className="h-4 w-4" />}
                           </Button>
+                          <Button
+                            onClick={() => setShowDeleteConfirm(user.id)}
+                            size="sm"
+                            variant="outline"
+                            className="p-2 h-8 w-8 hover:bg-red-50 hover:border-red-300 hover:text-red-700 transition-all duration-200 bg-white shadow-sm hover:shadow-md cursor-pointer"
+                            title="Delete user"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
                         </div>
                       )}
                     </td>
@@ -581,6 +621,15 @@ export default function UserManagementPage() {
                       >
                         {user.is_active ? <PowerOff className="h-4 w-4" /> : <Power className="h-4 w-4" />}
                       </Button>
+                      <Button
+                        onClick={() => setShowDeleteConfirm(user.id)}
+                        size="sm"
+                        variant="outline"
+                        className="p-2 h-8 w-8 hover:bg-red-50 hover:border-red-300 hover:text-red-700 transition-all duration-200 bg-white shadow-sm hover:shadow-md cursor-pointer"
+                        title="Delete user"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
                     </div>
                   </div>
 
@@ -610,6 +659,41 @@ export default function UserManagementPage() {
           <div className="text-center py-12">
             <div className="text-gray-500 text-lg">No users found</div>
             <div className="text-gray-400 text-sm mt-2">Create your first user to get started</div>
+          </div>
+        )}
+
+        {/* Delete Confirmation Dialog */}
+        {showDeleteConfirm && (
+          <div className="fixed inset-0 backdrop-blur-sm bg-white/30 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4 shadow-xl border border-gray-200">
+              <div className="flex items-center mb-4">
+                <div className="flex-shrink-0 w-10 h-10 mx-auto flex items-center justify-center rounded-full bg-red-100">
+                  <Trash2 className="w-6 h-6 text-red-600" />
+                </div>
+              </div>
+              <div className="text-center">
+                <h3 className="text-lg font-medium text-gray-900 mb-2">Delete User</h3>
+                <p className="text-sm text-gray-500 mb-6">
+                  Are you sure you want to delete this user? This action cannot be undone.
+                </p>
+                <div className="flex space-x-3 justify-center">
+                  <Button
+                    onClick={() => setShowDeleteConfirm(null)}
+                    variant="outline"
+                    className="cursor-pointer"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={() => handleDeleteUser(showDeleteConfirm)}
+                    disabled={deletingUser === showDeleteConfirm}
+                    className="bg-red-600 hover:bg-red-700 cursor-pointer"
+                  >
+                    {deletingUser === showDeleteConfirm ? 'Deleting...' : 'Delete User'}
+                  </Button>
+                </div>
+              </div>
+            </div>
           </div>
         )}
       </div>

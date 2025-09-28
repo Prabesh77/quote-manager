@@ -184,53 +184,10 @@ export const useQuotes = () => {
     }
   }, [fetchParts]);
 
-  // Real-time subscriptions
+  // Initial data fetch (realtime is now handled by RealtimeProvider)
   useEffect(() => {
-    // Subscribe to quotes table changes
-    const quotesSubscription = supabase
-      .channel('quotes-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'quotes'
-        },
-        () => {
-          // Refresh both quotes and parts since status depends on parts data
-          fetchQuotes();
-          fetchParts();
-        }
-      )
-      .subscribe();
-
-    // Subscribe to parts table changes
-    const partsSubscription = supabase
-      .channel('parts-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'parts'
-        },
-        () => {
-          // Refresh both quotes and parts since status depends on parts data
-          fetchQuotes();
-          fetchParts();
-        }
-      )
-      .subscribe();
-
-    // Initial data fetch
     fetchQuotes();
     fetchParts();
-
-    // Cleanup subscriptions
-    return () => {
-      quotesSubscription.unsubscribe();
-      partsSubscription.unsubscribe();
-    };
   }, [fetchQuotes, fetchParts]);
 
   return {

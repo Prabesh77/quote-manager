@@ -350,6 +350,9 @@ export default function UserStatsDashboard({ className = '' }: UserStatsDashboar
                   Priced
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Verified
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Completed
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -380,7 +383,10 @@ export default function UserStatsDashboard({ className = '' }: UserStatsDashboar
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
-                        <span className="text-sm font-medium text-gray-900">{user.quotes_created}</span>
+                        <div className="flex flex-col">
+                          <span className="text-sm font-medium text-gray-900">{user.quotes_created}</span>
+                          <span className="text-xs text-gray-500">{user.parts_created} parts</span>
+                        </div>
                         <FileText className="ml-2 w-4 h-4 text-blue-500" />
                       </div>
                     </td>
@@ -388,6 +394,12 @@ export default function UserStatsDashboard({ className = '' }: UserStatsDashboar
                       <div className="flex items-center">
                         <span className="text-sm font-medium text-gray-900">{user.quotes_priced}</span>
                         <DollarSign className="ml-2 w-4 h-4 text-green-500" />
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center">
+                        <span className="text-sm font-medium text-gray-900">{user.quotes_verified}</span>
+                        <CheckCircle className="ml-2 w-4 h-4 text-emerald-500" />
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">

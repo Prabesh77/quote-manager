@@ -1,6 +1,6 @@
 'use client';
 
-import { useQuotesQuery, useDeleteQuoteMutation, useUpdatePartInQuoteJsonMutation, useUpdatePartsComprehensiveBatchMutation, queryKeys } from '@/hooks/queries/useQuotesQuery';
+import { useQuotesQuery, useDeleteQuoteMutation, useUpdatePartInQuoteJsonMutation, useUpdatePartsComprehensiveBatchMutation, useUpdateQuoteMutation, queryKeys } from '@/hooks/queries/useQuotesQuery';
 import { useAllQuoteParts } from '@/hooks/useAllQuoteParts';
 import QuoteTable from "@/components/ui/QuoteTable";
 import { ProtectedRoute } from "@/components/common/ProtectedRoute";
@@ -41,11 +41,16 @@ export default function PricingPage() {
   const deleteQuoteMutation = useDeleteQuoteMutation();
   const updatePartMutation = useUpdatePartInQuoteJsonMutation();
   const updatePartsComprehensiveBatchMutation = useUpdatePartsComprehensiveBatchMutation();
+  const updateQuoteMutation = useUpdateQuoteMutation();
 
-  // Placeholder functions for now - these will need to be implemented with the new API
+  // Quote update function using the proper mutation
   const updateQuote = async (id: string, fields: Record<string, any>) => {
-    // TODO: Implement with new API
-    return { error: new Error('Not implemented yet') };
+    try {
+      const result = await updateQuoteMutation.mutateAsync({ id, fields });
+      return { error: null };
+    } catch (error) {
+      return { error: error instanceof Error ? error : new Error('Unknown error') };
+    }
   };
 
   const deleteQuote = async (id: string) => {

@@ -169,19 +169,10 @@ export class QuoteActionsService {
   // Get user statistics
   static async getUserStats(startDate?: string, endDate?: string): Promise<UserStats[]> {
     try {
-      // First, get all quote actions with quote data
+      // First, get all quote actions
       let actionsQuery = supabase
         .from('quote_actions')
-        .select(`
-          user_id, 
-          action_type, 
-          timestamp,
-          quote_id,
-          quotes(
-            id,
-            parts_requested
-          )
-        `)
+        .select('user_id, action_type, timestamp, quote_id')
         .order('timestamp', { ascending: false });
 
       if (startDate) {
@@ -198,11 +189,40 @@ export class QuoteActionsService {
         return [];
       }
 
+
+      // Get unique quote IDs and fetch quote data separately
+      const quoteIds = [...new Set(actions?.map(action => action.quote_id) || [])];
+
+      const { data: quotes, error: quotesError } = await supabase
+        .from('quotes')
+        .select('id, parts_requested')
+        .in('id', quoteIds);
+
+      if (quotesError) {
+        console.error('Error fetching quotes for user stats:', quotesError);
+        return [];
+      }
+
+
+      // Create a map of quote ID to quote data
+      const quotesMap = new Map(quotes?.map(quote => [quote.id, quote]) || []);
+      console.log('🔍 Quotes map:', quotesMap);
+
       // Helper function to calculate quote total value
-      const calculateQuoteValue = (partsRequested: any[]): number => {
-        if (!Array.isArray(partsRequested)) return 0;
+      const calculateQuoteValue = (partsRequested: any): number => {
+        // Handle JSON string case
+        let partsArray = partsRequested;
+        if (typeof partsRequested === 'string') {
+          try {
+            partsArray = JSON.parse(partsRequested);
+          } catch (e) {
+            return 0;
+          }
+        }
         
-        return partsRequested.reduce((total, part) => {
+        if (!Array.isArray(partsArray)) return 0;
+        
+        return partsArray.reduce((total, part) => {
           if (!part.variants || !Array.isArray(part.variants)) return total;
           
           const defaultVariant = part.variants.find((v: any) => v.is_default === true);
@@ -217,7 +237,8 @@ export class QuoteActionsService {
 
       (actions || []).forEach(action => {
         const userId = action.user_id;
-        const quoteValue = calculateQuoteValue(action.quotes?.[0]?.parts_requested || []);
+        const quote = quotesMap.get(action.quote_id);
+        const quoteValue = calculateQuoteValue(quote?.parts_requested || []);
         
         if (!userStatsMap.has(userId)) {
           userStatsMap.set(userId, {
@@ -225,11 +246,14 @@ export class QuoteActionsService {
             user_email: 'User',
             user_name: 'User',
             quotes_created: 0,
+            parts_created: 0,
             quotes_priced: 0,
+            quotes_verified: 0,
             quotes_completed: 0,
             total_quotes: 0,
             total_value_created: 0,
             total_value_priced: 0,
+            total_value_verified: 0,
             total_value_completed: 0
           });
         }
@@ -241,10 +265,42 @@ export class QuoteActionsService {
           case 'CREATED':
             stats.quotes_created++;
             stats.total_value_created += quoteValue;
+            // Count parts created when quote is created
+            const partsRequested = quote?.parts_requested;
+            console.log('🔍 CREATED action debug:', {
+              quoteId: action.quote_id,
+              userId: action.user_id,
+              quote: quote,
+              partsRequested: partsRequested,
+              type: typeof partsRequested,
+              isArray: Array.isArray(partsRequested),
+              length: Array.isArray(partsRequested) ? partsRequested.length : 'N/A'
+            });
+            
+            // Handle JSON string case
+            let partsArray = partsRequested;
+            if (typeof partsRequested === 'string') {
+              try {
+                partsArray = JSON.parse(partsRequested);
+              } catch (e) {
+                console.log('❌ Failed to parse JSON string:', e);
+                partsArray = null;
+              }
+            }
+            
+            if (Array.isArray(partsArray)) {
+              stats.parts_created += partsArray.length;
+            } else {
+              console.log('❌ Parts not counted - partsRequested is not an array:', partsRequested, 'parsed:', partsArray);
+            }
             break;
           case 'PRICED':
             stats.quotes_priced++;
             stats.total_value_priced += quoteValue;
+            break;
+          case 'VERIFIED':
+            stats.quotes_verified++;
+            stats.total_value_verified += quoteValue;
             break;
           case 'COMPLETED':
             stats.quotes_completed++;
@@ -257,13 +313,13 @@ export class QuoteActionsService {
       });
 
       // Convert map to array and get user information
-      const userIds = Array.from(userStatsMap.keys());
+      const finalUserIds = Array.from(userStatsMap.keys());
       
       // Fetch user data from user_profiles table
       const { data: userProfiles, error: usersError } = await supabase
         .from('user_profiles')
         .select('id, username, full_name')
-        .in('id', userIds);
+        .in('id', finalUserIds);
       
       if (usersError) {
         console.error('Error fetching user profiles for stats:', usersError);

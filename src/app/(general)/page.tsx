@@ -328,6 +328,7 @@ export default function HomePage() {
             currentPageName="home"
           />
         </div>
+
       </div>
     </ProtectedRoute>
   );

@@ -299,80 +299,11 @@ export const useQuotes = () => {
     }
   };
 
-  // Real-time subscriptions
+  // Initial data fetch (realtime is now handled by RealtimeProvider)
   useEffect(() => {
-    
-    // Subscribe to quotes table changes
-    const quotesSubscription = supabase
-      .channel('quotes-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'quotes'
-        },
-        (payload) => {
-          // Refresh both quotes and parts since status depends on parts data
-          fetchQuotes();
-          fetchParts();
-        }
-      )
-      .subscribe((status) => {
-        // console.log('Quotes subscription status:', status);
-      });
-
-    // Subscribe to parts table changes
-    const partsSubscription = supabase
-      .channel('parts-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'parts'
-        },
-        (payload) => {
-          // Refresh both quotes and parts since status depends on parts data
-          fetchQuotes();
-          fetchParts();
-        }
-      )
-      .subscribe((status) => {
-        // console.log('Parts subscription status:', status);
-      });
-
-    // Subscribe to quote_parts table changes
-    const quotePartsSubscription = supabase
-      .channel('quote-parts-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'quote_parts'
-        },
-        (payload) => {
-          // Refresh quotes when quote_parts change since pricing affects quote status
-          fetchQuotes();
-          fetchParts();
-        }
-      )
-      .subscribe((status) => {
-        // console.log('Quote parts subscription status:', status);
-      });
-
-    // Initial data fetch
     fetchQuotes();
     fetchParts();
     testSupabaseConnection();
-
-    // Cleanup subscriptions on unmount
-    return () => {
-      quotesSubscription.unsubscribe();
-      partsSubscription.unsubscribe();
-      quotePartsSubscription.unsubscribe();
-    };
   }, []);
 
   const addQuote = async (fields: Record<string, string>, partIds: string[]) => {

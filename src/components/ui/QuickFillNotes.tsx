@@ -21,7 +21,7 @@ const QuickFillNotes: React.FC<QuickFillNotesProps> = ({
     location?: string;
     availableIn?: string;
     brand?: string;
-    info?: string;
+    info?: string[];
     eta?: string;
   }>({});
 
@@ -38,11 +38,12 @@ const QuickFillNotes: React.FC<QuickFillNotesProps> = ({
           items.availableIn = part.replace('AVAILABLE IN ', '').trim();
         } else if (part.startsWith('ETA ')) {
           items.eta = part.replace('ETA ', '').trim();
-        } else if (['STOCK ARRIVING', 'ON BACKORDER', 'INVOICE PRICE: $', 'COMPLETE FAN ASSEMBLY'].includes(part.toUpperCase())) {
-          items.info = part.toUpperCase();
-        } else if (['GENUINE WITH BRACKET', 'GENUINE WITHOUT BRACKET'].includes(part.toUpperCase())) {
-          items.info = part.toUpperCase();
-        } else if (['GENUINE WITH LOGO', 'ZILAX', 'CRYOMAX', 'KOYO', 'DELPHI', 'MAHLE', 'DENSO', 'DELANG', 'NRF'].includes(part.toUpperCase())) {
+        } else if (['STOCK ARRIVING', 'ON BACKORDER', 'INVOICE PRICE: $', 'COMPLETE FAN ASSEMBLY', 'GENUINE WITH BRACKET', 'GENUINE WITHOUT BRACKET'].includes(part.toUpperCase())) {
+          if (!items.info) items.info = [];
+          if (!items.info.includes(part.toUpperCase())) {
+            items.info.push(part.toUpperCase());
+          }
+        } else if (['GENUINE WITH LOGO', 'ZILAX', 'CRYOMAX', 'KOYO', 'DELPHI', 'MAHLE', 'DENSO', 'DELANG', 'NRF', 'HELLA', 'VALEO'].includes(part.toUpperCase())) {
           items.brand = part.toUpperCase();
         } else if (part.toUpperCase() === 'GENUINE') {
           items.brand = 'GENUINE';
@@ -119,15 +120,37 @@ const QuickFillNotes: React.FC<QuickFillNotesProps> = ({
   const handleSelect = (section: string, value: string, displayValue: string) => {
     const newSelectedItems = { ...selectedItems };
     
-    // Replace existing item in the same section (no need to delete first)
-    newSelectedItems[section as keyof typeof newSelectedItems] = displayValue;
+    if (section === 'info') {
+      // Handle multiple selection for info items
+      if (!newSelectedItems.info) newSelectedItems.info = [];
+      if (newSelectedItems.info.includes(displayValue)) {
+        // Remove if already selected
+        newSelectedItems.info = newSelectedItems.info.filter(item => item !== displayValue);
+      } else {
+        // Add if not selected
+        newSelectedItems.info.push(displayValue);
+      }
+    } else {
+      // Replace existing item in the same section (no need to delete first)
+      if (section === 'location') {
+        newSelectedItems.location = displayValue;
+      } else if (section === 'availableIn') {
+        newSelectedItems.availableIn = displayValue;
+      } else if (section === 'brand') {
+        newSelectedItems.brand = displayValue;
+      } else if (section === 'eta') {
+        newSelectedItems.eta = displayValue;
+      }
+    }
     
     // Build the final string by combining existing text with new quick fill items
     const parts = [];
     if (newSelectedItems.location) parts.push(`EX ${newSelectedItems.location.toUpperCase()}`);
     if (newSelectedItems.availableIn) parts.push(`AVAILABLE IN ${newSelectedItems.availableIn.toUpperCase()}`);
     if (newSelectedItems.brand) parts.push(newSelectedItems.brand);
-    if (newSelectedItems.info) parts.push(newSelectedItems.info);
+    if (newSelectedItems.info && newSelectedItems.info.length > 0) {
+      parts.push(...newSelectedItems.info);
+    }
     if (newSelectedItems.eta) parts.push(`ETA ${newSelectedItems.eta}`);
     
     // Combine quick fill items with any existing custom text
@@ -158,7 +181,9 @@ const QuickFillNotes: React.FC<QuickFillNotesProps> = ({
         /\bMAHLE\b/g,
         /\bDENSO\b/g,
         /\bDELANG\b/g,
-        /\bNRF\b/g
+        /\bNRF\b/g,
+        /\bHELLA\b/g,
+        /\bVALEO\b/g
       ];
       
       let customText = existingText;
@@ -183,15 +208,29 @@ const QuickFillNotes: React.FC<QuickFillNotesProps> = ({
     }, 50);
   };
 
-  const removeItem = (section: string) => {
+  const removeItem = (section: string, itemValue?: string) => {
     const newSelectedItems = { ...selectedItems };
-    delete newSelectedItems[section as keyof typeof newSelectedItems];
+    
+    if (section === 'info' && itemValue) {
+      // Remove specific info item
+      if (newSelectedItems.info) {
+        newSelectedItems.info = newSelectedItems.info.filter(item => item !== itemValue);
+        if (newSelectedItems.info.length === 0) {
+          delete newSelectedItems.info;
+        }
+      }
+    } else {
+      // Remove entire section
+      delete newSelectedItems[section as keyof typeof newSelectedItems];
+    }
     
     const parts = [];
     if (newSelectedItems.location) parts.push(`EX ${newSelectedItems.location.toUpperCase()}`);
     if (newSelectedItems.availableIn) parts.push(`AVAILABLE IN ${newSelectedItems.availableIn.toUpperCase()}`);
     if (newSelectedItems.brand) parts.push(newSelectedItems.brand);
-    if (newSelectedItems.info) parts.push(newSelectedItems.info);
+    if (newSelectedItems.info && newSelectedItems.info.length > 0) {
+      parts.push(...newSelectedItems.info);
+    }
     if (newSelectedItems.eta) parts.push(`ETA ${newSelectedItems.eta}`);
     
     // Combine remaining quick fill items with any existing custom text
@@ -222,7 +261,9 @@ const QuickFillNotes: React.FC<QuickFillNotesProps> = ({
         /\bMAHLE\b/g,
         /\bDENSO\b/g,
         /\bDELANG\b/g,
-        /\bNRF\b/g
+        /\bNRF\b/g,
+        /\bHELLA\b/g,
+        /\bVALEO\b/g
       ];
       
       let customText = existingText;
@@ -259,7 +300,7 @@ const QuickFillNotes: React.FC<QuickFillNotesProps> = ({
     }
     
     const rect = triggerRef.current.getBoundingClientRect();
-    const popupWidth = 700; // Width of the popup (5 columns)
+    const popupWidth = 800; // Width of the popup (5 columns)
     const popupHeight = 320; // Approximate height of the popup
     
     // Calculate initial position
@@ -296,7 +337,7 @@ const QuickFillNotes: React.FC<QuickFillNotesProps> = ({
   return createPortal(
     <div
       ref={popupRef}
-      className="fixed z-[9999] w-[700px] bg-white border border-gray-200 rounded-lg shadow-lg max-h-80 overflow-y-auto"
+      className="fixed z-[9999] w-[800px] bg-white border border-gray-200 rounded-lg shadow-lg max-h-200 overflow-y-auto"
       style={{
         top: position.top,
         left: position.left,
@@ -307,7 +348,7 @@ const QuickFillNotes: React.FC<QuickFillNotesProps> = ({
         <h3 className="text-xs font-semibold text-gray-700 mb-2">NOTES PREVIEW</h3>
         <textarea
           value={currentValue}
-          onChange={(e) => onSelect(e.target.value.toUpperCase())}
+          onChange={(e) => onSelect(e.target.value)}
           placeholder="Click quick fill options above or type custom notes here..."
           className="w-full px-2 py-1 text-xs border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
           rows={2}
@@ -348,17 +389,17 @@ const QuickFillNotes: React.FC<QuickFillNotesProps> = ({
                 </button>
               </span>
             )}
-            {selectedItems.info && (
-              <span className="px-2 py-1 text-xs bg-orange-100 text-orange-700 rounded-md flex items-center gap-1">
-                {selectedItems.info}
+            {selectedItems.info && selectedItems.info.map((infoItem, index) => (
+              <span key={index} className="px-2 py-1 text-xs bg-orange-100 text-orange-700 rounded-md flex items-center gap-1">
+                {infoItem}
                 <button
-                  onClick={() => removeItem('info')}
+                  onClick={() => removeItem('info', infoItem)}
                   className="text-orange-500 hover:text-orange-700"
                 >
                   ×
                 </button>
               </span>
-            )}
+            ))}
             {selectedItems.eta && (
               <span className="px-2 py-1 text-xs bg-red-100 text-red-700 rounded-md flex items-center gap-1">
                 ETA {selectedItems.eta}
@@ -431,7 +472,7 @@ const QuickFillNotes: React.FC<QuickFillNotesProps> = ({
           <h3 className="text-xs font-semibold text-purple-700 mb-2 text-center">BRANDS</h3>
           <div className="space-y-1">
             {[
-              'GENUINE', 'GENUINE WITH LOGO', 'ZILAX', 'CRYOMAX', 'KOYO', 'DELPHI', 'MAHLE', 'DENSO', 'DELANG', 'NRF'
+              'GENUINE', 'GENUINE WITH LOGO', 'ZILAX', 'CRYOMAX', 'KOYO', 'DELPHI', 'MAHLE', 'DENSO', 'DELANG', 'NRF', 'HELLA', 'VALEO'
             ].map((brand) => (
               <button
                 key={brand}
@@ -470,7 +511,7 @@ const QuickFillNotes: React.FC<QuickFillNotesProps> = ({
                     handleSelect('info', stock, stock);
                   }}
                   className={`w-full px-2 py-1 text-xs rounded-md transition-colors truncate ${
-                    selectedItems.info === stock
+                    selectedItems.info && selectedItems.info.includes(stock)
                       ? 'bg-orange-200 text-orange-800'
                       : 'bg-orange-100 text-orange-700 hover:bg-orange-200'
                   }`}
@@ -495,7 +536,7 @@ const QuickFillNotes: React.FC<QuickFillNotesProps> = ({
                     handleSelect('info', info, info);
                   }}
                   className={`w-full px-2 py-1 text-xs rounded-md transition-colors truncate ${
-                    selectedItems.info === info
+                    selectedItems.info && selectedItems.info.includes(info)
                       ? 'bg-orange-200 text-orange-800'
                       : 'bg-orange-100 text-orange-700 hover:bg-orange-200'
                   }`}
@@ -513,7 +554,7 @@ const QuickFillNotes: React.FC<QuickFillNotesProps> = ({
           <h3 className="text-xs font-semibold text-red-700 mb-2 text-center">ETA</h3>
           <div className="space-y-1">
             {[
-              '1 DAY', '2 DAYS', '3 DAYS', '5 DAYS', '1 WEEK', '2 WEEKS', '3 WEEKS', '1 MONTH', '2 MONTHS'
+              'NEXT DAY', '1 DAY', '2 DAYS', '3 DAYS', '5 DAYS', '1 WEEK', '2 WEEKS', '3 WEEKS', '1 MONTH', '2 MONTHS'
             ].map((eta) => (
               <button
                 key={eta}

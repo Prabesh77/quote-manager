@@ -2099,11 +2099,10 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                       </div>
 
                       {/* Column 2: Customer Details */}
-                      <div className="flex flex-col space-y-1">
+                      <div className="flex flex-col space-y-1 max-w-64">
                         {/* Customer Name and Address */}
-                        <div className="flex items-center space-x-1 text-sm">
-
-                          <span className="font-medium text-gray-900">
+                        <div className="flex items-start">
+                          <span className="font-medium text-sm text-gray-900 text-left capitalize" title={quote.customer || 'Unknown Customer'}>
                             {quote.customer || 'Unknown Customer'}
                             {quote.settlement && quote.settlement > 0 && (
                               <span className="text-blue-600 font-medium"> ({quote.settlement}%)</span>
@@ -2111,11 +2110,19 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                           </span>
                         </div>
                         {quote.address && (
-                          <div className="flex items-center space-x-1 text-xs">
-                            <MapPin className="h-3 w-3 text-gray-400 flex-shrink-0" />
-                            <span className="text-gray-600 truncate " title={quote.address}>
+                          <div className="flex items-start space-x-1 text-xs">
+                            <MapPin className="h-3 w-3 text-gray-400 flex-shrink-0 mt-0.5" />
+                            <span className="text-gray-600 text-left capitalize leading-tight flex-1" title={quote.address}>
                               {quote.address}
                             </span>
+                            {typeof window !== 'undefined' && window.location.pathname === '/pricing' && (
+                              <CopyButton 
+                                text={quote.address}
+                                title="Copy address"
+                                size="sm"
+                                className="text-gray-400 hover:text-gray-600 flex-shrink-0"
+                              />
+                            )}
                           </div>
                         )}
                       </div>
@@ -2756,9 +2763,9 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                         </div>
 
                         {/* Customer Details */}
-                        <div className="flex flex-col space-y-1">
-                          <div className="flex items-center space-x-1 text-xs">
-                            <span className="font-medium text-gray-900 text-left">
+                        <div className="flex flex-col space-y-1 w-48">
+                          <div className="flex items-start">
+                            <span className="font-medium text-gray-900 text-left capitalize leading-tight" title={quote.customer || 'Unknown Customer'}>
                               {quote.customer || 'Unknown Customer'}
                               {quote.settlement && quote.settlement > 0 && (
                                 <span className="text-blue-600 font-medium"> ({quote.settlement}%)</span>
@@ -2766,11 +2773,19 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                             </span>
                           </div>
                           {quote.address && (
-                            <div className="flex items-center space-x-1 text-xs">
-                              <MapPin className="h-3 w-3 text-gray-400 flex-shrink-0" />
-                              <span className="text-gray-600 truncate text-left" title={quote.address}>
+                            <div className="flex items-start space-x-1 text-xs">
+                              <MapPin className="h-3 w-3 text-gray-400 flex-shrink-0 mt-0.5" />
+                              <span className="text-gray-600 text-left capitalize leading-tight flex-1" title={quote.address}>
                                 {quote.address}
                               </span>
+                              {typeof window !== 'undefined' && window.location.pathname === '/pricing' && (
+                                <CopyButton 
+                                  text={quote.address}
+                                  title="Copy address"
+                                  size="sm"
+                                  className="text-gray-400 hover:text-gray-600 flex-shrink-0"
+                                />
+                              )}
                             </div>
                           )}
                         </div>

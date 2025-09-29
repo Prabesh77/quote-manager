@@ -2104,9 +2104,9 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                         <div className="flex items-start">
                           <span className="font-medium text-sm text-gray-900 text-left capitalize" title={quote.customer || 'Unknown Customer'}>
                             {quote.customer || 'Unknown Customer'}
-                            {quote.settlement && quote.settlement > 0 && (
+                            {quote.settlement && Number(quote.settlement) > 0 ? (
                               <span className="text-blue-600 font-medium"> ({quote.settlement}%)</span>
-                            )}
+                            ): null}
                           </span>
                         </div>
                         {quote.address && (
@@ -2767,9 +2767,9 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                           <div className="flex items-start">
                             <span className="font-medium text-gray-900 text-left capitalize leading-tight" title={quote.customer || 'Unknown Customer'}>
                               {quote.customer || 'Unknown Customer'}
-                              {quote.settlement && quote.settlement > 0 && (
+                              {quote.settlement && Number(quote.settlement) > 0 ? (
                                 <span className="text-blue-600 font-medium"> ({quote.settlement}%)</span>
-                              )}
+                              ):null}
                             </span>
                           </div>
                           {quote.address && (

@@ -132,7 +132,15 @@ const QuickFillNotes: React.FC<QuickFillNotesProps> = ({
       }
     } else {
       // Replace existing item in the same section (no need to delete first)
-      newSelectedItems[section as keyof typeof newSelectedItems] = displayValue;
+      if (section === 'location') {
+        newSelectedItems.location = displayValue;
+      } else if (section === 'availableIn') {
+        newSelectedItems.availableIn = displayValue;
+      } else if (section === 'brand') {
+        newSelectedItems.brand = displayValue;
+      } else if (section === 'eta') {
+        newSelectedItems.eta = displayValue;
+      }
     }
     
     // Build the final string by combining existing text with new quick fill items

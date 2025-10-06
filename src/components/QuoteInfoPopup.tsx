@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Info, User, DollarSign, CheckCircle, Calendar, X, Edit3, Trash2, XCircle } from 'lucide-react';
+import { Info, User, DollarSign, CheckCircle, Calendar, X } from 'lucide-react';
 import { QuoteActionsService } from '@/services/quoteActions/quoteActionsService';
 import { QuoteActionWithUser } from '@/types/quoteActions';
 
@@ -10,12 +10,9 @@ interface QuoteInfoPopupProps {
   isOpen: boolean;
   onClose: () => void;
   triggerRef: React.RefObject<HTMLElement>;
-  onEditQuote?: () => void;
-  onDeleteQuote?: () => void;
-  onMarkAsWrong?: () => void;
 }
 
-const QuoteInfoPopup: React.FC<QuoteInfoPopupProps> = ({ quoteId, isOpen, onClose, triggerRef, onEditQuote, onDeleteQuote, onMarkAsWrong }) => {
+const QuoteInfoPopup: React.FC<QuoteInfoPopupProps> = ({ quoteId, isOpen, onClose, triggerRef }) => {
   const [actions, setActions] = useState<QuoteActionWithUser[]>([]);
   const [loading, setLoading] = useState(false);
   const [position, setPosition] = useState({ top: 0, left: 0 });
@@ -82,6 +79,8 @@ const QuoteInfoPopup: React.FC<QuoteInfoPopupProps> = ({ quoteId, isOpen, onClos
         return <User className="h-4 w-4 text-blue-600" />;
       case 'PRICED':
         return <DollarSign className="h-4 w-4 text-green-600" />;
+      case 'VERIFIED':
+        return <CheckCircle className="h-4 w-4 text-emerald-600" />;
       case 'COMPLETED':
         return <CheckCircle className="h-4 w-4 text-purple-600" />;
       default:
@@ -95,6 +94,8 @@ const QuoteInfoPopup: React.FC<QuoteInfoPopupProps> = ({ quoteId, isOpen, onClos
         return 'text-blue-600 bg-blue-50';
       case 'PRICED':
         return 'text-green-600 bg-green-50';
+      case 'VERIFIED':
+        return 'text-emerald-600 bg-emerald-50';
       case 'COMPLETED':
         return 'text-purple-600 bg-purple-50';
       default:
@@ -144,53 +145,6 @@ const QuoteInfoPopup: React.FC<QuoteInfoPopupProps> = ({ quoteId, isOpen, onClos
           </button>
         </div>
 
-        {/* Action Buttons */}
-        {(onEditQuote || onDeleteQuote || onMarkAsWrong) && (
-          <div className="flex items-center space-x-2 mb-3 pb-3 border-b border-gray-200">
-            {onEditQuote && (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onEditQuote();
-                  onClose();
-                }}
-                className="flex items-center space-x-1 px-2 py-1 text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded transition-colors cursor-pointer"
-                title="Edit quote details"
-              >
-                <Edit3 className="h-4 w-4" />
-                <span className="text-sm">Edit</span>
-              </button>
-            )}
-            {onMarkAsWrong && (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onMarkAsWrong();
-                  onClose();
-                }}
-                className="flex items-center space-x-1 px-2 py-1 text-orange-600 hover:text-orange-700 hover:bg-orange-50 rounded transition-colors cursor-pointer"
-                title="Mark as wrong"
-              >
-                <XCircle className="h-4 w-4" />
-                <span className="text-sm">Mark Wrong</span>
-              </button>
-            )}
-            {onDeleteQuote && (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onDeleteQuote();
-                  onClose();
-                }}
-                className="flex items-center space-x-1 px-2 py-1 text-red-600 hover:text-red-700 hover:bg-red-50 rounded transition-colors cursor-pointer"
-                title="Delete quote"
-              >
-                <Trash2 className="h-4 w-4" />
-                <span className="text-sm">Delete</span>
-              </button>
-            )}
-          </div>
-        )}
 
         {/* Content */}
         <div className="space-y-3">

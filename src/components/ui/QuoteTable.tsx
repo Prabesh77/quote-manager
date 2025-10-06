@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useState, useEffect, useMemo, useCallback, useRef, forwardRef, useImperativeHandle } from 'react';
-import { ChevronDown, Edit, Save, X, Search, Copy, CheckCircle, AlertTriangle, ShoppingCart, Package, Plus, Info, MapPin, Send, Loader2, LayoutGrid, List, Eye, RefreshCw } from 'lucide-react';
+import { ChevronDown, Edit, Save, X, Search, Copy, CheckCircle, AlertTriangle, ShoppingCart, Package, Plus, Info, MapPin, Send, Loader2, LayoutGrid, List, Eye, RefreshCw, MoreVertical } from 'lucide-react';
+import { Popover, PopoverContent, PopoverTrigger } from './popover';
 import CopyButton from './CopyButton';
 
 // Helper function to get display quote reference (without RC suffix) and check if it's from RepairConnection
@@ -156,6 +157,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
   // Info popup state
   const [infoPopupOpen, setInfoPopupOpen] = useState<string | null>(null);
   const [infoTriggerElement, setInfoTriggerElement] = useState<HTMLElement | null>(null);
+
 
   // Pagination state (used only when server-driven props are not provided)
   const [currentPage, setCurrentPage] = useState(1);
@@ -2000,7 +2002,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
           <>
             {/* Table Header */}
             <div className="bg-white border-b border-gray-200 sticky top-0 z-10">
-              <div className="grid grid-cols-4 px-6 py-4" style={{ gridTemplateColumns: '1fr 1fr 1fr 1fr' }}>
+              <div className="grid grid-cols-4 px-6 py-4 gap-2" style={{ gridTemplateColumns: '1fr 1fr 1fr 1fr' }}>
                 <div className="font-semibold text-gray-900">Quote</div>
                 <div className="font-semibold text-gray-900">Customer</div>
                 <div className="font-semibold text-gray-900">Vehicle</div>
@@ -2193,8 +2195,56 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                 {quoteParts.length}
                               </span>
                             </div>
-                            <div className="flex space-y-1">
+                            <div className="flex items-center space-x-1">
                               {getStatusChip(status)}
+                              {/* Kebab Menu for Actions */}
+                              <Popover>
+                                <PopoverTrigger asChild>
+                                  <button
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors cursor-pointer"
+                                    title="Actions"
+                                  >
+                                    <MoreVertical className="h-4 w-4" />
+                                  </button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-48 p-2" align="end">
+                                  <div className="space-y-1">
+                                    <button
+                                      onClick={() => {
+                                        const currentQuote = quotes.find(q => q.id === quote.id);
+                                        if (currentQuote) {
+                                          handleEditQuote(currentQuote);
+                                        }
+                                      }}
+                                      className="w-full flex items-center space-x-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded transition-colors cursor-pointer"
+                                    >
+                                      <Edit className="h-4 w-4" />
+                                      <span>Edit Quote</span>
+                                    </button>
+                                    
+                                    <button
+                                      onClick={() => {
+                                        handleDeleteWithConfirm(quote.id);
+                                      }}
+                                      className="w-full flex items-center space-x-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded transition-colors cursor-pointer"
+                                    >
+                                      <X className="h-4 w-4" />
+                                      <span>Delete Quote</span>
+                                    </button>
+                                    
+                                    <button
+                                      onClick={() => {
+                                        handleMarkAsWrong(quote.id);
+                                      }}
+                                      className="w-full flex items-center space-x-2 px-3 py-2 text-sm text-orange-600 hover:bg-orange-50 rounded transition-colors cursor-pointer"
+                                    >
+                                      <AlertTriangle className="h-4 w-4" />
+                                      <span>Mark as Wrong</span>
+                                    </button>
+                                  </div>
+                                </PopoverContent>
+                              </Popover>
                             </div>
                           </div>
 
@@ -2873,8 +2923,56 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                             </span>
 
                             {/* Status */}
-                            <div className="flex justify-end">
+                            <div className="flex items-center justify-end space-x-1">
                               {getStatusChip(status)}
+                              {/* Kebab Menu for Actions */}
+                              <Popover>
+                                <PopoverTrigger asChild>
+                                  <button
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors cursor-pointer"
+                                    title="Actions"
+                                  >
+                                    <MoreVertical className="h-4 w-4" />
+                                  </button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-48 p-2" align="end">
+                                  <div className="space-y-1">
+                                    <button
+                                      onClick={() => {
+                                        const currentQuote = quotes.find(q => q.id === quote.id);
+                                        if (currentQuote) {
+                                          handleEditQuote(currentQuote);
+                                        }
+                                      }}
+                                      className="w-full flex items-center space-x-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded transition-colors cursor-pointer"
+                                    >
+                                      <Edit className="h-4 w-4" />
+                                      <span>Edit Quote</span>
+                                    </button>
+                                    
+                                    <button
+                                      onClick={() => {
+                                        handleDeleteWithConfirm(quote.id);
+                                      }}
+                                      className="w-full flex items-center space-x-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded transition-colors cursor-pointer"
+                                    >
+                                      <X className="h-4 w-4" />
+                                      <span>Delete Quote</span>
+                                    </button>
+                                    
+                                    <button
+                                      onClick={() => {
+                                        handleMarkAsWrong(quote.id);
+                                      }}
+                                      className="w-full flex items-center space-x-2 px-3 py-2 text-sm text-orange-600 hover:bg-orange-50 rounded transition-colors cursor-pointer"
+                                    >
+                                      <AlertTriangle className="h-4 w-4" />
+                                      <span>Mark as Wrong</span>
+                                    </button>
+                                  </div>
+                                </PopoverContent>
+                              </Popover>
                             </div>
 
                             {/* Action buttons for mobile */}
@@ -3540,20 +3638,8 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
           isOpen={true}
           onClose={() => setInfoPopupOpen(null)}
           triggerRef={{ current: infoTriggerElement }}
-          onEditQuote={() => {
-            const quote = quotes.find(q => q.id === infoPopupOpen);
-            if (quote) {
-              handleEditQuote(quote);
-            }
-          }}
-          onDeleteQuote={() => {
-            handleDeleteWithConfirm(infoPopupOpen);
-          }}
-          onMarkAsWrong={() => {
-            handleMarkAsWrong(infoPopupOpen);
-          }}
         />
       )}
     </div>
   );
-} 
+}

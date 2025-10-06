@@ -122,6 +122,7 @@ const fetchQuotes = async (page: number = 1, limit: number = 20, filters?: { sta
         notes: normalizedQuote.notes || undefined,
         status: normalizedQuote.status as Quote['status'],
         taxInvoiceNumber: normalizedQuote.tax_invoice_number || undefined,
+        source: normalizedQuote.source || 'unknown',
       };
 
       return legacyQuote;

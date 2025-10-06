@@ -3,6 +3,14 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef, forwardRef, useImperativeHandle } from 'react';
 import { ChevronDown, Edit, Save, X, Search, Copy, CheckCircle, AlertTriangle, ShoppingCart, Package, Plus, Info, MapPin, Send, Loader2, LayoutGrid, List, Eye, RefreshCw } from 'lucide-react';
 import CopyButton from './CopyButton';
+
+// Helper function to get display quote reference (without RC suffix) and check if it's from RepairConnection
+const getQuoteRefDisplay = (quoteRef: string, source?: string) => {
+  const isRepairConnection = source === 'repairconnection' || quoteRef.endsWith(' RC');
+  const displayRef = isRepairConnection ? quoteRef.replace(' RC', '') : quoteRef;
+  return { displayRef, isRepairConnection };
+};
+
 import { useQueryClient } from '@tanstack/react-query';
 import { Quote, Part } from './useQuotes';
 
@@ -2030,29 +2038,50 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
 
                     <AccordionTrigger className="py-2 grid grid-cols-4 gap-4 w-full px-3 hover:bg-gray-50 transition-colors cursor-pointer" style={{ gridTemplateColumns: '1fr 1fr 1fr 1fr' }}>
                       {/* Column 1: Quote Details (Ref + VIN) */}
-                      <div className="flex flex-col space-y-2 ml-4">
+                      <div className="flex flex-col space-y-1 ml-4">
 
                         <div className="flex items-center  w-full space-x-2">
-                          {/* Time Indicator on the right side */}
-                          {quote.status !== 'completed' && quote.status !== 'ordered' && quote.status !== 'delivered' && (() => {
-                            const deadlineInfo = getDeadlineIndicator(quote.requiredBy);
-                            if (!deadlineInfo) return null;
+                          {/* RC Indicator or Time Indicator */}
+                          {(() => {
+                            const { isRepairConnection } = getQuoteRefDisplay(quote.quoteRef || '', quote.source);
+                            
+                            // Show RC indicator if quote is from RepairConnection
+                            if (isRepairConnection) {
+                              return (
+                                <div className="px-2 py-0.5 text-xs font-semibold border shadow-sm rounded bg-purple-100 text-purple-700 border-purple-200">
+                                  RC
+                                </div>
+                              );
+                            }
+                            
+                            // Show time indicator for non-RC quotes (existing logic)
+                            if (quote.status !== 'completed' && quote.status !== 'ordered' && quote.status !== 'delivered') {
+                              const deadlineInfo = getDeadlineIndicator(quote.requiredBy);
+                              if (!deadlineInfo) return null;
 
-                            return (
-                              <div className={`px-1 py-0.5 text-xs font-semibold border shadow-sm rounded ${deadlineInfo.color} relative`}>
-                                {deadlineInfo.timeDisplay}
-                                {/* Small ping circle in top-right corner */}
-                                {deadlineInfo.animation === '' && (deadlineInfo.color.includes('red')) && (
-                                  <div className="absolute -top-1 -right-1 w-2 h-2 bg-red-300 rounded-full animate-ping shadow-lg border border-red-600"></div>
-                                )}
-                              </div>
-                            );
+                              return (
+                                <div className={`px-1 py-0.5 text-xs font-semibold border shadow-sm rounded ${deadlineInfo.color} relative`}>
+                                  {deadlineInfo.timeDisplay}
+                                  {/* Small ping circle in top-right corner */}
+                                  {deadlineInfo.animation === '' && (deadlineInfo.color.includes('red')) && (
+                                    <div className="absolute -top-1 -right-1 w-2 h-2 bg-red-300 rounded-full animate-ping shadow-lg border border-red-600"></div>
+                                  )}
+                                </div>
+                              );
+                            }
+                            
+                            return null;
                           })()}
                           <div className="flex items-center space-x-2">
                             <>
-                              <span className={`text-sm font-bold ${hasSpecialCharacters(quote.quoteRef || '') ? 'text-blue-600 bg-blue-50 px-2 py-0 rounded border border-blue-200 shadow-sm' : 'text-gray-900'}`}>
-                                {quote.quoteRef}
-                              </span>
+                               {(() => {
+                                 const { displayRef } = getQuoteRefDisplay(quote.quoteRef || '', quote.source);
+                                 return (
+                                   <span className={`text-[15px] font-semibold ${hasSpecialCharacters(quote.quoteRef || '') ? 'text-blue-600 bg-blue-50 px-2 py-1 rounded border border-blue-200 shadow-sm' : 'text-gray-900'}`}>
+                                     {displayRef}
+                                   </span>
+                                 );
+                               })()}
                               <CopyButton
                                 text={quote.quoteRef || ''}
                                 title="Copy quote ref"
@@ -2715,28 +2744,49 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                         <div className="flex flex-col space-y-2">
                           <div className="flex items-center w-full">
 
-                            {/* Time Indicator on the left side for mobile */}
-                            {quote.status !== 'completed' && quote.status !== 'ordered' && quote.status !== 'delivered' && (() => {
-                              const deadlineInfo = getDeadlineIndicator(quote.requiredBy);
-                              if (!deadlineInfo) return null;
+                            {/* RC Indicator or Time Indicator for mobile */}
+                            {(() => {
+                              const { isRepairConnection } = getQuoteRefDisplay(quote.quoteRef || '', quote.source);
+                              
+                              // Show RC indicator if quote is from RepairConnection
+                              if (isRepairConnection) {
+                                return (
+                                  <div className="px-2 py-1 text-xs font-semibold border shadow-sm rounded bg-purple-100 text-purple-700 border-purple-200 mr-2">
+                                    RC
+                                  </div>
+                                );
+                              }
+                              
+                              // Show time indicator for non-RC quotes (existing logic)
+                              if (quote.status !== 'completed' && quote.status !== 'ordered' && quote.status !== 'delivered') {
+                                const deadlineInfo = getDeadlineIndicator(quote.requiredBy);
+                                if (!deadlineInfo) return null;
 
-                              return (
-                                <div className={`px-1 py-0.5 text-xs font-semibold border shadow-sm rounded ${deadlineInfo.color} relative mr-2`}>
-                                  {deadlineInfo.timeDisplay}
-                                  {/* Small ping circle in top-right corner */}
-                                  {deadlineInfo.animation === '' && (deadlineInfo.color.includes('red') || deadlineInfo.color.includes('yellow')) && (
-                                    <div className="absolute -top-1 -right-1 w-2 h-2 bg-red-300 rounded-full animate-ping shadow-lg border border-red-600"></div>
-                                  )}
-                                </div>
-                              );
+                                return (
+                                  <div className={`px-1 py-0.5 text-xs font-semibold border shadow-sm rounded ${deadlineInfo.color} relative mr-2`}>
+                                    {deadlineInfo.timeDisplay}
+                                    {/* Small ping circle in top-right corner */}
+                                    {deadlineInfo.animation === '' && (deadlineInfo.color.includes('red') || deadlineInfo.color.includes('yellow')) && (
+                                      <div className="absolute -top-1 -right-1 w-2 h-2 bg-red-300 rounded-full animate-ping shadow-lg border border-red-600"></div>
+                                    )}
+                                  </div>
+                                );
+                              }
+                              
+                              return null;
                             })()}
 
                             <div className="flex items-center space-x-2">
                               <div className="flex flex-col">
                                 <span className="text-xs font-medium text-gray-500 text-left">Quote Ref</span>
-                                <span className={`text-sm font-bold text-left ${hasSpecialCharacters(quote.quoteRef || '') ? 'text-blue-600 bg-blue-50 px-2 py-0 rounded border border-blue-200 shadow-sm' : 'text-gray-900'}`}>
-                                  {quote.quoteRef}
-                                </span>
+                                 {(() => {
+                                   const { displayRef } = getQuoteRefDisplay(quote.quoteRef || '', quote.source);
+                                   return (
+                                     <span className={`text-sm font-bold text-left ${hasSpecialCharacters(quote.quoteRef || '') ? 'text-blue-600 bg-blue-50 px-2 py-1 rounded border border-blue-200 shadow-sm' : 'text-gray-900'}`}>
+                                       {displayRef}
+                                     </span>
+                                   );
+                                 })()}
                               </div>
                               <CopyButton
                                 text={quote.quoteRef || ''}

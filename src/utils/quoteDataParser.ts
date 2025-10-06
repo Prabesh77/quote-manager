@@ -384,7 +384,7 @@ export function parseQuoteData(text: string): ParsedQuoteData {
   }
 
   // Merge with default values
-  return {
+  const result = {
     quoteRef: parsedData.quoteRef || '',
     vin: parsedData.vin || '',
     make: parsedData.make || '',
@@ -402,6 +402,13 @@ export function parseQuoteData(text: string): ParsedQuoteData {
     notes: parsedData.notes || '',
     source: parsedData.source || 'unknown'
   };
+
+  // Append "RC" to quoteRef if source is repairconnection
+  if (result.source === 'repairconnection' && result.quoteRef && !result.quoteRef.endsWith(' RC')) {
+    result.quoteRef = result.quoteRef + ' RC';
+  }
+
+  return result;
 }
 
 /**

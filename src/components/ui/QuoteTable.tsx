@@ -154,9 +154,6 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
   // Local quotes state for variant management
   const [localQuotes, setLocalQuotes] = useState<Quote[]>(quotes);
 
-  // Info popup state
-  const [infoPopupOpen, setInfoPopupOpen] = useState<string | null>(null);
-  const [infoTriggerElement, setInfoTriggerElement] = useState<HTMLElement | null>(null);
 
 
   // Pagination state (used only when server-driven props are not provided)
@@ -2026,17 +2023,24 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
 
 
                     {/* Info Icon - Top Right Corner */}
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setInfoTriggerElement(e.currentTarget);
-                        setInfoPopupOpen(infoPopupOpen === quote.id ? null : quote.id);
-                      }}
-                      className="absolute top-0 right-0 p-1 text-green-600 hover:text-green-400 hover:bg-blue-50 rounded-full transition-colors cursor-pointer z-10"
-                      title="View quote history"
-                    >
-                      <Info className="h-4 w-4" />
-                    </button>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <button
+                          onClick={(e) => e.stopPropagation()}
+                          className="absolute top-0 right-0 p-1 text-green-600 hover:text-green-400 hover:bg-blue-50 rounded-full transition-colors cursor-pointer z-10"
+                          title="View quote history"
+                        >
+                          <Info className="h-4 w-4" />
+                        </button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-80 p-0" align="end">
+                        <QuoteInfoPopup
+                          quoteId={quote.id}
+                          isOpen={true}
+                          onClose={() => {}}
+                        />
+                      </PopoverContent>
+                    </Popover>
 
                     <AccordionTrigger className="py-2 grid grid-cols-4 gap-4 w-full px-3 hover:bg-gray-50 transition-colors cursor-pointer" style={{ gridTemplateColumns: '1fr 1fr 1fr 1fr' }}>
                       {/* Column 1: Quote Details (Ref + VIN) */}
@@ -3631,15 +3635,6 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
         onSave={handleSaveQuoteEdit}
       />
 
-      {/* Quote Info Popup */}
-      {infoPopupOpen && infoTriggerElement && (
-        <QuoteInfoPopup
-          quoteId={infoPopupOpen}
-          isOpen={true}
-          onClose={() => setInfoPopupOpen(null)}
-          triggerRef={{ current: infoTriggerElement }}
-        />
-      )}
     </div>
   );
 }

@@ -9,7 +9,7 @@ interface QuoteInfoPopupProps {
   quoteId: string;
   isOpen: boolean;
   onClose: () => void;
-  triggerRef: React.RefObject<HTMLElement>;
+  triggerRef?: React.RefObject<HTMLElement>;
 }
 
 const QuoteInfoPopup: React.FC<QuoteInfoPopupProps> = ({ quoteId, isOpen, onClose, triggerRef }) => {
@@ -20,11 +20,15 @@ const QuoteInfoPopup: React.FC<QuoteInfoPopupProps> = ({ quoteId, isOpen, onClos
   useEffect(() => {
     if (isOpen && quoteId) {
       fetchQuoteActions();
-      updatePosition();
+      if (triggerRef) {
+        updatePosition();
+      }
     }
-  }, [isOpen, quoteId]);
+  }, [isOpen, quoteId, triggerRef]);
 
   useEffect(() => {
+    if (!triggerRef) return;
+    
     const handleResize = () => updatePosition();
     const handleScroll = () => updatePosition();
     
@@ -53,7 +57,7 @@ const QuoteInfoPopup: React.FC<QuoteInfoPopupProps> = ({ quoteId, isOpen, onClos
   };
 
   const updatePosition = () => {
-    if (triggerRef.current) {
+    if (triggerRef?.current) {
       const rect = triggerRef.current.getBoundingClientRect();
       const popupWidth = 360;
       const popupHeight = 200;
@@ -118,6 +122,66 @@ const QuoteInfoPopup: React.FC<QuoteInfoPopupProps> = ({ quoteId, isOpen, onClos
 
   if (!isOpen) return null;
 
+  // If triggerRef is not provided, render content without positioning (for use inside Popover)
+  if (!triggerRef) {
+    return (
+      <div className="bg-white rounded-lg border border-gray-200 p-4 w-90">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center space-x-2">
+            <Info className="h-4 w-4 text-gray-600" />
+            <h3 className="text-sm font-semibold text-gray-900">Quote History</h3>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-1 text-gray-400 hover:text-gray-600 transition-colors"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+
+        {/* Content */}
+        <div className="space-y-3">
+          {loading ? (
+            <div className="flex items-center justify-center py-4">
+              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+            </div>
+          ) : actions.length === 0 ? (
+            <div className="text-center py-4">
+              <p className="text-sm text-gray-500">No actions recorded yet</p>
+            </div>
+          ) : (
+            actions.map((action) => (
+              <div key={action.id} className="flex items-start space-x-3">
+                <div className={`flex-shrink-0 p-2 rounded-full ${getActionColor(action.action_type)}`}>
+                  {getActionIcon(action.action_type)}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center space-x-2">
+                    <span className="text-sm font-medium text-gray-900 capitalize">
+                      {action.action_type.toLowerCase()}
+                    </span>
+                    <span className="text-xs text-gray-500">
+                      by {action.user?.raw_user_meta_data?.full_name || action.user?.email || 'Unknown User'}
+                    </span>
+                  </div>
+                  <div className="flex items-center space-x-1 mt-1">
+                    <Calendar className="h-3 w-3 text-gray-400" />
+                    <span className="text-xs text-gray-500">
+                      {formatDate(action.timestamp)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // Original positioned version (for backward compatibility)
   return (
     <>
       {/* Backdrop */}
@@ -144,7 +208,6 @@ const QuoteInfoPopup: React.FC<QuoteInfoPopupProps> = ({ quoteId, isOpen, onClos
             <X className="h-4 w-4" />
           </button>
         </div>
-
 
         {/* Content */}
         <div className="space-y-3">

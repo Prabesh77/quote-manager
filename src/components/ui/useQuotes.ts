@@ -116,6 +116,7 @@ export interface Quote {
   notes?: string; // Global quote notes
   status: 'active' | 'completed' | 'unpriced' | 'waiting_verification' | 'priced' | 'ordered' | 'delivered'; // Updated status field
   taxInvoiceNumber?: string; // Tax invoice number for orders
+  source?: 'partscheck' | 'repairconnection' | 'unknown'; // Source platform for the quote
   [key: string]: any; // Allow string indexing
 }
 

@@ -128,11 +128,12 @@ export default function VerifyPricePage() {
 
     try {
       // Use the comprehensive batch mutation to update all parts in a single operation
-      await updatePartsComprehensiveBatchMutation.mutateAsync({ 
+      const result = await updatePartsComprehensiveBatchMutation.mutateAsync({ 
         quoteId: quote.id, 
         updates, 
         changeStatus 
       });
+      return result;
     } catch (error) {
       console.error('❌ Error in updateMultipleParts:', error);
     }
@@ -225,11 +226,13 @@ export default function VerifyPricePage() {
     return { data: result.data || null, error: null };
   };
 
-  const handleUpdateMultipleParts = async (updates: Array<{ id: string; updates: any }>, quoteId?: string, changeStatus: boolean = true): Promise<void> => {
+  const handleUpdateMultipleParts = async (updates: Array<{ id: string; updates: any }>, quoteId?: string, changeStatus: boolean = true): Promise<any> => {
     try {
-      await updateMultipleParts(updates, quoteId, changeStatus);
+      const result = await updateMultipleParts(updates, quoteId, changeStatus);
+      return result;
     } catch (error) {
       console.error('Error updating multiple parts:', error);
+      throw error;
     }
   };
 

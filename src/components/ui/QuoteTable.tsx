@@ -37,7 +37,7 @@ interface QuoteTableProps {
   onUpdateQuote: (id: string, fields: Record<string, any>) => Promise<{ error: Error | null }>;
   onDeleteQuote: (id: string) => Promise<{ error: Error | null }>;
   onUpdatePart: (id: string, updates: Partial<Part>) => Promise<{ data: Part; error: Error | null }>;
-  onUpdateMultipleParts: (updates: Array<{ id: string; updates: Partial<Part> }>, quoteId?: string, changeStatus?: boolean) => Promise<void>;
+  onUpdateMultipleParts: (updates: Array<{ id: string; updates: Partial<Part> }>, quoteId?: string, changeStatus?: boolean) => Promise<any>;
   onMarkCompleted?: (id: string) => Promise<{ error: Error | null }>;
   onMarkAsOrdered?: (id: string, taxInvoiceNumber: string) => Promise<{ error: Error | null }>;
   onMarkAsOrderedWithParts?: (id: string, taxInvoiceNumber: string, partIds: string[]) => Promise<{ error: Error | null }>;
@@ -222,20 +222,57 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
     // Only add to local state, don't save to database yet
     const newVariantId = generateVariantId();
 
-    // Use functional updates to ensure state consistency and prevent race conditions
-    setPartEditData(prev => {
-      const existingPartData = prev[partId] || {};
+    console.log('➕ Adding new variant:', { quoteId, partId, newVariantId });
 
-      // Create new data that preserves ALL existing variant data
-      const newData = {
-        ...prev,
-        [partId]: {
-          ...existingPartData, // Preserve existing variant data including primary variant
-          [newVariantId]: { note: '', final_price: null, list_price: null, af: false }
+    // CRITICAL FIX: When adding a new variant, we must ensure ALL existing variants 
+    // are also tracked in partEditData to ensure they get sent in the payload
+    setPartEditData(prev => {
+      const quote = localQuotes.find(q => q.id === quoteId);
+      const quotePart = quote?.partsRequested?.find(p => p.part_id === partId);
+      const existingVariants = quotePart?.variants || [];
+      
+      const existingPartData = prev[partId] || {};
+      
+      // Build the new part data structure that includes ALL variants
+      const newPartData: any = { ...existingPartData };
+      
+      // Get the part to access the number field
+      const actualPart = parts.find(p => p.id === partId);
+      
+      // FIRST: Ensure ALL existing variants are in partEditData
+      // This is crucial - if they're not being edited, they won't be in partEditData,
+      // and won't be sent to the backend
+      existingVariants.forEach(variant => {
+        if (!newPartData[variant.id]) {
+          // CRITICAL: Add existing variant data INCLUDING number field to ensure it's included in payload
+          newPartData[variant.id] = {
+            number: variant.number || actualPart?.number || '',
+            note: variant.note || '',
+            final_price: variant.final_price,
+            list_price: variant.list_price,
+            af: variant.af || false
+          };
+          console.log('📝 Adding existing variant to partEditData:', { 
+            partId, 
+            variantId: variant.id,
+            hasNumber: !!(variant.number || actualPart?.number)
+          });
         }
+      });
+      
+      // THEN: Add the new variant (with number field)
+      newPartData[newVariantId] = { 
+        number: actualPart?.number || '',
+        note: '', 
+        final_price: null, 
+        list_price: null, 
+        af: false 
       };
 
-      return newData;
+      return {
+        ...prev,
+        [partId]: newPartData
+      };
     });
 
     // Add to local quote state for display - use functional update for consistency
@@ -272,6 +309,8 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
 
     // Always ensure editing state is set for this quote
     setEditingParts(quoteId);
+    
+    console.log('✅ Variant added successfully');
   };
 
   const removeVariantFromPart = (quoteId: string, partId: string, variantId: string) => {
@@ -770,10 +809,17 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
         Object.keys(partEditData).forEach(partId => {
           const partEditDataForPart = partEditData[partId];
           if (partEditDataForPart) {
-            // Process ALL variants for this part, not just the first one
-            const quotePart = quote.partsRequested?.find(qp => qp.part_id === partId);
+            // CRITICAL FIX: Use ORIGINAL quote from database (quotes prop), not local state
+            // This ensures we correctly detect new variants that don't exist in DB yet
+            const originalQuote = quotes.find(q => q.id === editingParts);
+            const originalQuotePart = originalQuote?.partsRequested?.find(qp => qp.part_id === partId);
+            const existingVariants = originalQuotePart?.variants || [];
+            
+            // Also get current local state for comparison
+            const localQuotePart = quote.partsRequested?.find(qp => qp.part_id === partId);
+            const currentVariants = localQuotePart?.variants || [];
+            
             const actualPart = parts.find(p => p.id === partId); // Find the actual Part object
-            const existingVariants = quotePart?.variants || [];
 
             let hasActualChanges = false;
 
@@ -842,14 +888,21 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
               }
             });
 
-            // IMPORTANT FIX: Also process new variants that don't exist yet
-            // This handles cases where parts have no existing variants but have edit data
+            // IMPORTANT FIX: Process new variants that don't exist in DB yet
+            // By using originalQuote above, existingVariants only contains DB variants
+            // Any variant in partEditDataForPart that's not in existingVariants is NEW
+            const newVariants: string[] = [];
             Object.keys(partEditDataForPart).forEach(variantId => {
-              // Skip if we already processed this variant above
+              // Skip non-variant keys and variants we already processed
+              if (variantId === 'number') return; // Skip part-level number field
+              
               const alreadyProcessed = existingVariants.some(v => v.id === variantId);
               if (!alreadyProcessed) {
+                newVariants.push(variantId);
                 const variantEditData = partEditDataForPart[variantId];
-                if (variantEditData && (variantEditData.number !== undefined || variantEditData.note !== undefined || variantEditData.final_price !== undefined || variantEditData.list_price !== undefined || variantEditData.af !== undefined)) {
+                // For new variants, save them even if fields are empty (to create the variant)
+                if (variantEditData) {
+                  console.log('🆕 New variant detected:', { partId, variantId, variantEditData });
                   hasActualChanges = true;
                   updates.push({
                     id: partId,
@@ -865,13 +918,67 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                 }
               }
             });
+
+            // CRITICAL FIX: If new variants were added, we MUST also save all existing variants
+            // from the current local state, even if they weren't edited
+            // This ensures the complete variant list is sent to the backend
+            if (newVariants.length > 0 && currentVariants.length > 0) {
+              console.log('🔄 New variants detected, ensuring ALL variants are sent:', {
+                partId,
+                newVariants,
+                currentVariants: currentVariants.length,
+                existingVariants: existingVariants.length
+              });
+              
+              // Process ALL current variants to ensure they're all in the updates
+              currentVariants.forEach(variant => {
+                // Skip if we already added this variant
+                const alreadyInUpdates = updates.some(u => u.id === partId && u.updates.variantId === variant.id);
+                if (!alreadyInUpdates) {
+                  console.log('➕ Adding existing variant to ensure it is saved:', { partId, variantId: variant.id });
+                  hasActualChanges = true;
+                  updates.push({
+                    id: partId,
+                    updates: {
+                      variantId: variant.id,
+                      number: actualPart?.number || '',
+                      note: variant.note || '',
+                      price: variant.final_price,
+                      list_price: variant.list_price,
+                      af: variant.af || false
+                    }
+                  });
+                }
+              });
+            }
           }
+        });
+
+        console.log('📊 Final payload preview:', { 
+          totalUpdates: updates.length, 
+          updates: updates.map(u => ({ 
+            partId: u.id, 
+            variantId: u.updates.variantId,
+            hasPrice: u.updates.price !== undefined, 
+            hasNote: u.updates.note !== undefined 
+          })) 
         });
 
         if (updates.length > 0) {
           console.log('📤 Send button: Sending updates for', updates.length, 'parts:', updates.map(u => ({ id: u.id, hasPrice: u.updates.price !== undefined, hasNote: u.updates.note !== undefined, hasListPrice: u.updates.list_price !== undefined, hasNumber: u.updates.number !== undefined })));
           try {
-            await onUpdateMultipleParts(updates, quote.id, true); // Change status for send button
+            const result = await onUpdateMultipleParts(updates, quote.id, true); // Change status for send button
+            
+            // CRITICAL FIX: Instantly update localQuotes with the fresh data from the server
+            if (result?.updatedQuote) {
+              console.log('✅ Instantly updating localQuotes with fresh variant data (Send button)');
+              setLocalQuotes(prev => prev.map(q => 
+                q.id === quote.id 
+                  ? { ...q, partsRequested: result.updatedQuote.parts_requested, status: result.updatedQuote.status }
+                  : q
+              ));
+            }
+            
             updateLocalState();
             setEditingParts(null);
             setPartEditData({});
@@ -945,10 +1052,17 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
         Object.keys(partEditData).forEach(partId => {
           const partEditDataForPart = partEditData[partId];
           if (partEditDataForPart) {
-            // Process ALL variants for this part, not just the first one
-            const quotePart = quote.partsRequested?.find(qp => qp.part_id === partId);
+            // CRITICAL FIX: Use ORIGINAL quote from database (quotes prop), not local state
+            // This ensures we correctly detect new variants that don't exist in DB yet
+            const originalQuote = quotes.find(q => q.id === editingParts);
+            const originalQuotePart = originalQuote?.partsRequested?.find(qp => qp.part_id === partId);
+            const existingVariants = originalQuotePart?.variants || [];
+            
+            // Also get current local state for comparison
+            const localQuotePart = quote.partsRequested?.find(qp => qp.part_id === partId);
+            const currentVariants = localQuotePart?.variants || [];
+            
             const actualPart = parts.find(p => p.id === partId); // Find the actual Part object
-            const existingVariants = quotePart?.variants || [];
 
             let hasActualChanges = false;
 
@@ -1017,14 +1131,21 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
               }
             });
 
-            // IMPORTANT FIX: Also process new variants that don't exist yet
-            // This handles cases where parts have no existing variants but have edit data
+            // IMPORTANT FIX: Process new variants that don't exist in DB yet
+            // By using originalQuote above, existingVariants only contains DB variants
+            // Any variant in partEditDataForPart that's not in existingVariants is NEW
+            const newVariants: string[] = [];
             Object.keys(partEditDataForPart).forEach(variantId => {
-              // Skip if we already processed this variant above
+              // Skip non-variant keys and variants we already processed
+              if (variantId === 'number') return; // Skip part-level number field
+              
               const alreadyProcessed = existingVariants.some(v => v.id === variantId);
               if (!alreadyProcessed) {
+                newVariants.push(variantId);
                 const variantEditData = partEditDataForPart[variantId];
-                if (variantEditData && (variantEditData.number !== undefined || variantEditData.note !== undefined || variantEditData.final_price !== undefined || variantEditData.list_price !== undefined || variantEditData.af !== undefined)) {
+                // For new variants, save them even if fields are empty (to create the variant)
+                if (variantEditData) {
+                  console.log('🆕 New variant detected:', { partId, variantId, variantEditData });
                   hasActualChanges = true;
                   updates.push({
                     id: partId,
@@ -1040,7 +1161,50 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                 }
               }
             });
+
+            // CRITICAL FIX: If new variants were added, we MUST also save all existing variants
+            // from the current local state, even if they weren't edited
+            // This ensures the complete variant list is sent to the backend
+            if (newVariants.length > 0 && currentVariants.length > 0) {
+              console.log('🔄 New variants detected, ensuring ALL variants are sent:', {
+                partId,
+                newVariants,
+                currentVariants: currentVariants.length,
+                existingVariants: existingVariants.length
+              });
+              
+              // Process ALL current variants to ensure they're all in the updates
+              currentVariants.forEach(variant => {
+                // Skip if we already added this variant
+                const alreadyInUpdates = updates.some(u => u.id === partId && u.updates.variantId === variant.id);
+                if (!alreadyInUpdates) {
+                  console.log('➕ Adding existing variant to ensure it is saved:', { partId, variantId: variant.id });
+                  hasActualChanges = true;
+                  updates.push({
+                    id: partId,
+                    updates: {
+                      variantId: variant.id,
+                      number: actualPart?.number || '',
+                      note: variant.note || '',
+                      price: variant.final_price,
+                      list_price: variant.list_price,
+                      af: variant.af || false
+                    }
+                  });
+                }
+              });
+            }
           }
+        });
+
+        console.log('📊 Final payload preview:', { 
+          totalUpdates: updates.length, 
+          updates: updates.map(u => ({ 
+            partId: u.id, 
+            variantId: u.updates.variantId,
+            hasPrice: u.updates.price !== undefined, 
+            hasNote: u.updates.note !== undefined 
+          })) 
         });
 
         // Check for variant removals - compare current state with original database state
@@ -1108,11 +1272,20 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
             console.log('💾 Save button: Sending updates for', updates.length, 'parts:', updates.map(u => ({ id: u.id, hasPrice: u.updates.price !== undefined, hasNote: u.updates.note !== undefined, hasListPrice: u.updates.list_price !== undefined, hasNumber: u.updates.number !== undefined })));
             try {
               // Pass the quote ID to onUpdateMultipleParts for more reliable lookup
-              await onUpdateMultipleParts(updates, editingParts, false); // Don't change status for save button
+              const result = await onUpdateMultipleParts(updates, editingParts, false); // Don't change status for save button
+
+              // CRITICAL FIX: Instantly update localQuotes with the fresh data from the server
+              if (result?.updatedQuote) {
+                console.log('✅ Instantly updating localQuotes with fresh variant data');
+                setLocalQuotes(prev => prev.map(q => 
+                  q.id === editingParts 
+                    ? { ...q, partsRequested: result.updatedQuote.parts_requested }
+                    : q
+                ));
+              }
 
               // Update local state after successful backend save
               updateLocalState();
-
 
             } catch (error) {
               console.error('Error saving parts to backend:', error);

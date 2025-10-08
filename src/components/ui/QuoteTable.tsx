@@ -413,6 +413,14 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
     }
   };
 
+  // Helper function to combine quote notes with part notes
+  const getCombinedNotes = (quoteNotes: string | undefined, partNote: string | undefined): string => {
+    if (!quoteNotes) return partNote || '';
+    if (!partNote) return quoteNotes;
+    // If both exist, combine them with a separator
+    return `${quoteNotes} | ${partNote}`;
+  };
+
   // Function to get parts with notes for a specific quote (synchronous)
   const getQuotePartsWithNotesSync = (quoteId: string): Part[] => {
     // First try to find the quote with JSON structure
@@ -2759,6 +2767,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                                       <input
                                                         ref={(el) => { focusRefs.current['list_price'] = el; }}
                                                         type="number"
+                                                        step="5"
                                                         value={partEditData[part.id]?.[variant.id]?.list_price !== undefined ? partEditData[part.id][variant.id].list_price : (variant.list_price ?? '')}
                                                         onChange={(e) => handleVariantEditChange(part.id, variant.id, 'list_price', e.target.value ? Number(e.target.value) : null)}
                                                         className={`w-full px-2 py-1 border border-gray-300 rounded-sm text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 ${index === 0 ? 'bg-white' : 'bg-gray-50'}`}
@@ -2792,6 +2801,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                                       <input
                                                         ref={(el) => { focusRefs.current['final_price'] = el; }}
                                                         type="number"
+                                                        step="5"
                                                         value={partEditData[part.id]?.[variant.id]?.final_price !== undefined ? partEditData[part.id][variant.id].final_price : (variant.final_price ?? '')}
                                                         onChange={(e) => handleVariantEditChange(part.id, variant.id, 'final_price', e.target.value ? Number(e.target.value) : null)}
                                                         className={`w-full px-2 py-1 border border-gray-300 rounded-sm text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 ${index === 0 ? 'bg-white' : 'bg-gray-50'}`}
@@ -2853,29 +2863,36 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                                       {isPartEditing ? (
                                                         <QuickFillInput
                                                           ref={(el) => { focusRefs.current['note'] = el; }}
-                                                          value={partEditData[part.id]?.[variant.id]?.note ?? variant.note ?? ''}
+                                                          value={getCombinedNotes(quote.notes, partEditData[part.id]?.[variant.id]?.note ?? variant.note)}
                                                           onChange={(value) => handleVariantEditChange(part.id, variant.id, 'note', value)}
                                                           placeholder="Add notes..."
                                                           className={`flex-1 ${index === 0 ? 'bg-white' : 'bg-gray-50'}`}
                                                         />
                                                       ) : (
                                                         <>
-                                                          <span
-                                                            className={`text-sm cursor-pointer hover:bg-gray-100 px-1 py-0.5 rounded transition-colors ${variant.note ? 'text-gray-700' : 'text-gray-400'}`}
-                                                            onClick={() => handleDirectEdit(quote.id, 'note')}
-                                                            title="Click to edit"
-                                                          >
-                                                            {variant.note || 'No notes'}
-                                                          </span>
-                                                          {variant.note && (
-                                                            <CopyButton
-                                                              text={variant.note || ''}
-                                                              title="Copy to clipboard"
-                                                              size="md"
-                                                              className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-md transition-all duration-200 cursor-pointer"
-                                                              iconClassName="h-3.5 w-3.5"
-                                                            />
-                                                          )}
+                                                          {(() => {
+                                                            const combinedNote = getCombinedNotes(quote.notes, variant.note);
+                                                            return (
+                                                              <>
+                                                                <span
+                                                                  className={`text-sm cursor-pointer hover:bg-gray-100 px-1 py-0.5 rounded transition-colors ${combinedNote ? 'text-gray-700' : 'text-gray-400'}`}
+                                                                  onClick={() => handleDirectEdit(quote.id, 'note')}
+                                                                  title="Click to edit"
+                                                                >
+                                                                  {combinedNote || 'No notes'}
+                                                                </span>
+                                                                {combinedNote && (
+                                                                  <CopyButton
+                                                                    text={combinedNote}
+                                                                    title="Copy to clipboard"
+                                                                    size="md"
+                                                                    className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-md transition-all duration-200 cursor-pointer"
+                                                                    iconClassName="h-3.5 w-3.5"
+                                                                  />
+                                                                )}
+                                                              </>
+                                                            );
+                                                          })()}
                                                         </>
                                                       )}
                                                     </div>
@@ -3419,6 +3436,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                               <input
                                                 ref={(el) => { focusRefs.current['list_price_mobile'] = el; }}
                                                 type="number"
+                                                step="5"
                                                 value={partEditData[part.id]?.list_price !== undefined ? partEditData[part.id].list_price : ''}
                                                 onChange={(e) => handlePartEditChange(part.id, 'list_price', e.target.value ? Number(e.target.value) : null)}
                                                 className="flex-1 px-2 py-1 border border-gray-300 rounded-md text-sm focus:ring-1 focus:ring-red-500 focus:border-transparent"
@@ -3452,6 +3470,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                               <input
                                                 ref={(el) => { focusRefs.current['price_mobile'] = el; }}
                                                 type="number"
+                                                step="5"
                                                 value={partEditData[part.id]?.price ?? ''}
                                                 onChange={(e) => handlePartEditChange(part.id, 'price', e.target.value ? Number(e.target.value) : null)}
                                                 className="flex-1 px-2 py-1 border border-gray-300 rounded-md text-sm focus:ring-1 focus:ring-red-500 focus:border-transparent"

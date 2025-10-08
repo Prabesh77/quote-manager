@@ -218,14 +218,16 @@ export default function HomePage() {
 
     try {
       // Use the comprehensive batch mutation to update all parts in a single operation
-      await updatePartsComprehensiveBatchMutation.mutateAsync({ 
+      const result = await updatePartsComprehensiveBatchMutation.mutateAsync({ 
         quoteId: quote.id, 
         updates, 
         changeStatus 
       });
+      return result;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       showSnackbar(`Error updating parts: ${errorMessage}`, 'error');
+      throw error;
     }
   };
 

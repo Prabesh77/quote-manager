@@ -1243,6 +1243,10 @@ export const useUpdatePartsComprehensiveBatchMutation = () => {
       );
 
       const promises: Promise<any>[] = [];
+      
+      // Store for return value
+      let finalQuoteData: any = null;
+      let finalUpdatedPartsRequested: any[] = [];
 
       // 1. Handle part number updates (to parts table)
       if (partNumberUpdates.length > 0) {
@@ -1263,7 +1267,7 @@ export const useUpdatePartsComprehensiveBatchMutation = () => {
         // Get current quote data
         const { data: quoteData, error: quoteError } = await supabase
       .from('quotes')
-          .select('parts_requested, status')
+          .select('parts_requested, status, id')
       .eq('id', quoteId)
       .single();
 
@@ -1275,80 +1279,86 @@ export const useUpdatePartsComprehensiveBatchMutation = () => {
           throw new Error('No parts found in quote');
         }
 
-        // Process all parts updates in a single operation
+        // CRITICAL FIX: Process all parts updates in a single operation
+        // IMPORTANT: A single part can have MULTIPLE updates (one per variant)
         const updatedPartsRequested = quoteData.parts_requested.map((partItem: any) => {
-          const updateData = quoteJsonUpdates.find(u => u.id === partItem.part_id);
-          if (!updateData) return partItem;
+          // Find ALL updates for this part (not just the first one!)
+          const partUpdatesArray = quoteJsonUpdates.filter(u => u.id === partItem.part_id);
+          if (partUpdatesArray.length === 0) return partItem;
 
           const updatedPart = { ...partItem };
-          const { updates: partUpdates } = updateData;
           
-          // Handle variant-specific updates
-          if (partUpdates.variantId && partUpdates) {
-            // Handle variant removal
-            if (partUpdates.variantId === 'variant-removal' && partUpdates._removedVariantIds && partUpdates._currentVariants) {
-              // Use the current variants state from frontend (already filtered)
-              updatedPart.variants = partUpdates._currentVariants;
-            } else {
-              const variants = updatedPart.variants || [];
-              const variantIndex = variants.findIndex((v: any) => v.id === partUpdates.variantId);
-              
-              if (variantIndex !== -1) {
-                // Update existing variant
-                variants[variantIndex] = {
-                  ...variants[variantIndex],
-                  ...(partUpdates.note !== undefined && { note: partUpdates.note }),
-                  ...(partUpdates.price !== undefined && { final_price: partUpdates.price }),
-                  ...(partUpdates.list_price !== undefined && { list_price: partUpdates.list_price }),
-                  ...(partUpdates.af !== undefined && { af: partUpdates.af }),
-                  ...(partUpdates.number !== undefined && { number: partUpdates.number }),
-                };
-                updatedPart.variants = variants;
+          // Process EACH update for this part
+          for (const updateData of partUpdatesArray) {
+            const { updates: partUpdates } = updateData;
+            
+            // Handle variant-specific updates
+            if (partUpdates.variantId && partUpdates) {
+              // Handle variant removal
+              if (partUpdates.variantId === 'variant-removal' && partUpdates._removedVariantIds && partUpdates._currentVariants) {
+                // Use the current variants state from frontend (already filtered)
+                updatedPart.variants = partUpdates._currentVariants;
               } else {
-                // Create new variant
+                const variants = updatedPart.variants || [];
+                const variantIndex = variants.findIndex((v: any) => v.id === partUpdates.variantId);
+                
+                if (variantIndex !== -1) {
+                  // Update existing variant
+                  variants[variantIndex] = {
+                    ...variants[variantIndex],
+                    ...(partUpdates.note !== undefined && { note: partUpdates.note }),
+                    ...(partUpdates.price !== undefined && { final_price: partUpdates.price }),
+                    ...(partUpdates.list_price !== undefined && { list_price: partUpdates.list_price }),
+                    ...(partUpdates.af !== undefined && { af: partUpdates.af }),
+                    ...(partUpdates.number !== undefined && { number: partUpdates.number }),
+                  };
+                  updatedPart.variants = variants;
+                } else {
+                  // Create new variant
+                  const newVariant = {
+                    id: partUpdates.variantId,
+                    note: partUpdates.note || '',
+                    final_price: partUpdates.price || null,
+                    list_price: partUpdates.list_price || null,
+                    af: partUpdates.af || false,
+                    number: partUpdates.number || partItem.part_id,
+                    created_at: new Date().toISOString(),
+                    is_default: false
+                  };
+                  updatedPart.variants = [...variants, newVariant];
+                }
+              }
+            } else if (partUpdates) {
+              // Handle part-level updates (no specific variant) - update the default variant
+              const variants = updatedPart.variants || [];
+              const defaultVariantIndex = variants.findIndex((v: any) => v.is_default === true);
+              
+              if (defaultVariantIndex === -1) {
+                // Create new default variant
                 const newVariant = {
-                  id: partUpdates.variantId,
+                  id: `var_${partItem.part_id}_${Date.now()}`,
                   note: partUpdates.note || '',
                   final_price: partUpdates.price || null,
                   list_price: partUpdates.list_price || null,
                   af: partUpdates.af || false,
                   number: partUpdates.number || partItem.part_id,
                   created_at: new Date().toISOString(),
-                  is_default: false
+                  is_default: true
                 };
-                updatedPart.variants = [...variants, newVariant];
+                updatedPart.variants = [newVariant];
+              } else {
+                // Update existing default variant
+                const updatedVariants = [...variants];
+                updatedVariants[defaultVariantIndex] = {
+                  ...updatedVariants[defaultVariantIndex],
+                  ...(partUpdates.note !== undefined && { note: partUpdates.note }),
+                  ...(partUpdates.price !== undefined && { final_price: partUpdates.price }),
+                  ...(partUpdates.list_price !== undefined && { list_price: partUpdates.list_price }),
+                  ...(partUpdates.af !== undefined && { af: partUpdates.af }),
+                  ...(partUpdates.number !== undefined && { number: partUpdates.number }),
+                };
+                updatedPart.variants = updatedVariants;
               }
-            }
-          } else if (partUpdates) {
-            // Handle part-level updates (no specific variant) - update the default variant
-            const variants = updatedPart.variants || [];
-            const defaultVariantIndex = variants.findIndex((v: any) => v.is_default === true);
-            
-            if (defaultVariantIndex === -1) {
-              // Create new default variant
-              const newVariant = {
-                id: `var_${partItem.part_id}_${Date.now()}`,
-                note: partUpdates.note || '',
-                final_price: partUpdates.price || null,
-                list_price: partUpdates.list_price || null,
-                af: partUpdates.af || false,
-                number: partUpdates.number || partItem.part_id,
-                created_at: new Date().toISOString(),
-                is_default: true
-              };
-              updatedPart.variants = [newVariant];
-      } else {
-              // Update existing default variant
-              const updatedVariants = [...variants];
-              updatedVariants[defaultVariantIndex] = {
-                ...updatedVariants[defaultVariantIndex],
-                ...(partUpdates.note !== undefined && { note: partUpdates.note }),
-                ...(partUpdates.price !== undefined && { final_price: partUpdates.price }),
-                ...(partUpdates.list_price !== undefined && { list_price: partUpdates.list_price }),
-                ...(partUpdates.af !== undefined && { af: partUpdates.af }),
-                ...(partUpdates.number !== undefined && { number: partUpdates.number }),
-              };
-              updatedPart.variants = updatedVariants;
             }
           }
 
@@ -1367,10 +1377,15 @@ export const useUpdatePartsComprehensiveBatchMutation = () => {
           }
         }
 
+        // Store for return value
+        finalQuoteData = quoteData;
+        finalUpdatedPartsRequested = updatedPartsRequested;
+
         // Prepare update data
         const updateData: any = { parts_requested: updatedPartsRequested };
         if (statusChanged) {
           updateData.status = 'waiting_verification';
+          finalQuoteData.status = 'waiting_verification';
         }
 
         // Add quote update to promises
@@ -1396,27 +1411,24 @@ export const useUpdatePartsComprehensiveBatchMutation = () => {
       return { 
         data: { success: true, partsUpdated: updates.length }, 
         error: null,
-        statusChanged: changeStatus && quoteJsonUpdates.length > 0
+        statusChanged: changeStatus && quoteJsonUpdates.length > 0,
+        updatedQuote: finalQuoteData ? {
+          id: finalQuoteData.id,
+          parts_requested: finalUpdatedPartsRequested,
+          status: finalQuoteData.status
+        } : null
       };
     },
     onSuccess: (data, variables) => {
-      console.log('🔄 Comprehensive batch mutation onSuccess called:', {
-        partsUpdated: variables.updates.length,
-        statusChanged: data?.statusChanged,
-        quoteId: variables.quoteId
-      });
-      
       // Invalidate both parts and quotes caches
       queryClient.invalidateQueries({ 
         queryKey: ['all-parts-for-quotes'],
         exact: false
       });
       
-      // Only invalidate main quotes if status actually changed
-      if (data?.statusChanged) {
-        console.log('🔄 Invalidating main quotes cache due to status change');
-        queryClient.invalidateQueries({ queryKey: queryKeys.quotesBase });
-      }
+      // CRITICAL FIX: Always invalidate quotes cache to reflect variant changes
+      // Not just when status changes, but also when variants are added/updated
+      queryClient.invalidateQueries({ queryKey: queryKeys.quotesBase });
       
       showSnackbar(`${variables.updates.length} parts updated successfully!`, 'success');
     },

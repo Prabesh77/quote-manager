@@ -37,7 +37,7 @@ interface QuoteTableProps {
   onUpdateQuote: (id: string, fields: Record<string, any>) => Promise<{ error: Error | null }>;
   onDeleteQuote: (id: string) => Promise<{ error: Error | null }>;
   onUpdatePart: (id: string, updates: Partial<Part>) => Promise<{ data: Part; error: Error | null }>;
-  onUpdateMultipleParts: (updates: Array<{ id: string; updates: Partial<Part> }>, quoteId?: string, changeStatus?: boolean) => Promise<void>;
+  onUpdateMultipleParts: (updates: Array<{ id: string; updates: Partial<Part> }>, quoteId?: string, changeStatus?: boolean) => Promise<any>;
   onMarkCompleted?: (id: string) => Promise<{ error: Error | null }>;
   onMarkAsOrdered?: (id: string, taxInvoiceNumber: string) => Promise<{ error: Error | null }>;
   onMarkAsOrderedWithParts?: (id: string, taxInvoiceNumber: string, partIds: string[]) => Promise<{ error: Error | null }>;
@@ -222,20 +222,51 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
     // Only add to local state, don't save to database yet
     const newVariantId = generateVariantId();
 
-    // Use functional updates to ensure state consistency and prevent race conditions
-    setPartEditData(prev => {
-      const existingPartData = prev[partId] || {};
 
-      // Create new data that preserves ALL existing variant data
-      const newData = {
-        ...prev,
-        [partId]: {
-          ...existingPartData, // Preserve existing variant data including primary variant
-          [newVariantId]: { note: '', final_price: null, list_price: null, af: false }
+    // CRITICAL FIX: When adding a new variant, we must ensure ALL existing variants 
+    // are also tracked in partEditData to ensure they get sent in the payload
+    setPartEditData(prev => {
+      const quote = localQuotes.find(q => q.id === quoteId);
+      const quotePart = quote?.partsRequested?.find(p => p.part_id === partId);
+      const existingVariants = quotePart?.variants || [];
+      
+      const existingPartData = prev[partId] || {};
+      
+      // Build the new part data structure that includes ALL variants
+      const newPartData: any = { ...existingPartData };
+      
+      // Get the part to access the number field
+      const actualPart = parts.find(p => p.id === partId);
+      
+      // FIRST: Ensure ALL existing variants are in partEditData
+      // This is crucial - if they're not being edited, they won't be in partEditData,
+      // and won't be sent to the backend
+      existingVariants.forEach(variant => {
+        if (!newPartData[variant.id]) {
+          // CRITICAL: Add existing variant data INCLUDING number field to ensure it's included in payload
+          newPartData[variant.id] = {
+            number: variant.number || actualPart?.number || '',
+            note: variant.note || '',
+            final_price: variant.final_price,
+            list_price: variant.list_price,
+            af: variant.af || false
+          };
         }
+      });
+      
+      // THEN: Add the new variant (with number field)
+      newPartData[newVariantId] = { 
+        number: actualPart?.number || '',
+        note: '', 
+        final_price: null, 
+        list_price: null, 
+        af: false 
       };
 
-      return newData;
+      return {
+        ...prev,
+        [partId]: newPartData
+      };
     });
 
     // Add to local quote state for display - use functional update for consistency
@@ -272,6 +303,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
 
     // Always ensure editing state is set for this quote
     setEditingParts(quoteId);
+    
   };
 
   const removeVariantFromPart = (quoteId: string, partId: string, variantId: string) => {
@@ -372,6 +404,14 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
       console.error('Error fetching quote parts:', error);
       return getQuoteParts(partRequested); // Fallback to basic parts
     }
+  };
+
+  // Helper function to combine quote notes with part notes
+  const getCombinedNotes = (quoteNotes: string | undefined, partNote: string | undefined): string => {
+    if (!quoteNotes) return partNote || '';
+    if (!partNote) return quoteNotes;
+    // If both exist, combine them with a separator
+    return `${quoteNotes} | ${partNote}`;
   };
 
   // Function to get parts with notes for a specific quote (synchronous)
@@ -652,7 +692,6 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
       try {
         const { QuoteActionsService } = await import('@/services/quoteActions/quoteActionsService');
         await QuoteActionsService.trackQuoteAction(quoteId, 'PRICED');
-        console.log('✅ PRICED: Successfully tracked pricing action for quote:', quoteId);
       } catch (trackingError) {
         console.warn('⚠️ PRICED: Failed to track pricing action:', trackingError);
       }
@@ -770,26 +809,25 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
         Object.keys(partEditData).forEach(partId => {
           const partEditDataForPart = partEditData[partId];
           if (partEditDataForPart) {
-            // Process ALL variants for this part, not just the first one
-            const quotePart = quote.partsRequested?.find(qp => qp.part_id === partId);
+            // CRITICAL FIX: Use ORIGINAL quote from database (quotes prop), not local state
+            // This ensures we correctly detect new variants that don't exist in DB yet
+            const originalQuote = quotes.find(q => q.id === editingParts);
+            const originalQuotePart = originalQuote?.partsRequested?.find(qp => qp.part_id === partId);
+            const existingVariants = originalQuotePart?.variants || [];
+            
+            // Also get current local state for comparison
+            const localQuotePart = quote.partsRequested?.find(qp => qp.part_id === partId);
+            const currentVariants = localQuotePart?.variants || [];
+            
             const actualPart = parts.find(p => p.id === partId); // Find the actual Part object
-            const existingVariants = quotePart?.variants || [];
 
             let hasActualChanges = false;
 
             // Handle part-level changes (like number) that don't have a variant ID
             const partLevelNumber = partEditDataForPart.number;
-            console.log('🔍 Part number change check:', {
-              partId,
-              partLevelNumber,
-              actualPartNumber: actualPart?.number,
-              isDifferent: partLevelNumber !== actualPart?.number,
-              hasValue: partLevelNumber !== undefined && typeof partLevelNumber === 'string'
-            });
 
             if (partLevelNumber !== undefined && typeof partLevelNumber === 'string' && partLevelNumber !== actualPart?.number) {
               hasActualChanges = true;
-              console.log('✅ Part number change detected, adding to updates');
               // Apply part-level number change to the first variant (default variant)
               if (existingVariants.length > 0) {
                 const defaultVariant = existingVariants[0];
@@ -816,15 +854,6 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                   (variantEditData.number !== undefined && variantEditData.number !== actualPart?.number)
                 );
 
-                console.log('🔍 Variant change check:', {
-                  partId,
-                  variantId: variant.id,
-                  variantEditDataNumber: variantEditData.number,
-                  actualPartNumber: actualPart?.number,
-                  hasNumberChange: variantEditData.number !== undefined && variantEditData.number !== actualPart?.number,
-                  hasChanges
-                });
-
                 if (hasChanges) {
                   hasActualChanges = true;
                   updates.push({
@@ -842,14 +871,20 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
               }
             });
 
-            // IMPORTANT FIX: Also process new variants that don't exist yet
-            // This handles cases where parts have no existing variants but have edit data
+            // IMPORTANT FIX: Process new variants that don't exist in DB yet
+            // By using originalQuote above, existingVariants only contains DB variants
+            // Any variant in partEditDataForPart that's not in existingVariants is NEW
+            const newVariants: string[] = [];
             Object.keys(partEditDataForPart).forEach(variantId => {
-              // Skip if we already processed this variant above
+              // Skip non-variant keys and variants we already processed
+              if (variantId === 'number') return; // Skip part-level number field
+              
               const alreadyProcessed = existingVariants.some(v => v.id === variantId);
               if (!alreadyProcessed) {
+                newVariants.push(variantId);
                 const variantEditData = partEditDataForPart[variantId];
-                if (variantEditData && (variantEditData.number !== undefined || variantEditData.note !== undefined || variantEditData.final_price !== undefined || variantEditData.list_price !== undefined || variantEditData.af !== undefined)) {
+                // For new variants, save them even if fields are empty (to create the variant)
+                if (variantEditData) {
                   hasActualChanges = true;
                   updates.push({
                     id: partId,
@@ -865,13 +900,50 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                 }
               }
             });
+
+            // CRITICAL FIX: If new variants were added, we MUST also save all existing variants
+            // from the current local state, even if they weren't edited
+            // This ensures the complete variant list is sent to the backend
+            if (newVariants.length > 0 && currentVariants.length > 0) {
+              
+              // Process ALL current variants to ensure they're all in the updates
+              currentVariants.forEach(variant => {
+                // Skip if we already added this variant
+                const alreadyInUpdates = updates.some(u => u.id === partId && u.updates.variantId === variant.id);
+                if (!alreadyInUpdates) {
+                  hasActualChanges = true;
+                  updates.push({
+                    id: partId,
+                    updates: {
+                      variantId: variant.id,
+                      number: actualPart?.number || '',
+                      note: variant.note || '',
+                      price: variant.final_price,
+                      list_price: variant.list_price,
+                      af: variant.af || false
+                    }
+                  });
+                }
+              });
+            }
           }
         });
 
+       
+
         if (updates.length > 0) {
-          console.log('📤 Send button: Sending updates for', updates.length, 'parts:', updates.map(u => ({ id: u.id, hasPrice: u.updates.price !== undefined, hasNote: u.updates.note !== undefined, hasListPrice: u.updates.list_price !== undefined, hasNumber: u.updates.number !== undefined })));
           try {
-            await onUpdateMultipleParts(updates, quote.id, true); // Change status for send button
+            const result = await onUpdateMultipleParts(updates, quote.id, true); // Change status for send button
+            
+            // CRITICAL FIX: Instantly update localQuotes with the fresh data from the server
+            if (result?.updatedQuote) {
+              setLocalQuotes(prev => prev.map(q => 
+                q.id === quote.id 
+                  ? { ...q, partsRequested: result.updatedQuote.parts_requested, status: result.updatedQuote.status }
+                  : q
+              ));
+            }
+            
             updateLocalState();
             setEditingParts(null);
             setPartEditData({});
@@ -945,26 +1017,26 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
         Object.keys(partEditData).forEach(partId => {
           const partEditDataForPart = partEditData[partId];
           if (partEditDataForPart) {
-            // Process ALL variants for this part, not just the first one
-            const quotePart = quote.partsRequested?.find(qp => qp.part_id === partId);
+            // CRITICAL FIX: Use ORIGINAL quote from database (quotes prop), not local state
+            // This ensures we correctly detect new variants that don't exist in DB yet
+            const originalQuote = quotes.find(q => q.id === editingParts);
+            const originalQuotePart = originalQuote?.partsRequested?.find(qp => qp.part_id === partId);
+            const existingVariants = originalQuotePart?.variants || [];
+            
+            // Also get current local state for comparison
+            const localQuotePart = quote.partsRequested?.find(qp => qp.part_id === partId);
+            const currentVariants = localQuotePart?.variants || [];
+            
             const actualPart = parts.find(p => p.id === partId); // Find the actual Part object
-            const existingVariants = quotePart?.variants || [];
 
             let hasActualChanges = false;
 
             // Handle part-level changes (like number) that don't have a variant ID
             const partLevelNumber = partEditDataForPart.number;
-            console.log('🔍 Part number change check:', {
-              partId,
-              partLevelNumber,
-              actualPartNumber: actualPart?.number,
-              isDifferent: partLevelNumber !== actualPart?.number,
-              hasValue: partLevelNumber !== undefined && typeof partLevelNumber === 'string'
-            });
+           
 
             if (partLevelNumber !== undefined && typeof partLevelNumber === 'string' && partLevelNumber !== actualPart?.number) {
               hasActualChanges = true;
-              console.log('✅ Part number change detected, adding to updates');
               // Apply part-level number change to the first variant (default variant)
               if (existingVariants.length > 0) {
                 const defaultVariant = existingVariants[0];
@@ -991,14 +1063,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                   (variantEditData.number !== undefined && variantEditData.number !== actualPart?.number)
                 );
 
-                console.log('🔍 Variant change check:', {
-                  partId,
-                  variantId: variant.id,
-                  variantEditDataNumber: variantEditData.number,
-                  actualPartNumber: actualPart?.number,
-                  hasNumberChange: variantEditData.number !== undefined && variantEditData.number !== actualPart?.number,
-                  hasChanges
-                });
+              
 
                 if (hasChanges) {
                   hasActualChanges = true;
@@ -1017,14 +1082,20 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
               }
             });
 
-            // IMPORTANT FIX: Also process new variants that don't exist yet
-            // This handles cases where parts have no existing variants but have edit data
+            // IMPORTANT FIX: Process new variants that don't exist in DB yet
+            // By using originalQuote above, existingVariants only contains DB variants
+            // Any variant in partEditDataForPart that's not in existingVariants is NEW
+            const newVariants: string[] = [];
             Object.keys(partEditDataForPart).forEach(variantId => {
-              // Skip if we already processed this variant above
+              // Skip non-variant keys and variants we already processed
+              if (variantId === 'number') return; // Skip part-level number field
+              
               const alreadyProcessed = existingVariants.some(v => v.id === variantId);
               if (!alreadyProcessed) {
+                newVariants.push(variantId);
                 const variantEditData = partEditDataForPart[variantId];
-                if (variantEditData && (variantEditData.number !== undefined || variantEditData.note !== undefined || variantEditData.final_price !== undefined || variantEditData.list_price !== undefined || variantEditData.af !== undefined)) {
+                // For new variants, save them even if fields are empty (to create the variant)
+                if (variantEditData) {
                   hasActualChanges = true;
                   updates.push({
                     id: partId,
@@ -1040,9 +1111,37 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                 }
               }
             });
+
+            // CRITICAL FIX: If new variants were added, we MUST also save all existing variants
+            // from the current local state, even if they weren't edited
+            // This ensures the complete variant list is sent to the backend
+            if (newVariants.length > 0 && currentVariants.length > 0) {
+             
+              
+              // Process ALL current variants to ensure they're all in the updates
+              currentVariants.forEach(variant => {
+                // Skip if we already added this variant
+                const alreadyInUpdates = updates.some(u => u.id === partId && u.updates.variantId === variant.id);
+                if (!alreadyInUpdates) {
+                  hasActualChanges = true;
+                  updates.push({
+                    id: partId,
+                    updates: {
+                      variantId: variant.id,
+                      number: actualPart?.number || '',
+                      note: variant.note || '',
+                      price: variant.final_price,
+                      list_price: variant.list_price,
+                      af: variant.af || false
+                    }
+                  });
+                }
+              });
+            }
           }
         });
 
+       
         // Check for variant removals - compare current state with original database state
         quote.partsRequested?.forEach(partItem => {
           const partId = partItem.part_id;
@@ -1097,7 +1196,6 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                 number: part.number || ''
               }
             }));
-            console.log('💾 Force Save: Sending dummy updates for', dummyUpdates.length, 'parts');
             try {
               await onUpdateMultipleParts(dummyUpdates, editingParts, false); // Don't change status for save button
               updateLocalState();
@@ -1108,11 +1206,20 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
             console.log('💾 Save button: Sending updates for', updates.length, 'parts:', updates.map(u => ({ id: u.id, hasPrice: u.updates.price !== undefined, hasNote: u.updates.note !== undefined, hasListPrice: u.updates.list_price !== undefined, hasNumber: u.updates.number !== undefined })));
             try {
               // Pass the quote ID to onUpdateMultipleParts for more reliable lookup
-              await onUpdateMultipleParts(updates, editingParts, false); // Don't change status for save button
+              const result = await onUpdateMultipleParts(updates, editingParts, false); // Don't change status for save button
+
+              // CRITICAL FIX: Instantly update localQuotes with the fresh data from the server
+              if (result?.updatedQuote) {
+                console.log('✅ Instantly updating localQuotes with fresh variant data');
+                setLocalQuotes(prev => prev.map(q => 
+                  q.id === editingParts 
+                    ? { ...q, partsRequested: result.updatedQuote.parts_requested }
+                    : q
+                ));
+              }
 
               // Update local state after successful backend save
               updateLocalState();
-
 
             } catch (error) {
               console.error('Error saving parts to backend:', error);
@@ -2586,6 +2693,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                                       <input
                                                         ref={(el) => { focusRefs.current['list_price'] = el; }}
                                                         type="number"
+                                                        step="5"
                                                         value={partEditData[part.id]?.[variant.id]?.list_price !== undefined ? partEditData[part.id][variant.id].list_price : (variant.list_price ?? '')}
                                                         onChange={(e) => handleVariantEditChange(part.id, variant.id, 'list_price', e.target.value ? Number(e.target.value) : null)}
                                                         className={`w-full px-2 py-1 border border-gray-300 rounded-sm text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 ${index === 0 ? 'bg-white' : 'bg-gray-50'}`}
@@ -2619,6 +2727,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                                       <input
                                                         ref={(el) => { focusRefs.current['final_price'] = el; }}
                                                         type="number"
+                                                        step="5"
                                                         value={partEditData[part.id]?.[variant.id]?.final_price !== undefined ? partEditData[part.id][variant.id].final_price : (variant.final_price ?? '')}
                                                         onChange={(e) => handleVariantEditChange(part.id, variant.id, 'final_price', e.target.value ? Number(e.target.value) : null)}
                                                         className={`w-full px-2 py-1 border border-gray-300 rounded-sm text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 ${index === 0 ? 'bg-white' : 'bg-gray-50'}`}
@@ -2680,29 +2789,36 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                                       {isPartEditing ? (
                                                         <QuickFillInput
                                                           ref={(el) => { focusRefs.current['note'] = el; }}
-                                                          value={partEditData[part.id]?.[variant.id]?.note ?? variant.note ?? ''}
+                                                          value={getCombinedNotes(quote.notes, partEditData[part.id]?.[variant.id]?.note ?? variant.note)}
                                                           onChange={(value) => handleVariantEditChange(part.id, variant.id, 'note', value)}
                                                           placeholder="Add notes..."
                                                           className={`flex-1 ${index === 0 ? 'bg-white' : 'bg-gray-50'}`}
                                                         />
                                                       ) : (
                                                         <>
-                                                          <span
-                                                            className={`text-sm cursor-pointer hover:bg-gray-100 px-1 py-0.5 rounded transition-colors ${variant.note ? 'text-gray-700' : 'text-gray-400'}`}
-                                                            onClick={() => handleDirectEdit(quote.id, 'note')}
-                                                            title="Click to edit"
-                                                          >
-                                                            {variant.note || 'No notes'}
-                                                          </span>
-                                                          {variant.note && (
-                                                            <CopyButton
-                                                              text={variant.note || ''}
-                                                              title="Copy to clipboard"
-                                                              size="md"
-                                                              className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-md transition-all duration-200 cursor-pointer"
-                                                              iconClassName="h-3.5 w-3.5"
-                                                            />
-                                                          )}
+                                                          {(() => {
+                                                            const combinedNote = getCombinedNotes(quote.notes, variant.note);
+                                                            return (
+                                                              <>
+                                                                <span
+                                                                  className={`text-sm cursor-pointer hover:bg-gray-100 px-1 py-0.5 rounded transition-colors ${combinedNote ? 'text-gray-700' : 'text-gray-400'}`}
+                                                                  onClick={() => handleDirectEdit(quote.id, 'note')}
+                                                                  title="Click to edit"
+                                                                >
+                                                                  {combinedNote || 'No notes'}
+                                                                </span>
+                                                                {combinedNote && (
+                                                                  <CopyButton
+                                                                    text={combinedNote}
+                                                                    title="Copy to clipboard"
+                                                                    size="md"
+                                                                    className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-md transition-all duration-200 cursor-pointer"
+                                                                    iconClassName="h-3.5 w-3.5"
+                                                                  />
+                                                                )}
+                                                              </>
+                                                            );
+                                                          })()}
                                                         </>
                                                       )}
                                                     </div>
@@ -3246,6 +3362,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                               <input
                                                 ref={(el) => { focusRefs.current['list_price_mobile'] = el; }}
                                                 type="number"
+                                                step="5"
                                                 value={partEditData[part.id]?.list_price !== undefined ? partEditData[part.id].list_price : ''}
                                                 onChange={(e) => handlePartEditChange(part.id, 'list_price', e.target.value ? Number(e.target.value) : null)}
                                                 className="flex-1 px-2 py-1 border border-gray-300 rounded-md text-sm focus:ring-1 focus:ring-red-500 focus:border-transparent"
@@ -3279,6 +3396,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                               <input
                                                 ref={(el) => { focusRefs.current['price_mobile'] = el; }}
                                                 type="number"
+                                                step="5"
                                                 value={partEditData[part.id]?.price ?? ''}
                                                 onChange={(e) => handlePartEditChange(part.id, 'price', e.target.value ? Number(e.target.value) : null)}
                                                 className="flex-1 px-2 py-1 border border-gray-300 rounded-md text-sm focus:ring-1 focus:ring-red-500 focus:border-transparent"

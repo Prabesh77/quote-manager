@@ -58,6 +58,7 @@ export interface QuotePartItem {
 
 export interface PartVariant {
   id: string;
+  number?: string; // Part number for this variant
   final_price: number | null;
   list_price: number | null;
   af: boolean;

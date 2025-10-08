@@ -1286,12 +1286,6 @@ export const useUpdatePartsComprehensiveBatchMutation = () => {
           const partUpdatesArray = quoteJsonUpdates.filter(u => u.id === partItem.part_id);
           if (partUpdatesArray.length === 0) return partItem;
 
-          console.log('🔄 Processing part updates:', { 
-            partId: partItem.part_id, 
-            updateCount: partUpdatesArray.length,
-            variantIds: partUpdatesArray.map(u => u.updates.variantId)
-          });
-
           const updatedPart = { ...partItem };
           
           // Process EACH update for this part
@@ -1304,14 +1298,12 @@ export const useUpdatePartsComprehensiveBatchMutation = () => {
               if (partUpdates.variantId === 'variant-removal' && partUpdates._removedVariantIds && partUpdates._currentVariants) {
                 // Use the current variants state from frontend (already filtered)
                 updatedPart.variants = partUpdates._currentVariants;
-                console.log('🗑️ Removing variants, new count:', partUpdates._currentVariants.length);
               } else {
                 const variants = updatedPart.variants || [];
                 const variantIndex = variants.findIndex((v: any) => v.id === partUpdates.variantId);
                 
                 if (variantIndex !== -1) {
                   // Update existing variant
-                  console.log('✏️ Updating existing variant:', { variantId: partUpdates.variantId });
                   variants[variantIndex] = {
                     ...variants[variantIndex],
                     ...(partUpdates.note !== undefined && { note: partUpdates.note }),
@@ -1323,7 +1315,6 @@ export const useUpdatePartsComprehensiveBatchMutation = () => {
                   updatedPart.variants = variants;
                 } else {
                   // Create new variant
-                  console.log('🆕 Creating new variant:', { variantId: partUpdates.variantId });
                   const newVariant = {
                     id: partUpdates.variantId,
                     note: partUpdates.note || '',
@@ -1370,11 +1361,6 @@ export const useUpdatePartsComprehensiveBatchMutation = () => {
               }
             }
           }
-
-          console.log('✅ Part processing complete:', { 
-            partId: partItem.part_id, 
-            variantsCount: updatedPart.variants?.length 
-          });
 
           return updatedPart;
         });
@@ -1434,12 +1420,6 @@ export const useUpdatePartsComprehensiveBatchMutation = () => {
       };
     },
     onSuccess: (data, variables) => {
-      console.log('🔄 Comprehensive batch mutation onSuccess called:', {
-        partsUpdated: variables.updates.length,
-        statusChanged: data?.statusChanged,
-        quoteId: variables.quoteId
-      });
-      
       // Invalidate both parts and quotes caches
       queryClient.invalidateQueries({ 
         queryKey: ['all-parts-for-quotes'],
@@ -1448,7 +1428,6 @@ export const useUpdatePartsComprehensiveBatchMutation = () => {
       
       // CRITICAL FIX: Always invalidate quotes cache to reflect variant changes
       // Not just when status changes, but also when variants are added/updated
-      console.log('🔄 Invalidating quotes cache to reflect variant changes');
       queryClient.invalidateQueries({ queryKey: queryKeys.quotesBase });
       
       showSnackbar(`${variables.updates.length} parts updated successfully!`, 'success');

@@ -222,7 +222,6 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
     // Only add to local state, don't save to database yet
     const newVariantId = generateVariantId();
 
-    console.log('➕ Adding new variant:', { quoteId, partId, newVariantId });
 
     // CRITICAL FIX: When adding a new variant, we must ensure ALL existing variants 
     // are also tracked in partEditData to ensure they get sent in the payload
@@ -252,11 +251,6 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
             list_price: variant.list_price,
             af: variant.af || false
           };
-          console.log('📝 Adding existing variant to partEditData:', { 
-            partId, 
-            variantId: variant.id,
-            hasNumber: !!(variant.number || actualPart?.number)
-          });
         }
       });
       
@@ -310,7 +304,6 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
     // Always ensure editing state is set for this quote
     setEditingParts(quoteId);
     
-    console.log('✅ Variant added successfully');
   };
 
   const removeVariantFromPart = (quoteId: string, partId: string, variantId: string) => {
@@ -699,7 +692,6 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
       try {
         const { QuoteActionsService } = await import('@/services/quoteActions/quoteActionsService');
         await QuoteActionsService.trackQuoteAction(quoteId, 'PRICED');
-        console.log('✅ PRICED: Successfully tracked pricing action for quote:', quoteId);
       } catch (trackingError) {
         console.warn('⚠️ PRICED: Failed to track pricing action:', trackingError);
       }
@@ -833,17 +825,9 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
 
             // Handle part-level changes (like number) that don't have a variant ID
             const partLevelNumber = partEditDataForPart.number;
-            console.log('🔍 Part number change check:', {
-              partId,
-              partLevelNumber,
-              actualPartNumber: actualPart?.number,
-              isDifferent: partLevelNumber !== actualPart?.number,
-              hasValue: partLevelNumber !== undefined && typeof partLevelNumber === 'string'
-            });
 
             if (partLevelNumber !== undefined && typeof partLevelNumber === 'string' && partLevelNumber !== actualPart?.number) {
               hasActualChanges = true;
-              console.log('✅ Part number change detected, adding to updates');
               // Apply part-level number change to the first variant (default variant)
               if (existingVariants.length > 0) {
                 const defaultVariant = existingVariants[0];
@@ -869,15 +853,6 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                   (variantEditData.af !== undefined && variantEditData.af !== variant.af) ||
                   (variantEditData.number !== undefined && variantEditData.number !== actualPart?.number)
                 );
-
-                console.log('🔍 Variant change check:', {
-                  partId,
-                  variantId: variant.id,
-                  variantEditDataNumber: variantEditData.number,
-                  actualPartNumber: actualPart?.number,
-                  hasNumberChange: variantEditData.number !== undefined && variantEditData.number !== actualPart?.number,
-                  hasChanges
-                });
 
                 if (hasChanges) {
                   hasActualChanges = true;
@@ -910,7 +885,6 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                 const variantEditData = partEditDataForPart[variantId];
                 // For new variants, save them even if fields are empty (to create the variant)
                 if (variantEditData) {
-                  console.log('🆕 New variant detected:', { partId, variantId, variantEditData });
                   hasActualChanges = true;
                   updates.push({
                     id: partId,
@@ -931,19 +905,12 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
             // from the current local state, even if they weren't edited
             // This ensures the complete variant list is sent to the backend
             if (newVariants.length > 0 && currentVariants.length > 0) {
-              console.log('🔄 New variants detected, ensuring ALL variants are sent:', {
-                partId,
-                newVariants,
-                currentVariants: currentVariants.length,
-                existingVariants: existingVariants.length
-              });
               
               // Process ALL current variants to ensure they're all in the updates
               currentVariants.forEach(variant => {
                 // Skip if we already added this variant
                 const alreadyInUpdates = updates.some(u => u.id === partId && u.updates.variantId === variant.id);
                 if (!alreadyInUpdates) {
-                  console.log('➕ Adding existing variant to ensure it is saved:', { partId, variantId: variant.id });
                   hasActualChanges = true;
                   updates.push({
                     id: partId,
@@ -962,24 +929,14 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
           }
         });
 
-        console.log('📊 Final payload preview:', { 
-          totalUpdates: updates.length, 
-          updates: updates.map(u => ({ 
-            partId: u.id, 
-            variantId: u.updates.variantId,
-            hasPrice: u.updates.price !== undefined, 
-            hasNote: u.updates.note !== undefined 
-          })) 
-        });
+       
 
         if (updates.length > 0) {
-          console.log('📤 Send button: Sending updates for', updates.length, 'parts:', updates.map(u => ({ id: u.id, hasPrice: u.updates.price !== undefined, hasNote: u.updates.note !== undefined, hasListPrice: u.updates.list_price !== undefined, hasNumber: u.updates.number !== undefined })));
           try {
             const result = await onUpdateMultipleParts(updates, quote.id, true); // Change status for send button
             
             // CRITICAL FIX: Instantly update localQuotes with the fresh data from the server
             if (result?.updatedQuote) {
-              console.log('✅ Instantly updating localQuotes with fresh variant data (Send button)');
               setLocalQuotes(prev => prev.map(q => 
                 q.id === quote.id 
                   ? { ...q, partsRequested: result.updatedQuote.parts_requested, status: result.updatedQuote.status }
@@ -1076,17 +1033,10 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
 
             // Handle part-level changes (like number) that don't have a variant ID
             const partLevelNumber = partEditDataForPart.number;
-            console.log('🔍 Part number change check:', {
-              partId,
-              partLevelNumber,
-              actualPartNumber: actualPart?.number,
-              isDifferent: partLevelNumber !== actualPart?.number,
-              hasValue: partLevelNumber !== undefined && typeof partLevelNumber === 'string'
-            });
+           
 
             if (partLevelNumber !== undefined && typeof partLevelNumber === 'string' && partLevelNumber !== actualPart?.number) {
               hasActualChanges = true;
-              console.log('✅ Part number change detected, adding to updates');
               // Apply part-level number change to the first variant (default variant)
               if (existingVariants.length > 0) {
                 const defaultVariant = existingVariants[0];
@@ -1113,14 +1063,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                   (variantEditData.number !== undefined && variantEditData.number !== actualPart?.number)
                 );
 
-                console.log('🔍 Variant change check:', {
-                  partId,
-                  variantId: variant.id,
-                  variantEditDataNumber: variantEditData.number,
-                  actualPartNumber: actualPart?.number,
-                  hasNumberChange: variantEditData.number !== undefined && variantEditData.number !== actualPart?.number,
-                  hasChanges
-                });
+              
 
                 if (hasChanges) {
                   hasActualChanges = true;
@@ -1153,7 +1096,6 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                 const variantEditData = partEditDataForPart[variantId];
                 // For new variants, save them even if fields are empty (to create the variant)
                 if (variantEditData) {
-                  console.log('🆕 New variant detected:', { partId, variantId, variantEditData });
                   hasActualChanges = true;
                   updates.push({
                     id: partId,
@@ -1174,19 +1116,13 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
             // from the current local state, even if they weren't edited
             // This ensures the complete variant list is sent to the backend
             if (newVariants.length > 0 && currentVariants.length > 0) {
-              console.log('🔄 New variants detected, ensuring ALL variants are sent:', {
-                partId,
-                newVariants,
-                currentVariants: currentVariants.length,
-                existingVariants: existingVariants.length
-              });
+             
               
               // Process ALL current variants to ensure they're all in the updates
               currentVariants.forEach(variant => {
                 // Skip if we already added this variant
                 const alreadyInUpdates = updates.some(u => u.id === partId && u.updates.variantId === variant.id);
                 if (!alreadyInUpdates) {
-                  console.log('➕ Adding existing variant to ensure it is saved:', { partId, variantId: variant.id });
                   hasActualChanges = true;
                   updates.push({
                     id: partId,
@@ -1205,16 +1141,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
           }
         });
 
-        console.log('📊 Final payload preview:', { 
-          totalUpdates: updates.length, 
-          updates: updates.map(u => ({ 
-            partId: u.id, 
-            variantId: u.updates.variantId,
-            hasPrice: u.updates.price !== undefined, 
-            hasNote: u.updates.note !== undefined 
-          })) 
-        });
-
+       
         // Check for variant removals - compare current state with original database state
         quote.partsRequested?.forEach(partItem => {
           const partId = partItem.part_id;
@@ -1269,7 +1196,6 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                 number: part.number || ''
               }
             }));
-            console.log('💾 Force Save: Sending dummy updates for', dummyUpdates.length, 'parts');
             try {
               await onUpdateMultipleParts(dummyUpdates, editingParts, false); // Don't change status for save button
               updateLocalState();

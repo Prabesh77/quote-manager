@@ -1667,7 +1667,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
     if (!quote) return;
 
     try {
-      let updates: Array<{ id: string; updates: Partial<Part> }> = [];
+      const updates: Array<{ id: string; updates: Partial<Part> }> = [];
 
       if (editingParts === quoteId) {
         // We're in editing mode, save pending edits first

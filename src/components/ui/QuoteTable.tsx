@@ -607,59 +607,67 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
           return;
         }
 
-        // Build updates from edit data
-        updates = quoteParts.map(part => {
-          const editData = partEditData[part.id];
-          if (editData) {
-            // Check if editData has variant structure (object with variant IDs as keys)
-            const hasVariantStructure = Object.keys(editData).some(key =>
+        // Build updates from edit data - SAME LOGIC AS SAVE BUTTON
+        // Process each part in partEditData to get ALL variants
+        Object.keys(partEditData).forEach(partId => {
+          const partEditDataForPart = partEditData[partId];
+          if (partEditDataForPart) {
+            const quotePart = quote.partsRequested?.find(qp => qp.part_id === partId);
+            const existingVariants = quotePart?.variants || [];
+            const actualPart = parts.find(p => p.id === partId);
+
+            // Check if editData has variant structure
+            const hasVariantStructure = Object.keys(partEditDataForPart).some(key =>
               key !== 'note' && key !== 'price' && key !== 'list_price' && key !== 'af' && key !== 'number'
             );
 
             if (hasVariantStructure) {
-              // For parts with variants, use the first variant's data
-              const variantId = Object.keys(editData).find(key =>
-                key !== 'note' && key !== 'price' && key !== 'list_price' && key !== 'af' && key !== 'number'
-              );
-              const variantData = variantId ? editData[variantId] : {};
+              // Process ALL variants for this part
+              Object.keys(partEditDataForPart).forEach(variantId => {
+                if (variantId === 'note' || variantId === 'price' || variantId === 'list_price' || variantId === 'af' || variantId === 'number') return;
+                
+                const variantEditData = partEditDataForPart[variantId];
+                const variant = existingVariants.find(v => v.id === variantId);
+                
+                const hasChanges = (
+                  (variantEditData.note !== undefined && variantEditData.note !== variant?.note) ||
+                  (variantEditData.final_price !== undefined && variantEditData.final_price !== variant?.final_price) ||
+                  (variantEditData.list_price !== undefined && variantEditData.list_price !== variant?.list_price) ||
+                  (variantEditData.af !== undefined && variantEditData.af !== variant?.af) ||
+                  (variantEditData.number !== undefined && variantEditData.number !== actualPart?.number)
+                );
 
-              return {
-                id: part.id,
-                updates: {
-                  variantId: variantId || 'default',
-                  note: (variantData.note ?? part.note) || '',
-                  price: (variantData.final_price ?? part.price) || null,
-                  list_price: (variantData.list_price ?? part.list_price) || null,
-                  af: (variantData.af ?? part.af) || false,
-                  number: part.number || ''
+                if (hasChanges || !variant) {
+                  updates.push({
+                    id: partId,
+                    updates: {
+                      variantId,
+                      note: variantEditData.note ?? variant?.note ?? '',
+                      price: variantEditData.final_price ?? variant?.final_price ?? null,
+                      list_price: variantEditData.list_price ?? variant?.list_price ?? null,
+                      af: variantEditData.af ?? variant?.af ?? false,
+                      number: variantEditData.number ?? variant?.number ?? actualPart?.number ?? ''
+                    }
+                  } as any);
                 }
-              };
+              });
             } else {
-              // For parts without variants, use part-level data
-              return {
-                id: part.id,
-                updates: {
-                  note: (editData.note ?? part.note) || '',
-                  price: (editData.price ?? part.price) || null,
-                  list_price: (editData.list_price ?? part.list_price) || null,
-                  af: (editData.af ?? part.af) || false,
-                  number: (editData.number ?? part.number) || ''
-                }
-              };
+              // Part-level data (no variants)
+              const part = quoteParts.find(p => p.id === partId);
+              if (part) {
+                updates.push({
+                  id: partId,
+                  updates: {
+                    note: partEditDataForPart.note ?? part.note ?? '',
+                    price: partEditDataForPart.price ?? part.price ?? null,
+                    list_price: partEditDataForPart.list_price ?? part.list_price ?? null,
+                    af: partEditDataForPart.af ?? part.af ?? false,
+                    number: partEditDataForPart.number ?? part.number ?? ''
+                  }
+                });
+              }
             }
           }
-
-          // No edit data, use existing part data
-          return {
-            id: part.id,
-            updates: {
-              note: part.note || '',
-              price: part.price || null,
-              list_price: part.list_price || null,
-              af: part.af || false,
-              number: part.number || ''
-            }
-          };
         });
       } else {
         // Not in editing mode, use existing data
@@ -686,7 +694,16 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
       }
 
       // Use the comprehensive batch mutation that handles both parts and status
-      await onUpdateMultipleParts(updates, quoteId, true); // Pass true to change status
+      const result = await onUpdateMultipleParts(updates, quoteId, true); // Pass true to change status
+
+      // CRITICAL FIX: Instantly update localQuotes with the fresh data from the server
+      if (result?.updatedQuote) {
+        setLocalQuotes(prev => prev.map(q => 
+          q.id === quoteId 
+            ? { ...q, partsRequested: result.updatedQuote.parts_requested, status: result.updatedQuote.status }
+            : q
+        ));
+      }
 
       // Track PRICED action
       try {

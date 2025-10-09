@@ -744,16 +744,16 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
   };
 
   // Handle direct click to start editing
-  const handleDirectEdit = (quoteId: string, fieldToFocus?: string) => {
+  const handleDirectEdit = (quoteId: string, partId: string, variantId: string, field: string) => {
     if (editingParts !== quoteId) {
       setEditingParts(quoteId);
       setPartEditData({});
     }
 
     // Set focus field for the specific input that was clicked
-    if (fieldToFocus) {
-      setFocusField(fieldToFocus);
-    }
+    // Use unique key that includes partId, variantId, and field
+    const focusKey = `${partId}_${variantId}_${field}`;
+    setFocusField(focusKey);
   };
 
   // Focus the appropriate field when focusField changes
@@ -2695,6 +2695,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                                     <div className="flex items-center space-x-1">
                                                       {isPartEditing ? (
                                                         <input
+                                                          ref={(el) => { focusRefs.current[`${part.id}_${variant.id}_number`] = el; }}
                                                           type="text"
                                                           value={partEditData[part.id]?.[variant.id]?.number ?? part.number ?? ''}
                                                           onChange={(e) => handleVariantEditChange(part.id, variant.id, 'number', e.target.value)}
@@ -2742,7 +2743,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                                   <div className="flex items-center space-x-1">
                                                     {isPartEditing ? (
                                                       <input
-                                                        ref={(el) => { focusRefs.current['list_price'] = el; }}
+                                                        ref={(el) => { focusRefs.current[`${part.id}_${variant.id}_list_price`] = el; }}
                                                         type="number"
                                                         step="5"
                                                         value={partEditData[part.id]?.[variant.id]?.list_price !== undefined ? partEditData[part.id][variant.id].list_price : (variant.list_price ?? '')}
@@ -2754,7 +2755,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                                       <>
                                                         <span
                                                           className={`text-sm font-medium cursor-pointer hover:bg-gray-100 px-1 py-0.5 rounded transition-colors ${variant.list_price ? (variant.list_price < 10 ? 'text-red-600 line-through' : 'text-gray-900') : 'text-gray-400'}`}
-                                                          onClick={() => handleDirectEdit(quote.id, 'list_price')}
+                                                          onClick={() => handleDirectEdit(quote.id, part.id, variant.id, 'list_price')}
                                                           title={variant.list_price && variant.list_price < 10 ? "Part not available" : "Click to edit"}
                                                         >
                                                           {variant.list_price ? (variant.list_price < 10 ? 'N/A' : `$${variant.list_price.toFixed(2)}`) : 'Not set'}
@@ -2776,7 +2777,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                                   <div className="flex items-center space-x-1">
                                                     {isPartEditing ? (
                                                       <input
-                                                        ref={(el) => { focusRefs.current['final_price'] = el; }}
+                                                        ref={(el) => { focusRefs.current[`${part.id}_${variant.id}_final_price`] = el; }}
                                                         type="number"
                                                         step="5"
                                                         value={partEditData[part.id]?.[variant.id]?.final_price !== undefined ? partEditData[part.id][variant.id].final_price : (variant.final_price ?? '')}
@@ -2788,7 +2789,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                                       <>
                                                         <span
                                                           className={`text-sm font-medium cursor-pointer hover:bg-gray-100 px-1 py-0.5 rounded transition-colors ${variant.final_price ? (variant.final_price < 10 ? 'text-red-600 line-through' : 'text-gray-900') : 'text-gray-400'}`}
-                                                          onClick={() => handleDirectEdit(quote.id, 'final_price')}
+                                                          onClick={() => handleDirectEdit(quote.id, part.id, variant.id, 'final_price')}
                                                           title={variant.final_price && variant.final_price < 10 ? "Part not available" : "Click to edit"}
                                                         >
                                                           {variant.final_price ? (variant.final_price < 10 ? 'N/A' : `$${variant.final_price.toFixed(2)}`) : 'Not set'}
@@ -2810,7 +2811,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                                   <div className="flex items-start justify-start">
                                                     {isPartEditing ? (
                                                       <input
-                                                        ref={(el) => { focusRefs.current['af'] = el; }}
+                                                        ref={(el) => { focusRefs.current[`${part.id}_${variant.id}_af`] = el; }}
                                                         type="checkbox"
                                                         checked={partEditData[part.id]?.[variant.id]?.af ?? variant.af ?? false}
                                                         onChange={(e) => handleVariantEditChange(part.id, variant.id, 'af', e.target.checked)}
@@ -2820,7 +2821,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                                     ) : (
                                                       <span
                                                         className={`text-sm cursor-pointer hover:bg-gray-100 px-1 py-0.5 rounded transition-colors ${variant.af ? 'text-green-600 font-medium' : 'text-gray-400'}`}
-                                                        onClick={() => handleDirectEdit(quote.id, 'af')}
+                                                        onClick={() => handleDirectEdit(quote.id, part.id, variant.id, 'af')}
                                                         title="Click to edit"
                                                       >
                                                         {variant.af ? (
@@ -2839,7 +2840,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                                     <div className="flex items-center space-x-1 flex-1 min-w-0">
                                                       {isPartEditing ? (
                                                         <QuickFillInput
-                                                          ref={(el) => { focusRefs.current['note'] = el; }}
+                                                          ref={(el) => { focusRefs.current[`${part.id}_${variant.id}_note`] = el; }}
                                                           value={getCombinedNotes(quote.notes, partEditData[part.id]?.[variant.id]?.note ?? variant.note)}
                                                           onChange={(value) => handleVariantEditChange(part.id, variant.id, 'note', value)}
                                                           placeholder="Add notes..."
@@ -2853,7 +2854,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                                               <>
                                                                 <span
                                                                   className={`text-sm cursor-pointer hover:bg-gray-100 px-1 py-0.5 rounded transition-colors ${combinedNote ? 'text-gray-700' : 'text-gray-400'}`}
-                                                                  onClick={() => handleDirectEdit(quote.id, 'note')}
+                                                                  onClick={() => handleDirectEdit(quote.id, part.id, variant.id, 'note')}
                                                                   title="Click to edit"
                                                                 >
                                                                   {combinedNote || 'No notes'}
@@ -3411,7 +3412,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                           <div className="flex items-center space-x-1">
                                             {isPartEditing ? (
                                               <input
-                                                ref={(el) => { focusRefs.current['list_price_mobile'] = el; }}
+                                                ref={(el) => { focusRefs.current[`${part.id}_mobile_list_price`] = el; }}
                                                 type="number"
                                                 step="5"
                                                 value={partEditData[part.id]?.list_price !== undefined ? partEditData[part.id].list_price : ''}
@@ -3422,7 +3423,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                               <>
                                                 <span
                                                   className={`text-sm font-medium cursor-pointer hover:bg-gray-100 px-1 py-0.5 rounded transition-colors ${part.list_price ? (part.list_price < 10 ? 'text-red-600 line-through' : 'text-gray-900') : 'text-gray-400'}`}
-                                                  onClick={() => handleDirectEdit(quote.id, 'list_price_mobile')}
+                                                  onClick={() => handleDirectEdit(quote.id, part.id, 'mobile', 'list_price')}
                                                   title={part.list_price && part.list_price < 10 ? "Part not available" : "Click to edit"}
                                                 >
                                                   {part.list_price ? (part.list_price < 10 ? 'N/A' : `$${part.list_price.toFixed(2)}`) : '-'}
@@ -3445,7 +3446,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                           <div className="flex items-center space-x-1">
                                             {isPartEditing ? (
                                               <input
-                                                ref={(el) => { focusRefs.current['price_mobile'] = el; }}
+                                                ref={(el) => { focusRefs.current[`${part.id}_mobile_price`] = el; }}
                                                 type="number"
                                                 step="5"
                                                 value={partEditData[part.id]?.price ?? ''}
@@ -3456,7 +3457,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                               <>
                                                 <span
                                                   className={`text-sm font-medium cursor-pointer hover:bg-gray-100 px-1 py-0.5 rounded transition-colors ${part.price ? (part.price < 10 ? 'text-red-600 line-through' : 'text-gray-900') : 'text-gray-400'}`}
-                                                  onClick={() => handleDirectEdit(quote.id, 'price_mobile')}
+                                                  onClick={() => handleDirectEdit(quote.id, part.id, 'mobile', 'price')}
                                                   title={part.price && part.price < 10 ? "Part not available" : "Click to edit"}
                                                 >
                                                   {part.price ? (part.price < 10 ? 'N/A' : `$${part.price.toFixed(2)}`) : '-'}
@@ -3481,7 +3482,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                           <div className="flex items-center space-x-1">
                                             {isPartEditing ? (
                                               <input
-                                                ref={(el) => { focusRefs.current['af_mobile'] = el; }}
+                                                ref={(el) => { focusRefs.current[`${part.id}_mobile_af`] = el; }}
                                                 type="checkbox"
                                                 checked={partEditData[part.id]?.af || false}
                                                 onChange={(e) => handlePartEditChange(part.id, 'af', e.target.checked)}
@@ -3491,7 +3492,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                             ) : (
                                               <span
                                                 className={`text-sm cursor-pointer hover:bg-gray-100 px-1 py-0.5 rounded transition-colors ${part.af ? 'text-green-600 font-medium' : 'text-gray-400'}`}
-                                                onClick={() => handleDirectEdit(quote.id, 'af_mobile')}
+                                                onClick={() => handleDirectEdit(quote.id, part.id, 'mobile', 'af')}
                                                 title="Click to edit"
                                               >
                                                 {part.af ? (
@@ -3511,7 +3512,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                           <div className="flex items-center space-x-1 min-w-0">
                                             {isPartEditing ? (
                                               <QuickFillInput
-                                                ref={(el) => { focusRefs.current['note_mobile'] = el; }}
+                                                ref={(el) => { focusRefs.current[`${part.id}_mobile_note`] = el; }}
                                                 value={partEditData[part.id]?.note ?? ''}
                                                 onChange={(value) => handlePartEditChange(part.id, 'note', value)}
                                                 className="flex-1"
@@ -3520,7 +3521,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                               <>
                                                 <span
                                                   className="text-sm text-gray-600 cursor-pointer hover:bg-gray-100 px-1 py-0.5 rounded transition-colors"
-                                                  onClick={() => handleDirectEdit(quote.id, 'note_mobile')}
+                                                  onClick={() => handleDirectEdit(quote.id, part.id, 'mobile', 'note')}
                                                   title="Click to edit"
                                                 >
                                                   {part.note || '-'}

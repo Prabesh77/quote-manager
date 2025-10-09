@@ -222,7 +222,6 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
     // Only add to local state, don't save to database yet
     const newVariantId = generateVariantId();
 
-
     // CRITICAL FIX: When adding a new variant, we must ensure ALL existing variants 
     // are also tracked in partEditData to ensure they get sent in the payload
     setPartEditData(prev => {
@@ -242,8 +241,10 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
       // This is crucial - if they're not being edited, they won't be in partEditData,
       // and won't be sent to the backend
       existingVariants.forEach(variant => {
+        // CRITICAL FIX: Always preserve existing variant data from partEditData if it exists
+        // Otherwise, use the variant data from the database
         if (!newPartData[variant.id]) {
-          // CRITICAL: Add existing variant data INCLUDING number field to ensure it's included in payload
+          // Variant not in partEditData yet, add it from database
           newPartData[variant.id] = {
             number: variant.number || actualPart?.number || '',
             note: variant.note || '',
@@ -252,6 +253,8 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
             af: variant.af || false
           };
         }
+        // If variant.id already exists in newPartData (from prev state), keep it as is
+        // This preserves any edits the user has made
       });
       
       // THEN: Add the new variant (with number field)
@@ -301,9 +304,13 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
       return updatedQuotes;
     });
 
-    // Always ensure editing state is set for this quote
-    setEditingParts(quoteId);
-    
+    // CRITICAL FIX: Set editing state AFTER updating data
+    // Use setTimeout to ensure state updates are processed in the correct order
+    setTimeout(() => {
+      if (editingParts !== quoteId) {
+        setEditingParts(quoteId);
+      }
+    }, 0);
   };
 
   const removeVariantFromPart = (quoteId: string, partId: string, variantId: string) => {

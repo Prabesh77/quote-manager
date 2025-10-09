@@ -414,6 +414,19 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
     return `${quoteNotes} | ${partNote}`;
   };
 
+  // Helper function to extract ETA from quote notes
+  const extractETA = (notes: string | undefined): string | null => {
+    if (!notes) return null;
+    const etaMatch = notes.match(/ETA\s+([^|]+)/i);
+    return etaMatch ? etaMatch[1].trim() : null;
+  };
+
+  // Helper function to remove ETA from notes (to avoid duplication)
+  const removeETAFromNotes = (notes: string | undefined): string => {
+    if (!notes) return '';
+    return notes.replace(/ETA\s+[^|]+\s*\|?\s*/gi, '').replace(/\|\s*\|/g, '|').replace(/^\s*\|\s*|\s*\|\s*$/g, '').trim();
+  };
+
   // Function to get parts with notes for a specific quote (synchronous)
   const getQuotePartsWithNotesSync = (quoteId: string): Part[] => {
     // First try to find the quote with JSON structure
@@ -2467,17 +2480,38 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                   <img src="/icons/notepad.png" height={20} width={20} alt="Notes" />
                                   <p>Note:</p>
                                 </label>
-                                <QuickFillInput
-                                  value={quoteNotesEditData[quote.id] !== undefined ? quoteNotesEditData[quote.id] : (quote.notes || '')}
-                                  onChange={(value) => handleQuoteNotesChange(quote.id, value)}
-                                  onQuickFillSelect={handleQuickFillSelect}
-                                  onPopupClose={() => handleQuoteNotesSave(quote.id)}
-                                  className="min-w-[200px]"
-                                  placeholder="Enter notes for all parts..."
-                                  textMode={true}
-                                  loading={quoteNotesLoading[quote.id] || false}
-                                />
+                                <div className="relative flex items-center">
+                                  <QuickFillInput
+                                    value={quoteNotesEditData[quote.id] !== undefined ? quoteNotesEditData[quote.id] : (quote.notes || '')}
+                                    onChange={(value) => handleQuoteNotesChange(quote.id, value)}
+                                    onQuickFillSelect={handleQuickFillSelect}
+                                    onPopupClose={() => handleQuoteNotesSave(quote.id)}
+                                    className="min-w-[200px]"
+                                    placeholder="Enter notes for all parts..."
+                                    textMode={true}
+                                    loading={quoteNotesLoading[quote.id] || false}
+                                    hideETA={true}
+                                  />
+                                </div>
                               </div>
+                              
+                              {/* ETA Badge - Displayed inline with notes */}
+                              {(() => {
+                                const eta = extractETA(quote.notes);
+                                if (!eta) return null;
+                                
+                                return (
+                                  <div className="flex items-center space-x-1 ml-2">
+                                    <div className="flex items-center space-x-1 px-2 py-1 bg-amber-100 border border-amber-300 rounded shadow-sm text-xs">
+                                      <span className="text-amber-900 font-bold text-xs inline-flex items-center">
+                                        <span className="inline-block animate-[swing_1s_ease-in-out_infinite] origin-top">⏰</span>
+                                        <span className="ml-1">Est. Delivery:</span>
+                                      </span>
+                                      <span className="text-amber-900 font-semibold text-xs">{eta}</span>
+                                    </div>
+                                  </div>
+                                );
+                              })()}
                             </div>
                             {quoteParts.length === 0 && (
                               <span className="text-sm text-gray-500">No parts linked to this quote</span>

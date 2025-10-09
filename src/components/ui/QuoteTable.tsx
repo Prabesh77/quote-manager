@@ -596,7 +596,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
     setSendForReviewLoading(quoteId);
 
     try {
-      let updates: Array<{ id: string; updates: Partial<Part> }> = [];
+      const updates: Array<{ id: string; updates: Partial<Part> }> = [];
 
       if (editingParts === quoteId) {
         // We're in editing mode, use the current edit data

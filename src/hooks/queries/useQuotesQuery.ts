@@ -183,7 +183,7 @@ export const useQuotesQuery = (page: number = 1, limit: number = 20, filters?: {
     staleTime: 30 * 1000, // Consider data fresh for 30 seconds
     gcTime: 5 * 60 * 1000, // 5 minutes cache time
     refetchOnWindowFocus: false, // Don't refetch on window focus
-    refetchOnMount: 'always', // Refetch when component mounts if data is stale
+    refetchOnMount: true, // OPTIMIZED: Don't refetch on mount, rely on cache and realtime updates
     retry: 2, // Retry twice on failure
   });
 };
@@ -543,9 +543,25 @@ export const useUpdateQuoteMutation = () => {
       
       return { id, fields };
     },
-    onSuccess: () => {
-      // Invalidate and refetch quotes after successful update
-      queryClient.invalidateQueries({ queryKey: queryKeys.quotesBase });
+    onSuccess: async (_data, variables) => {
+      // OPTIMIZED: Only invalidate specific quote queries, not all quotes
+      // Get the quote to check its status
+      const { data: quoteData } = await supabase
+        .from('quotes')
+        .select('status')
+        .eq('id', variables.id)
+        .single();
+      
+      if (quoteData) {
+        // Only invalidate queries for this quote's status
+        queryClient.invalidateQueries({
+          queryKey: ['quotes'],
+          predicate: (query) => {
+            const filters = query.queryKey[3] as any;
+            return filters?.status === quoteData.status || !filters?.status;
+          }
+        });
+      }
     },
     onError: (error) => {
       console.error('Error updating quote:', error);
@@ -572,8 +588,12 @@ export const useDeleteQuoteMutation = () => {
       return id;
     },
     onSuccess: () => {
-      // Invalidate and refetch quotes
-      queryClient.invalidateQueries({ queryKey: queryKeys.quotesBase });
+      // OPTIMIZED: Invalidate all quote queries since we don't know which page the deleted quote was on
+      // But use predicate to be more specific
+      queryClient.invalidateQueries({
+        queryKey: ['quotes'],
+        predicate: (query) => query.queryKey[0] === 'quotes'
+      });
     },
     onError: (error) => {
       console.error('Error deleting quote:', error);
@@ -1419,16 +1439,39 @@ export const useUpdatePartsComprehensiveBatchMutation = () => {
         } : null
       };
     },
-    onSuccess: (data, variables) => {
-      // Invalidate both parts and quotes caches
+    onSuccess: async (data, variables) => {
+      // Invalidate parts cache
       queryClient.invalidateQueries({ 
         queryKey: ['all-parts-for-quotes'],
         exact: false
       });
       
-      // CRITICAL FIX: Always invalidate quotes cache to reflect variant changes
-      // Not just when status changes, but also when variants are added/updated
-      queryClient.invalidateQueries({ queryKey: queryKeys.quotesBase });
+      // OPTIMIZED: Only invalidate the specific quote query keys that need updating
+      // Get the quote to check its status
+      const { data: quoteData } = await supabase
+        .from('quotes')
+        .select('status')
+        .eq('id', variables.quoteId)
+        .single();
+      
+      if (quoteData) {
+        // Invalidate queries for the current status and waiting_verification (where quote might have moved)
+        const statusesToInvalidate = [
+          quoteData.status,
+          'waiting_verification', // In case status changed
+          'unpriced' // In case it came from unpriced
+        ];
+        
+        statusesToInvalidate.forEach(status => {
+          queryClient.invalidateQueries({
+            queryKey: ['quotes'],
+            predicate: (query) => {
+              const filters = query.queryKey[3] as any;
+              return filters?.status === status;
+            }
+          });
+        });
+      }
       
       showSnackbar(`${variables.updates.length} parts updated successfully!`, 'success');
     },

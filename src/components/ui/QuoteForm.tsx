@@ -608,7 +608,7 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
                 {fields.customer && fields.quoteRef && (
                   <div className="flex items-center space-x-2 text-sm text-gray-600">
                     <span>•</span>
-                    <span className="font-medium text-blue-600">{fields.customer}</span>
+                    <span className="font-medium text-blue-600">{fields.customer}({fields.settlement ? fields.settlement : '0'}%)</span>
                     <span>•</span>
                     <span className="font-mono text-green-600">{fields.quoteRef}</span>
                     {(fields.make || fields.model) && (
@@ -810,6 +810,7 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
                     <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Customer Name
+                     
                       </label>
                       <Input
                       type="text"

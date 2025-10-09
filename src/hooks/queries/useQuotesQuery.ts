@@ -183,7 +183,7 @@ export const useQuotesQuery = (page: number = 1, limit: number = 20, filters?: {
     staleTime: 30 * 1000, // Consider data fresh for 30 seconds
     gcTime: 5 * 60 * 1000, // 5 minutes cache time
     refetchOnWindowFocus: false, // Don't refetch on window focus
-    refetchOnMount: false, // OPTIMIZED: Don't refetch on mount, rely on cache and realtime updates
+    refetchOnMount: true, // OPTIMIZED: Don't refetch on mount, rely on cache and realtime updates
     retry: 2, // Retry twice on failure
   });
 };

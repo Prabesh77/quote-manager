@@ -14,6 +14,7 @@ interface QuickFillInputProps {
   onPopupClose?: () => void; // Callback when quick fill popup is closed
   textMode?: boolean; // When true, looks like normal text when popup is closed
   loading?: boolean; // When true, shows loading spinner
+  hideETA?: boolean; // When true, hides ETA portion in text mode display
 }
 
 const QuickFillInput = forwardRef<HTMLInputElement, QuickFillInputProps>(({
@@ -27,7 +28,8 @@ const QuickFillInput = forwardRef<HTMLInputElement, QuickFillInputProps>(({
   onQuickFillSelect,
   onPopupClose,
   textMode = false,
-  loading = false
+  loading = false,
+  hideETA = false
 }, ref) => {
   const { isOpen, triggerRef, open, close } = useQuickFillNotes();
 
@@ -104,7 +106,24 @@ const QuickFillInput = forwardRef<HTMLInputElement, QuickFillInputProps>(({
               <span className="text-gray-400">Saving...</span>
             </>
           ) : (
-            value || placeholder
+            <>
+              {(() => {
+                const displayValue = value || placeholder;
+                if (!hideETA) return displayValue;
+                
+                // Hide ETA portion by making it invisible
+                const parts = displayValue.split('|').map(part => part.trim());
+                return parts.map((part, index) => {
+                  const isETA = part.match(/^ETA\s+/i);
+                  return (
+                    <React.Fragment key={index}>
+                      {index > 0 && <span> | </span>}
+                      <span className={isETA ? 'opacity-0' : ''}>{part}</span>
+                    </React.Fragment>
+                  );
+                });
+              })()}
+            </>
           )}
         </div>
       )}

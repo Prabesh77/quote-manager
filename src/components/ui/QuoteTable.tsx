@@ -414,6 +414,19 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
     return `${quoteNotes} | ${partNote}`;
   };
 
+  // Helper function to extract ETA from quote notes
+  const extractETA = (notes: string | undefined): string | null => {
+    if (!notes) return null;
+    const etaMatch = notes.match(/ETA\s+([^|]+)/i);
+    return etaMatch ? etaMatch[1].trim() : null;
+  };
+
+  // Helper function to remove ETA from notes (to avoid duplication)
+  const removeETAFromNotes = (notes: string | undefined): string => {
+    if (!notes) return '';
+    return notes.replace(/ETA\s+[^|]+\s*\|?\s*/gi, '').replace(/\|\s*\|/g, '|').replace(/^\s*\|\s*|\s*\|\s*$/g, '').trim();
+  };
+
   // Function to get parts with notes for a specific quote (synchronous)
   const getQuotePartsWithNotesSync = (quoteId: string): Part[] => {
     // First try to find the quote with JSON structure
@@ -607,59 +620,67 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
           return;
         }
 
-        // Build updates from edit data
-        updates = quoteParts.map(part => {
-          const editData = partEditData[part.id];
-          if (editData) {
-            // Check if editData has variant structure (object with variant IDs as keys)
-            const hasVariantStructure = Object.keys(editData).some(key =>
+        // Build updates from edit data - SAME LOGIC AS SAVE BUTTON
+        // Process each part in partEditData to get ALL variants
+        Object.keys(partEditData).forEach(partId => {
+          const partEditDataForPart = partEditData[partId];
+          if (partEditDataForPart) {
+            const quotePart = quote.partsRequested?.find(qp => qp.part_id === partId);
+            const existingVariants = quotePart?.variants || [];
+            const actualPart = parts.find(p => p.id === partId);
+
+            // Check if editData has variant structure
+            const hasVariantStructure = Object.keys(partEditDataForPart).some(key =>
               key !== 'note' && key !== 'price' && key !== 'list_price' && key !== 'af' && key !== 'number'
             );
 
             if (hasVariantStructure) {
-              // For parts with variants, use the first variant's data
-              const variantId = Object.keys(editData).find(key =>
-                key !== 'note' && key !== 'price' && key !== 'list_price' && key !== 'af' && key !== 'number'
-              );
-              const variantData = variantId ? editData[variantId] : {};
+              // Process ALL variants for this part
+              Object.keys(partEditDataForPart).forEach(variantId => {
+                if (variantId === 'note' || variantId === 'price' || variantId === 'list_price' || variantId === 'af' || variantId === 'number') return;
+                
+                const variantEditData = partEditDataForPart[variantId];
+                const variant = existingVariants.find(v => v.id === variantId);
+                
+                const hasChanges = (
+                  (variantEditData.note !== undefined && variantEditData.note !== variant?.note) ||
+                  (variantEditData.final_price !== undefined && variantEditData.final_price !== variant?.final_price) ||
+                  (variantEditData.list_price !== undefined && variantEditData.list_price !== variant?.list_price) ||
+                  (variantEditData.af !== undefined && variantEditData.af !== variant?.af) ||
+                  (variantEditData.number !== undefined && variantEditData.number !== actualPart?.number)
+                );
 
-              return {
-                id: part.id,
-                updates: {
-                  variantId: variantId || 'default',
-                  note: (variantData.note ?? part.note) || '',
-                  price: (variantData.final_price ?? part.price) || null,
-                  list_price: (variantData.list_price ?? part.list_price) || null,
-                  af: (variantData.af ?? part.af) || false,
-                  number: part.number || ''
+                if (hasChanges || !variant) {
+                  updates.push({
+                    id: partId,
+                    updates: {
+                      variantId,
+                      note: variantEditData.note ?? variant?.note ?? '',
+                      price: variantEditData.final_price ?? variant?.final_price ?? null,
+                      list_price: variantEditData.list_price ?? variant?.list_price ?? null,
+                      af: variantEditData.af ?? variant?.af ?? false,
+                      number: variantEditData.number ?? variant?.number ?? actualPart?.number ?? ''
+                    }
+                  } as any);
                 }
-              };
+              });
             } else {
-              // For parts without variants, use part-level data
-              return {
-                id: part.id,
-                updates: {
-                  note: (editData.note ?? part.note) || '',
-                  price: (editData.price ?? part.price) || null,
-                  list_price: (editData.list_price ?? part.list_price) || null,
-                  af: (editData.af ?? part.af) || false,
-                  number: (editData.number ?? part.number) || ''
-                }
-              };
+              // Part-level data (no variants)
+              const part = quoteParts.find(p => p.id === partId);
+              if (part) {
+                updates.push({
+                  id: partId,
+                  updates: {
+                    note: partEditDataForPart.note ?? part.note ?? '',
+                    price: partEditDataForPart.price ?? part.price ?? null,
+                    list_price: partEditDataForPart.list_price ?? part.list_price ?? null,
+                    af: partEditDataForPart.af ?? part.af ?? false,
+                    number: partEditDataForPart.number ?? part.number ?? ''
+                  }
+                });
+              }
             }
           }
-
-          // No edit data, use existing part data
-          return {
-            id: part.id,
-            updates: {
-              note: part.note || '',
-              price: part.price || null,
-              list_price: part.list_price || null,
-              af: part.af || false,
-              number: part.number || ''
-            }
-          };
         });
       } else {
         // Not in editing mode, use existing data
@@ -686,7 +707,16 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
       }
 
       // Use the comprehensive batch mutation that handles both parts and status
-      await onUpdateMultipleParts(updates, quoteId, true); // Pass true to change status
+      const result = await onUpdateMultipleParts(updates, quoteId, true); // Pass true to change status
+
+      // CRITICAL FIX: Instantly update localQuotes with the fresh data from the server
+      if (result?.updatedQuote) {
+        setLocalQuotes(prev => prev.map(q => 
+          q.id === quoteId 
+            ? { ...q, partsRequested: result.updatedQuote.parts_requested, status: result.updatedQuote.status }
+            : q
+        ));
+      }
 
       // Track PRICED action
       try {
@@ -2450,17 +2480,38 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                   <img src="/icons/notepad.png" height={20} width={20} alt="Notes" />
                                   <p>Note:</p>
                                 </label>
-                                <QuickFillInput
-                                  value={quoteNotesEditData[quote.id] !== undefined ? quoteNotesEditData[quote.id] : (quote.notes || '')}
-                                  onChange={(value) => handleQuoteNotesChange(quote.id, value)}
-                                  onQuickFillSelect={handleQuickFillSelect}
-                                  onPopupClose={() => handleQuoteNotesSave(quote.id)}
-                                  className="min-w-[200px]"
-                                  placeholder="Enter notes for all parts..."
-                                  textMode={true}
-                                  loading={quoteNotesLoading[quote.id] || false}
-                                />
+                                <div className="relative flex items-center">
+                                  <QuickFillInput
+                                    value={quoteNotesEditData[quote.id] !== undefined ? quoteNotesEditData[quote.id] : (quote.notes || '')}
+                                    onChange={(value) => handleQuoteNotesChange(quote.id, value)}
+                                    onQuickFillSelect={handleQuickFillSelect}
+                                    onPopupClose={() => handleQuoteNotesSave(quote.id)}
+                                    className="min-w-[200px]"
+                                    placeholder="Enter notes for all parts..."
+                                    textMode={true}
+                                    loading={quoteNotesLoading[quote.id] || false}
+                                    hideETA={true}
+                                  />
+                                </div>
                               </div>
+                              
+                              {/* ETA Badge - Displayed inline with notes */}
+                              {(() => {
+                                const eta = extractETA(quote.notes);
+                                if (!eta) return null;
+                                
+                                return (
+                                  <div className="flex items-center space-x-1 ml-2">
+                                    <div className="flex items-center space-x-1 px-2 py-1 bg-amber-100 border border-amber-300 rounded shadow-sm text-xs">
+                                      <span className="text-amber-900 font-bold text-xs inline-flex items-center">
+                                        <span className="inline-block animate-[swing_1s_ease-in-out_infinite] origin-top">⏰</span>
+                                        <span className="ml-1">Est. Delivery:</span>
+                                      </span>
+                                      <span className="text-amber-900 font-semibold text-xs">{eta}</span>
+                                    </div>
+                                  </div>
+                                );
+                              })()}
                             </div>
                             {quoteParts.length === 0 && (
                               <span className="text-sm text-gray-500">No parts linked to this quote</span>

@@ -241,9 +241,10 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
       // This is crucial - if they're not being edited, they won't be in partEditData,
       // and won't be sent to the backend
       existingVariants.forEach(variant => {
-        // CRITICAL FIX: Always preserve existing variant data from partEditData if it exists
-        // Otherwise, use the variant data from the database
-        if (!newPartData[variant.id]) {
+        // CRITICAL FIX: Check if variant already has EDITED data in partEditData
+        const hasEditedData = newPartData[variant.id];
+        
+        if (!hasEditedData) {
           // Variant not in partEditData yet, add it from database
           newPartData[variant.id] = {
             number: variant.number || actualPart?.number || '',
@@ -253,8 +254,8 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
             af: variant.af || false
           };
         }
-        // If variant.id already exists in newPartData (from prev state), keep it as is
-        // This preserves any edits the user has made
+        // If variant already exists in newPartData (from current edits), keep it untouched
+        // This preserves any edits the user has made, including list_price
       });
       
       // THEN: Add the new variant (with number field)

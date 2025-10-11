@@ -1,225 +1,50 @@
 // Gemini API service for AI-powered part extraction
-import { GoogleGenerativeAI } from '@google/generative-ai';
-
-// Initialize Gemini
-const genAI = new GoogleGenerativeAI(process.env.NEXT_PUBLIC_GEMINI_API_KEY || '');
-
-interface GeminiPartResponse {
-  partName: string;
-  partNumber: string;
-  context: string | null;
-}
+// Now uses backend API for security and performance
 
 export interface AIPartExtraction {
   partName: string;
   partNumber: string;
-  confidence: number; // Keep for compatibility but set to 1.0
+  confidence: number;
   rawText: string;
   context: string | undefined;
   list_price?: number;
 }
 
-export interface MultiPartExtraction {
-  parts: AIPartExtraction[];
-  totalPartsFound: number;
-  ignoredContent: string[];
-}
-
 /**
- * Extract part information using Gemini AI gemini-2.5-flash-lite
+ * Extract part information using Gemini AI via backend API
  * Enhanced to handle multiple parts from a single image
  */
 export async function extractPartsWithAI(ocrText: string): Promise<AIPartExtraction[]> {
   try {
-    // Check if this looks like a Nissan layout (complex, scattered format)
-    const lines = ocrText.split('\n').map(line => line.trim()).filter(line => line);
-    
-    // Nissan indicators: scattered format with mixed parts and numbers
-    const hasNissanParts = lines.some(line => 
-      line.toLowerCase().includes('headlamp') || 
-      line.toLowerCase().includes('radiator') || 
-      line.toLowerCase().includes('condenser') || 
-      line.toLowerCase().includes('oil cooler')
-    );
-    
-    // Check for Nissan-style scattered format (not clean table)
-    const hasScatteredFormat = lines.some(line => 
-      line.includes('O ') || line.includes('⚫ ') || line.includes('• ') || // Nissan-style prefixes
-      line.includes('ASSY-') || line.includes('& MOTOR') // Nissan-style text
-    );
-    
-    // Check for clean table format (not Nissan)
-    const hasCleanTableFormat = lines.some(line => 
-      line.includes('Part Number') || line.includes('Part Name') || 
-      line.includes('Short Code') || line.includes('Date Range') ||
-      /\d{2}\.\d{2}\.\d{4}/.test(line) // Date format like 04.04.2022
-    );
-    
-    // Only skip AI for truly complex Nissan layouts
-    if (hasNissanParts && hasScatteredFormat && !hasCleanTableFormat) {
+    // Call the backend API instead of running AI directly
+    const response = await fetch('/api/extract-parts', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ ocrText }),
+    });
+
+    if (!response.ok) {
+      console.error('Backend API failed, using fallback');
       return fallbackExtraction(ocrText);
     }
-    
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash-lite' });
 
-    const prompt = `
-You are an expert automotive parts analyst. Analyze the provided OCR text and extract ONLY the MAIN automotive parts according to the rules below.
+    const data = await response.json();
 
-TEXT TO ANALYZE:
-"""
-${ocrText}
-"""
-
-INSTRUCTIONS:
-1. Identify ONLY MAIN automotive parts. Exclude brackets, mounting hardware, bolts, nuts, clips, and other supporting components.
-2. Extract part numbers for each MAIN part. A valid part number must contain ≥ 8 letters/digits combined (ignore hyphens, spaces, and special characters when counting). Ignore any shorter numbers.
-3. Extract prices when available. Look for prices with $ signs (e.g., $125.50, $89.99, A$855.86). These are likely list prices for the parts. Handle various currency formats including A$ (Australian dollars).
-4. Determine Left/Right context:
-   - If text contains "LH", "L", or "Left" → Left
-   - If text contains "RH", "R", or "Right" → Right
-5. Focus on returning 2–9 MAIN parts maximum, but output no more than the first 8 valid parts found in text order.
-6. Extract part numbers that are clearly associated with each part.
-7. PART NUMBER PATTERNS: Look for these formats as they are most likely part numbers:
-   - Hyphenated format: "21606-EB405", "26060-5X00B", "92120-EB400" (these are almost always part numbers)
-   - Alphanumeric codes: "21460EB31B", "8110560K40" (8+ characters)
-7. Ignore irrelevant short codes like "10", "50", "110", "001" (these are quantities or prices, not part numbers).
-8. Keep part numbers clean — e.g., "8110560K40" not "8110560K40 UNIT ASSY".
-9. SINGLE LINE RULE: If multiple keywords appear in one line (e.g., "O FAN & MOTOR ASSY-CONDENSER"), select the LAST keyword as the part name with this priority: Condenser > Oil Cooler > Radiator > Fan > Motor > Assembly.
-10. DAYTIME HEADLAMP RULE: If a line contains 'headlamp' or 'headlight' WITH 'daytime' or 'combination' → classify as 'DayLight' (NOT 'Headlamp'). This takes priority over regular headlamp detection.
-11. CAMERA DETECTION: If text contains 'camera' keyword → classify as 'Camera'. This is definitive and takes priority over other sensor types.
-12. SENSOR DETECTION RULES:
-    - If text contains 'radar', 'radar sensor', 'fwd collision mitigation system', 'forward collision mitigation', 'collision mitigation system', 'fcms' → classify as 'Radar Sensor'
-    - If text contains 'corner radar', 'rear corner radar', 'lh - rear corner radar', 'rh - rear corner radar' → classify as 'Blindspot Sensor' (Left or Right based on L/R context)
-    - If text contains 'sensor' AND NOT 'radar' AND NOT 'camera' → classify as 'Parking Sensor' (unless corner is mentioned)
-    - For blindspot sensors: Use L/R context to determine 'Left Blindspot Sensor' or 'Right Blindspot Sensor'
-    - For parking sensors: Use 'Parking Sensor' (no L/R distinction needed)
-13. FORD-SPECIFIC RULES:
-    - FORD PART NUMBER SELECTION: When multiple values look like part numbers, prioritize the one that:
-      * Has spaces in it (e.g., "12345 ABC" vs "12345ABC")
-      * Has a label that includes "Part number" in the screenshot
-    - FORD RADAR SENSOR DETECTION: If text contains 'Sensor Assy' OR 'Les Bracket' → classify as 'Radar Sensor' for Ford cars
-
-IMPORTANT RULES:
-- Use these exact standardized part names:
-  'Left Headlamp', 'Right Headlamp', 'Left DayLight', 'Right DayLight', 'Left Rear Lamp', 'Right Rear Lamp', 'Radiator', 'Condenser', 'Fan Assembly', 'Intercooler', 'Left Intercooler', 'Right Intercooler', 'Add Cooler', 'Radar Sensor', 'Headlight Left', 'Headlight Right', 'Oil Cooler', 'Auxiliary Radiator', 'Camera', 'Parking Sensor', 'Left Blindspot Sensor', 'Right Blindspot Sensor'
-- COMBINATION LAMP DETECTION: If text contains "LAMP ASSY,COMBINATION" or "combination lamp" → classify as 'DayLight' (NOT 'Headlamp')
-- For combination lamps: If text contains RH/R/Right → 'Right DayLight', if LH/L/Left → 'Left DayLight'
-- Part naming priority:
-  * RADIATOR: If "RADIATOR" is found, use "Radiator" instead of generic radiator terms
-  * AUXILIARY RADIATOR: If text contains "auxiliary radiator", "additional radiator", "lowtemp radiator", "left radiator" OR part number starts with "G9" → classify as "Auxiliary Radiator" (NOT "Radiator")
-  * INTERCOOLER VARIATIONS: 
-    - If text contains "left intercooler", "lh intercooler", "intercooler left" → classify as "Left Intercooler"
-    - If text contains "right intercooler", "rh intercooler", "intercooler right" → classify as "Right Intercooler"  
-    - If text contains "add cooler", "additional cooler" → classify as "Add Cooler"
-    - If text contains just "intercooler" without L/R context → use generic "Intercooler"
-  * CONDENSER: If "CONDENSER" is found, use "Condenser" instead of "Refrigerant Condenser" or generic condenser terms
-  * Only use "Refrigerant Condenser" if no specific "Condenser" is found
-  * Only use generic radiator terms if no specific "RADIATOR" is found
-  * If both "Headlamp" and "DayLight" appear in the same name → prioritize "Headlamp"
-- For headlamps: If text contains RH/R/Right → 'Right Headlamp', if LH/L/Left → 'Left Headlamp'
-- For daylights: If text contains RH/R/Right → 'Right DayLight', if LH/L/Left → 'Left DayLight'
-- DAYTIME HEADLAMP DETECTION: If text contains 'headlamp' or 'headlight' WITH 'daytime' or 'combination' → classify as 'DayLight' (NOT 'Headlamp')
-- COMBINATION LAMP ASSEMBLY: If text contains "LAMP ASSY,COMBINATION" or "combination lamp assembly" → always classify as 'DayLight' regardless of other keywords
-- EXAMPLE: "LAMP ASSY,COMBINATION, FR RH" with price "A$855.86" → 'Right DayLight' with list_price: 855.86
-- REAR LAMP DETECTION: If text contains "rear lamp", "back lamp", "rear light", "back light", "rear combination lamp", "back combination lamp", "tail lamp", "tail light", "tail combination lamp", "lens and body rear combination lamp" → classify as 'Rear Lamp' (Left or Right based on L/R context)
-- REAR LAMP CONTEXT: 
-  - If text contains "rear lamp lh", "rear combination lamp lh", "rear lamp l", "back lamp left", "tail lamp lh", "tail lamp l", "tail lamp left" → 'Left Rear Lamp'
-  - If text contains "rear lamp rh", "rear combination lamp rh", "rear lamp r", "back lamp right", "tail lamp rh", "tail lamp r", "tail lamp right" → 'Right Rear Lamp'
-  - If no L/R context is specified for rear lamp → default to 'Left Rear Lamp'
-- PART NUMBER LENGTH: Only extract part numbers with ≥ 8 REAL alphanumeric characters (ignore special chars like hyphens)
-- MAXIMUM 8 MAIN PARTS per response
-- IGNORE: brackets, mounting hardware, bolts, nuts, clips, supporting components
-- DUPLICATE HANDLING: If multiple instances of the same part type exist (e.g., multiple "Radiator" entries), extract each one separately - the system will automatically group them
-
-RESPONSE FORMAT (JSON only):
-{
-  "parts": [
-    {
-      "partName": "Standardized part name",
-      "partNumber": "Clean part number only",
-      "context": "L/R context if applicable",
-      "list_price": 125.50
+    // Check if backend suggests using fallback
+    if (data.useFallback) {
+      return fallbackExtraction(ocrText);
     }
-  ],
-  "totalPartsFound": "Number of parts found",
-  "ignoredContent": ["List of irrelevant content that was ignored"]
-}
-`;
 
+    if (!data.parts || !Array.isArray(data.parts)) {
+      console.error('Invalid response from backend, using fallback');
+      return fallbackExtraction(ocrText);
+    }
 
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    const text = response.text();
-    
-    // Extract JSON from response
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      throw new Error('No JSON found in AI response');
-    }
-    
-    const aiResponse: MultiPartExtraction = JSON.parse(jsonMatch[0]);
-    
-    // Validate and format the response
-    if (!aiResponse.parts || !Array.isArray(aiResponse.parts)) {
-      throw new Error('Invalid AI response format - parts array missing');
-    }
-    
-    const extractedParts: AIPartExtraction[] = aiResponse.parts.map(part => ({
-      partName: part.partName,
-      partNumber: part.partNumber,
-      confidence: 1.0,
-      rawText: ocrText,
-      context: part.context || undefined,
-      list_price: part.list_price
-    }));
-    
-    // Post-process AI results to handle duplicates like Nissan variants
-    // Group parts by name and combine part numbers for duplicates
-    const partGroups = new Map<string, { part: AIPartExtraction; partNumbers: string[]; count: number }>();
-    
-    for (const part of extractedParts) {
-      const normalizedName = part.partName.toLowerCase().trim();
-      
-      if (partGroups.has(normalizedName)) {
-        // Part already exists, add part number to existing group
-        const existing = partGroups.get(normalizedName)!;
-        existing.partNumbers.push(part.partNumber);
-        existing.count++;
-        
-        // Merge contexts if different
-        if (part.context && existing.part.context && part.context !== existing.part.context) {
-          existing.part.context = `${existing.part.context}, ${part.context}`;
-        }
-      } else {
-        // Create new part group
-        partGroups.set(normalizedName, {
-          part: { ...part },
-          partNumbers: [part.partNumber],
-          count: 1
-        });
-      }
-    }
-    
-    // Create final result with grouped duplicates
-    const finalParts: AIPartExtraction[] = [];
-    for (const [_, groupData] of partGroups) {
-      if (groupData.count === 1) {
-        // Single part, no duplicates
-        finalParts.push(groupData.part);
-      } else {
-        finalParts.push({
-          ...groupData.part,
-          partNumber: groupData.partNumbers.join(', '),
-          context: groupData.part.context
-        });
-      }
-    }
-    
-    return finalParts;
-    
+    return data.parts;
   } catch (error) {
     console.error('AI extraction failed, falling back to basic extraction:', error);
-    // Fallback to basic extraction
     return fallbackExtraction(ocrText);
   }
 }
@@ -242,9 +67,18 @@ function fallbackExtraction(ocrText: string): AIPartExtraction[] {
     
     // Look for part numbers (alphanumeric, MUST be 8+ REAL alphanumeric chars, ignoring special chars)
     // Also look for part numbers with hyphens (e.g., 26060-5X00B, 26010-5X00B)
+    // Also look for Ford-style part numbers with prefix (e.g., N1WZ 9E731-D, ML3Z 9E731-E)
     // IMPORTANT: Exclude common part names that might match the regex
+    const fordStyleMatches = line.match(/\b[A-Z]{2,4}Z\s+[A-Z0-9]{5,15}(?:-[A-Z0-9]{1,5})?\b/gi); // Ford format: PREFIX + space + number
     const partNumberMatches = line.match(/\b[A-Z0-9]{8,20}\b/gi);
     const hyphenatedMatches = line.match(/\b[A-Z0-9]{3,10}-[A-Z0-9]{3,10}\b/gi);
+    
+    // Process Ford-style part numbers first (highest priority)
+    if (fordStyleMatches) {
+      fordStyleMatches.forEach(number => {
+        partNumberPositions.push({ number, lineIndex, line });
+      });
+    }
     
     if (partNumberMatches) {
       partNumberMatches.forEach(number => {
@@ -284,28 +118,29 @@ function fallbackExtraction(ocrText: string): AIPartExtraction[] {
     let partName = '';
     let context = '';
     
+    // Helper function to detect L/R context with enhanced standalone detection
+    const detectContext = (text: string): string => {
+      // Check for explicit LH/RH or Left/Right
+      if (/\b(rh|right)\b/i.test(text)) return 'RH';
+      if (/\b(lh|left)\b/i.test(text)) return 'LH';
+      
+      // Check for standalone R or L (with word boundaries, parentheses, or at line ends)
+      if (/(\s+R\s*$|\s+R\s+|^\s*R\s+|\(R\)|\[R\]|,\s*R\s*)/i.test(text)) return 'RH';
+      if (/(\s+L\s*$|\s+L\s+|^\s*L\s+|\(L\)|\[L\]|,\s*L\s*)/i.test(text)) return 'LH';
+      
+      return '';
+    };
+    
     // Check for daytime headlamps first (highest priority - overrides regular headlamp detection)
-    if ((line.toLowerCase().includes('headlamp') || line.toLowerCase().includes('headlight')) && 
+    if ((line.toLowerCase().includes('headlamp') || line.toLowerCase().includes('headlight') || line.toLowerCase().includes('lamp assy-head')) && 
         (line.toLowerCase().includes('daytime') || line.toLowerCase().includes('combination'))) {
-      if (/\b(rh|r\b|right)\b/i.test(line)) {
-        context = 'RH';
-      } else if (/\b(lh|l\b|left)\b/i.test(line)) {
-        context = 'LH';
-      }
+      context = detectContext(line);
       partName = 'DayLight';
-    } else if (line.toLowerCase().includes('headlamp') || line.toLowerCase().includes('headlight')) {
-      if (/\b(rh|r\b|right)\b/i.test(line)) {
-        context = 'RH';
-      } else if (/\b(lh|l\b|left)\b/i.test(line)) {
-        context = 'LH';
-      }
+    } else if (line.toLowerCase().includes('headlamp') || line.toLowerCase().includes('headlight') || line.toLowerCase().includes('lamp assy-head')) {
+      context = detectContext(line);
       partName = 'Headlamp';
     } else if (line.toLowerCase().includes('daylight') || line.toLowerCase().includes('drl')) {
-      if (/\b(rh|r\b|right)\b/i.test(line)) {
-        context = 'RH';
-      } else if (/\b(lh|l\b|left)\b/i.test(line)) {
-        context = 'LH';
-      }
+      context = detectContext(line);
       partName = 'DayLight';
     } else if (line.toLowerCase().includes('condenser') && !line.toLowerCase().includes('bracket')) {
       // Condenser has highest priority when multiple keywords exist
@@ -325,32 +160,38 @@ function fallbackExtraction(ocrText: string): AIPartExtraction[] {
                line.toLowerCase().includes('rear combination lamp') || line.toLowerCase().includes('back combination lamp') ||
                line.toLowerCase().includes('tail lamp') || line.toLowerCase().includes('tail light') ||
                line.toLowerCase().includes('tail combination lamp') || line.toLowerCase().includes('lens and body rear combination lamp')) {
-      // Handle rear lamp detection
-      if (/\b(rh|r\b|right)\b/i.test(line)) {
-        context = 'RH';
-      } else if (/\b(lh|l\b|left)\b/i.test(line)) {
-        context = 'LH';
-      }
+      // Handle rear lamp detection with enhanced context detection
+      context = detectContext(line);
       partName = 'Rear Lamp';
     } else if (line.toLowerCase().includes('corner') || line.toLowerCase().includes('rear corner radar') || 
                line.toLowerCase().includes('rear corner') || line.toLowerCase().includes('lh - rear corner radar') || 
                line.toLowerCase().includes('rh - rear corner radar')) {
-      // Handle blindspot sensor detection with proper side detection
-      if (/\b(rh|r\b|right)\b/i.test(line)) {
-        context = 'RH';
+      // Handle blindspot sensor detection with enhanced context detection
+      context = detectContext(line);
+      if (context === 'RH') {
         partName = 'Right Blindspot Sensor';
-      } else if (/\b(lh|l\b|left)\b/i.test(line)) {
-        context = 'LH';
+      } else if (context === 'LH') {
         partName = 'Left Blindspot Sensor';
       } else {
-        // Default to Left if no side context is specified (same as headlamp logic)
+        // Default to Left if no side context is specified
         context = 'LH';
         partName = 'Left Blindspot Sensor';
       }
-    } else if (line.toLowerCase().includes('radar') || line.toLowerCase().includes('sensor') || 
-               line.toLowerCase().includes('fwd collision mitigation') || line.toLowerCase().includes('forward collision mitigation') ||
-               line.toLowerCase().includes('collision mitigation system') || line.toLowerCase().includes('fcms') ||
-               line.toLowerCase().includes('sensor assy') || line.toLowerCase().includes('les bracket')) {
+    } else if (line.toLowerCase().includes('radar') || 
+               line.toLowerCase().includes('distance') || 
+               line.toLowerCase().includes('sonar') ||
+               line.toLowerCase().includes('collision') || 
+               line.toLowerCase().includes('mitigation') ||
+               line.toLowerCase().includes('speed sensor') ||
+               line.toLowerCase().includes('crash') ||
+               (line.toLowerCase().includes('bracket') && line.toLowerCase().includes('sensor')) ||
+               line.toLowerCase().includes('sensor assy') || 
+               line.toLowerCase().includes('sensor assembly') ||
+               line.toLowerCase().includes('les bracket') ||
+               // Fallback: generic 'sensor' without blindspot/parking keywords
+               (line.toLowerCase().includes('sensor') && 
+                !line.toLowerCase().includes('parking') && 
+                !line.toLowerCase().includes('park assist'))) {
       partName = 'Radar Sensor';
     } else if (line.toLowerCase().includes('auxiliary radiator') || line.toLowerCase().includes('aux radiator') || line.toLowerCase().includes('aux.radiator')) {
       partName = 'Auxiliary Radiator';

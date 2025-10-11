@@ -248,6 +248,7 @@ export default function PricedPage() {
           searchTerm={searchTerm}
           onSearchChange={setSearchTerm}
           useServerSideSearch={true}
+          currentPageName="priced"
         />
       </div>
     </ProtectedRoute>

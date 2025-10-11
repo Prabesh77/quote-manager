@@ -10,7 +10,7 @@ import { createNormalizedQuote } from '@/utils/normalizedQuoteCreation';
 
 // Query Keys - centralized for consistency
 export const queryKeys = {
-  quotes: (page: number = 1, limit: number = 20, filters?: { status?: string; customer?: string; make?: string; search?: string; created_by?: string }) => ['quotes', page, limit, filters] as const,
+  quotes: (page: number = 1, limit: number = 20, filters?: { status?: string; customer?: string; make?: string; search?: string; created_by?: string; startDate?: string; endDate?: string }) => ['quotes', page, limit, filters] as const,
   quotesBase: ['quotes'] as const, // Base key for invalidating all quote queries
   parts: ['parts'] as const,
   quote: (id: string) => ['quotes', id] as const,
@@ -19,7 +19,7 @@ export const queryKeys = {
 };
 
 // Fetch functions
-const fetchQuotes = async (page: number = 1, limit: number = 20, filters?: { status?: string; customer?: string; make?: string; search?: string; created_by?: string }): Promise<{ quotes: Quote[]; total: number; totalPages: number }> => {
+const fetchQuotes = async (page: number = 1, limit: number = 20, filters?: { status?: string; customer?: string; make?: string; search?: string; created_by?: string; startDate?: string; endDate?: string }): Promise<{ quotes: Quote[]; total: number; totalPages: number }> => {
   try {
     // Build the base query
     let query = supabase
@@ -44,27 +44,51 @@ const fetchQuotes = async (page: number = 1, limit: number = 20, filters?: { sta
       query = query.eq('created_by', filters.created_by);
     }
     
-    // Apply search filter - smart search by quote_ref and vehicle make
+    // Apply date filters (for completed quotes page)
+    if (filters?.startDate) {
+      query = query.gte('updated_at', filters.startDate);
+    }
+    if (filters?.endDate) {
+      // Add one day to endDate to include the entire end date
+      const endDateTime = new Date(filters.endDate);
+      endDateTime.setDate(endDateTime.getDate() + 1);
+      query = query.lt('updated_at', endDateTime.toISOString());
+    }
+    
+    // Apply search filter - search by quote_ref, customer name, customer address, vehicle make, and vehicle model
     if (filters?.search && filters.search.trim()) {
       const searchTerm = filters.search.trim();
       
-      // Check if the search term looks like a quote reference (primarily numeric)
-      const numericChars = (searchTerm.match(/\d/g) || []).length;
-      const totalChars = searchTerm.length;
-      const isNumericSearch = numericChars > totalChars / 2; // More than half are numbers
+      // First, find matching customer IDs by searching customer names and addresses
+      const { data: matchingCustomers } = await supabase
+        .from('customers')
+        .select('id')
+        .or(`name.ilike.*${searchTerm}*,address.ilike.*${searchTerm}*`);
       
-      if (isNumericSearch) {
-        // For numeric searches, focus primarily on quote_ref
-        // Only include vehicle make if it's a very short search term
-        if (searchTerm.length >= 4) {
-          query = query.ilike('quote_ref', `%${searchTerm}%`);
-        } else {
-          query = query.or(`quote_ref.ilike.*${searchTerm}*,vehicle.make.ilike.*${searchTerm}*`);
-        }
-      } else {
-        // For non-numeric searches (like brand names), search vehicle make
-        query = query.ilike('vehicle.make', `%${searchTerm}%`);
+      const customerIds = matchingCustomers?.map(c => c.id) || [];
+      
+      // Second, find matching vehicle IDs by searching make and model
+      const { data: matchingVehicles } = await supabase
+        .from('vehicles')
+        .select('id')
+        .or(`make.ilike.*${searchTerm}*,model.ilike.*${searchTerm}*`);
+      
+      const vehicleIds = matchingVehicles?.map(v => v.id) || [];
+      
+      // Build the OR condition for quotes
+      const conditions = [`quote_ref.ilike.*${searchTerm}*`];
+      
+      // Add customer ID conditions
+      if (customerIds.length > 0) {
+        conditions.push(...customerIds.map(id => `customer_id.eq.${id}`));
       }
+      
+      // Add vehicle ID conditions
+      if (vehicleIds.length > 0) {
+        conditions.push(...vehicleIds.map(id => `vehicle_id.eq.${id}`));
+      }
+      
+      query = query.or(conditions.join(','));
     }
 
     // Apply pagination using Supabase range
@@ -72,9 +96,15 @@ const fetchQuotes = async (page: number = 1, limit: number = 20, filters?: { sta
     const endIndex = startIndex + limit - 1; // Supabase range is inclusive
     query = query.range(startIndex, endIndex);
 
-    // Order by required_by (deadline) in ascending order (closest deadline first)
-    // Use nullsFirst: false to put quotes without deadlines at the end
-    query = query.order('required_by', { ascending: true, nullsFirst: false });
+    // Apply sorting based on status
+    if (filters?.status === 'completed') {
+      // For completed quotes, sort by updated_at (most recently updated first)
+      query = query.order('updated_at', { ascending: false });
+    } else {
+      // For other statuses, sort by required_by (closest deadline first)
+      // Use nullsFirst: false to put quotes without deadlines at the end
+      query = query.order('required_by', { ascending: true, nullsFirst: false });
+    }
 
     // Execute the query
     const { data: normalizedQuotes, error: quotesError, count } = await query;
@@ -176,7 +206,7 @@ const fetchParts = async (): Promise<Part[]> => {
 };
 
 // Custom hooks using TanStack Query
-export const useQuotesQuery = (page: number = 1, limit: number = 20, filters?: { status?: string; customer?: string; make?: string; search?: string; created_by?: string }) => {
+export const useQuotesQuery = (page: number = 1, limit: number = 20, filters?: { status?: string; customer?: string; make?: string; search?: string; created_by?: string; startDate?: string; endDate?: string }) => {
   return useQuery({
     queryKey: queryKeys.quotes(page, limit, filters),
     queryFn: () => fetchQuotes(page, limit, filters),

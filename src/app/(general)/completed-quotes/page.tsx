@@ -20,6 +20,10 @@ export default function CompletedQuotesPage() {
   });
   const queryClient = useQueryClient();
   
+  // Date filter state
+  const [startDate, setStartDate] = useState<string>('');
+  const [endDate, setEndDate] = useState<string>('');
+  
   // Search state with debouncing and page reset
   const { searchTerm, debouncedSearchTerm, setSearchTerm } = useDebouncedSearchWithPageReset(
     () => setCurrentPage(1)
@@ -28,7 +32,9 @@ export default function CompletedQuotesPage() {
   // Get quotes for completed quotes page with server-side pagination
   const { data: quotesData, isLoading: quotesLoading } = useQuotesQuery(currentPage, pageSize, { 
     status: 'completed',
-    search: debouncedSearchTerm 
+    search: debouncedSearchTerm,
+    startDate: startDate || undefined,
+    endDate: endDate || undefined
   });
   
   // Fetch parts for all quotes
@@ -243,7 +249,49 @@ export default function CompletedQuotesPage() {
     <ProtectedRoute allowedRoles={['quote_creator', 'price_manager', 'quality_controller', 'admin']}>
       <div className="py-6">
         <h1 className="text-2xl font-bold text-gray-900 mb-6">Completed Quotes</h1>
-        <p className="text-gray-600 mb-6">View and manage completed quotes.</p>
+        
+        {/* Date Filter */}
+        <div className="mb-2 inline-block bg-white rounded-lg border border-gray-200 px-4 py-2">
+          <div className="flex items-center gap-4 flex-wrap">
+            <div className="flex items-center gap-2">
+              <label className="text-sm font-medium text-gray-700">From:</label>
+              <input
+                type="date"
+                value={startDate}
+                onChange={(e) => {
+                  setStartDate(e.target.value);
+                  setCurrentPage(1);
+                }}
+                className="uppercase px-2 py-1 border border-gray-300 rounded-sm text-xs focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <label className="text-sm font-medium text-gray-700">To:</label>
+              <input
+                type="date"
+                value={endDate}
+                onChange={(e) => {
+                  setEndDate(e.target.value);
+                  setCurrentPage(1);
+                }}
+                className="uppercase px-2 py-1 border border-gray-300 rounded-sm text-xs focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+            {(startDate || endDate) && (
+              <button
+                onClick={() => {
+                  setStartDate('');
+                  setEndDate('');
+                  setCurrentPage(1);
+                }}
+                className="px-3 py-2 text-sm bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 transition-colors"
+              >
+                Clear Dates
+              </button>
+            )}
+          </div>
+        </div>
+        
         <QuoteTable
           quotes={quotesData?.quotes || []}
           parts={parts || []}

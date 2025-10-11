@@ -2747,7 +2747,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                                     </div>
                                                 </div>
                                                         <div className="flex-1">
-                                                          <div className="text-sm font-medium text-gray-700">Variant {index + 1}</div>
+                                                          <span className={`text-sm font-semibold ${variant.final_price && variant.final_price < 10 ? 'text-red-600 line-through' : 'text-gray-700'}`}>{part.name}</span>
                                                         </div>
                                                       </div>
                                                     )}

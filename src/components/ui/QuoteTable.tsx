@@ -1279,14 +1279,12 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
               console.error('Error force saving parts to backend:', error);
             }
           } else {
-            console.log('💾 Save button: Sending updates for', updates.length, 'parts:', updates.map(u => ({ id: u.id, hasPrice: u.updates.price !== undefined, hasNote: u.updates.note !== undefined, hasListPrice: u.updates.list_price !== undefined, hasNumber: u.updates.number !== undefined })));
             try {
               // Pass the quote ID to onUpdateMultipleParts for more reliable lookup
               const result = await onUpdateMultipleParts(updates, editingParts, false); // Don't change status for save button
 
               // CRITICAL FIX: Instantly update localQuotes with the fresh data from the server
               if (result?.updatedQuote) {
-                console.log('✅ Instantly updating localQuotes with fresh variant data');
                 setLocalQuotes(prev => prev.map(q => 
                   q.id === editingParts 
                     ? { ...q, partsRequested: result.updatedQuote.parts_requested }
@@ -1806,7 +1804,6 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
       try {
         const { QuoteActionsService } = await import('@/services/quoteActions/quoteActionsService');
         await QuoteActionsService.trackQuoteAction(quoteId, 'VERIFIED');
-        console.log('✅ VERIFIED: Successfully tracked verification action for quote:', quoteId);
       } catch (trackingError) {
         console.warn('⚠️ VERIFIED: Failed to track verification action:', trackingError);
       }
@@ -2568,16 +2565,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                 
                                 const isEtaConfirmed = etaConfirmed.has(quote.id);
                                 const isPricedPage = currentPageName === 'priced';
-                                
-                                console.log('🟢 ETA Debug:', {
-                                  quoteId: quote.id,
-                                  eta,
-                                  isEtaConfirmed,
-                                  isPricedPage,
-                                  currentPageName,
-                                  notes: quote.notes
-                                });
-                                
+                               
                                 return (
                                   <div className="flex items-center space-x-2 z-50 ml-16">
                                     <div className="flex items-center space-x-1 px-2 py-1 bg-amber-100 border border-amber-300 rounded shadow-sm text-xs">

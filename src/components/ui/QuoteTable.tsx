@@ -91,6 +91,9 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
     }
     return false;
   });
+  
+  // Track which quotes have their ETA confirmed (only for priced page)
+  const [etaConfirmed, setEtaConfirmed] = useState<Set<string>>(new Set());
 
   // Use external search term when server-side search is enabled
   const effectiveSearchTerm = useServerSideSearch ? externalSearchTerm || '' : searchTerm;
@@ -1276,14 +1279,12 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
               console.error('Error force saving parts to backend:', error);
             }
           } else {
-            console.log('💾 Save button: Sending updates for', updates.length, 'parts:', updates.map(u => ({ id: u.id, hasPrice: u.updates.price !== undefined, hasNote: u.updates.note !== undefined, hasListPrice: u.updates.list_price !== undefined, hasNumber: u.updates.number !== undefined })));
             try {
               // Pass the quote ID to onUpdateMultipleParts for more reliable lookup
               const result = await onUpdateMultipleParts(updates, editingParts, false); // Don't change status for save button
 
               // CRITICAL FIX: Instantly update localQuotes with the fresh data from the server
               if (result?.updatedQuote) {
-                console.log('✅ Instantly updating localQuotes with fresh variant data');
                 setLocalQuotes(prev => prev.map(q => 
                   q.id === editingParts 
                     ? { ...q, partsRequested: result.updatedQuote.parts_requested }
@@ -1803,7 +1804,6 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
       try {
         const { QuoteActionsService } = await import('@/services/quoteActions/quoteActionsService');
         await QuoteActionsService.trackQuoteAction(quoteId, 'VERIFIED');
-        console.log('✅ VERIFIED: Successfully tracked verification action for quote:', quoteId);
       } catch (trackingError) {
         console.warn('⚠️ VERIFIED: Failed to track verification action:', trackingError);
       }
@@ -2563,8 +2563,11 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                 const eta = extractETA(quote.notes);
                                 if (!eta) return null;
                                 
+                                const isEtaConfirmed = etaConfirmed.has(quote.id);
+                                const isPricedPage = currentPageName === 'priced';
+                               
                                 return (
-                                  <div className="flex items-center space-x-1 z-50 ml-16">
+                                  <div className="flex items-center space-x-2 z-50 ml-16">
                                     <div className="flex items-center space-x-1 px-2 py-1 bg-amber-100 border border-amber-300 rounded shadow-sm text-xs">
                                       <span className="text-amber-900 font-bold text-xs inline-flex items-center">
                                         <span className="inline-block animate-[swing_1s_ease-in-out_infinite] origin-top">⏰</span>
@@ -2572,6 +2575,26 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                       </span>
                                       <span className="text-amber-900 font-semibold text-xs">{eta}</span>
                                     </div>
+                                    {isPricedPage && (
+                                      <label className="flex items-center space-x-1 cursor-pointer">
+                                        <input
+                                          type="checkbox"
+                                          checked={isEtaConfirmed}
+                                          onChange={(e) => {
+                                            e.stopPropagation();
+                                            const newSet = new Set(etaConfirmed);
+                                            if (e.target.checked) {
+                                              newSet.add(quote.id);
+                                            } else {
+                                              newSet.delete(quote.id);
+                                            }
+                                            setEtaConfirmed(newSet);
+                                          }}
+                                          className="w-4 h-4 rounded-md text-amber-600 bg-white cursor-pointer"
+                                        />
+                                        <span className="text-xs text-gray-700 font-medium">Confirmed</span>
+                                      </label>
+                                    )}
                                   </div>
                                 );
                               })()}
@@ -2671,7 +2694,11 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                         <>
                           {/* Desktop Table View */}
                               <div className="hidden md:block">
-                            <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+                            <div className={`bg-white rounded-lg border border-gray-200 overflow-hidden relative ${
+                              currentPageName === 'priced' && extractETA(quote.notes) && !etaConfirmed.has(quote.id) 
+                                ? 'blur-xs pointer-events-none select-none' 
+                                : ''
+                            }`}>
                               <table className="w-full">
                                     <thead className="bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200">
                                       <tr>
@@ -3402,7 +3429,11 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                               </div>
                               
                               {quoteParts.length > 0 && (
-                          <div className="space-y-3">
+                          <div className={`space-y-3 ${
+                            currentPageName === 'priced' && extractETA(quote.notes) && !etaConfirmed.has(quote.id) 
+                              ? 'blur-sm pointer-events-none select-none' 
+                              : ''
+                          }`}>
                                   {quoteParts.map((part) => {
                               const isPartEditing = editingParts === quote.id;
                                     

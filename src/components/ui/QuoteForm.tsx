@@ -171,47 +171,55 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
 
       // Apply auto-assignment rules for left/right parts
       if (leftRightParts.includes(matchedPartName) || isUnidentifiedLeftRightPart) {
-        // If the AI already detected the side (Left/Right), respect it
-        if (leftRightParts.includes(matchedPartName)) {
-          // AI already determined the correct side - use it directly
-          finalPartName = matchedPartName;
-        } else if (isUnidentifiedLeftRightPart) {
-          // Only apply auto-assignment for unidentified parts (generic "Headlamp", "DayLight", etc.)
-          let partType: string;
-          
-          // Determine the part type based on the matched part name
-          if (matchedPartName === 'Headlamp' || matchedPartName === 'Headlight') {
-            partType = 'Headlamp';
-          } else if (matchedPartName === 'DayLight' || matchedPartName === 'Daylight') {
-            partType = 'DayLight';
-          } else if (matchedPartName === 'Blindspot Sensor' || matchedPartName === 'Blindspot') {
-            partType = 'Blindspot Sensor';
-          } else {
-            partType = matchedPartName;
-          }
-          
-          // Get current selected parts to check existing parts
-          const currentSelectedParts = selectedParts;
-          
-          // Count existing parts of this type (both left and right)
-          const leftPartName = `Left ${partType}`;
-          const rightPartName = `Right ${partType}`;
-          const leftExists = currentSelectedParts.includes(leftPartName);
-          const rightExists = currentSelectedParts.includes(rightPartName);
-          
-          if (leftExists && rightExists) {
-            // Both parts exist - keep current assignment
-            finalPartName = matchedPartName;
-          } else if (leftExists && !rightExists) {
+        // Determine the base part type (without Left/Right)
+        let partType: string;
+        if (matchedPartName.includes('Headlamp') || matchedPartName === 'Headlight') {
+          partType = 'Headlamp';
+        } else if (matchedPartName.includes('DayLight') || matchedPartName === 'Daylight') {
+          partType = 'DayLight';
+        } else if (matchedPartName.includes('Blindspot')) {
+          partType = 'Blindspot Sensor';
+        } else {
+          partType = matchedPartName;
+        }
+        
+        const leftPartName = `Left ${partType}`;
+        const rightPartName = `Right ${partType}`;
+        
+        // Check if context is weak/unclear (no explicit LH/RH markers)
+        const hasWeakContext = !part.context || 
+                               (part.context !== 'LH' && part.context !== 'RH' && 
+                                part.context !== 'Left' && part.context !== 'Right' &&
+                                part.context !== 'L' && part.context !== 'R');
+        
+        // Get current selected parts to check existing parts
+        const currentSelectedParts = selectedParts;
+        const leftExists = currentSelectedParts.includes(leftPartName);
+        const rightExists = currentSelectedParts.includes(rightPartName);
+        
+        // Smart side detection based on existing parts
+        if (isUnidentifiedLeftRightPart || (leftRightParts.includes(matchedPartName) && hasWeakContext)) {
+          // Apply intelligent side detection
+          if (leftExists && !rightExists) {
             // Left exists, right doesn't - assign as right
             finalPartName = rightPartName;
           } else if (!leftExists && rightExists) {
             // Right exists, left doesn't - assign as left
             finalPartName = leftPartName;
+          } else if (!leftExists && !rightExists) {
+            // Neither exists - respect AI detection if available, otherwise default to left
+            if (leftRightParts.includes(matchedPartName)) {
+              finalPartName = matchedPartName; // Use AI-detected side
+            } else {
+              finalPartName = leftPartName; // Default to left
+            }
           } else {
-            // Neither exists - assign as left by default (first part)
-            finalPartName = leftPartName;
+            // Both exist - respect AI detection or default to the detected side
+            finalPartName = leftRightParts.includes(matchedPartName) ? matchedPartName : leftPartName;
           }
+        } else {
+          // Strong context detected - respect AI's decision
+          finalPartName = matchedPartName;
         }
         
         // Add to selected parts

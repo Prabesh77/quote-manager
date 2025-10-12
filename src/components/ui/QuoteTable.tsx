@@ -753,6 +753,11 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
 
   // Handle direct click to start editing
   const handleDirectEdit = (quoteId: string, partId: string, variantId: string, field: string) => {
+    // Prevent editing on priced and completed pages
+    if (currentPageName === 'priced' || currentPageName === 'completed-quotes') {
+      return;
+    }
+    
     if (editingParts !== quoteId) {
       // CRITICAL FIX: Initialize partEditData with existing variant data
       // instead of clearing it, to preserve existing values when entering edit mode
@@ -2602,7 +2607,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                         {quoteParts.length === 0 && (
                           <span className="text-sm text-gray-500">No parts linked to this quote</span>
                         )}
-                        {quoteParts.length > 0 && editingParts !== quote.id && quote.status !== 'completed' && (
+                        {quoteParts.length > 0 && editingParts !== quote.id && quote.status !== 'completed' && currentPageName !== 'priced' && currentPageName !== 'completed-quotes' && (
                               <div className="flex space-x-2">
                           <button
                             onClick={(e) => {
@@ -2844,9 +2849,11 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                                 ) : (
                                                   <>
                                                         <span
-                                                          className={`text-sm font-medium cursor-pointer hover:bg-gray-100 px-1 py-0.5 rounded transition-colors ${variant.list_price ? (variant.list_price < 10 ? 'text-red-600 line-through' : 'text-gray-900') : 'text-gray-400'}`}
+                                                          className={`text-sm font-medium px-1 py-0.5 rounded transition-colors ${
+                                                            currentPageName !== 'priced' && currentPageName !== 'completed-quotes' ? 'cursor-pointer hover:bg-gray-100' : 'cursor-default'
+                                                          } ${variant.list_price ? (variant.list_price < 10 ? 'text-red-600 line-through' : 'text-gray-900') : 'text-gray-400'}`}
                                                           onClick={() => handleDirectEdit(quote.id, part.id, variant.id, 'list_price')}
-                                                          title={variant.list_price && variant.list_price < 10 ? "Part not available" : "Click to edit"}
+                                                          title={variant.list_price && variant.list_price < 10 ? "Part not available" : (currentPageName !== 'priced' && currentPageName !== 'completed-quotes' ? "Click to edit" : "")}
                                                         >
                                                           {variant.list_price ? (variant.list_price < 10 ? 'N/A' : `$${variant.list_price.toFixed(2)}`) : 'Not set'}
                                                     </span>
@@ -2878,9 +2885,11 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                                 ) : (
                                                   <>
                                                         <span
-                                                          className={`text-sm font-medium cursor-pointer hover:bg-gray-100 px-1 py-0.5 rounded transition-colors ${variant.final_price ? (variant.final_price < 10 ? 'text-red-600 line-through' : 'text-gray-900') : 'text-gray-400'}`}
+                                                          className={`text-sm font-medium px-1 py-0.5 rounded transition-colors ${
+                                                            currentPageName !== 'priced' && currentPageName !== 'completed-quotes' ? 'cursor-pointer hover:bg-gray-100' : 'cursor-default'
+                                                          } ${variant.final_price ? (variant.final_price < 10 ? 'text-red-600 line-through' : 'text-gray-900') : 'text-gray-400'}`}
                                                           onClick={() => handleDirectEdit(quote.id, part.id, variant.id, 'final_price')}
-                                                          title={variant.final_price && variant.final_price < 10 ? "Part not available" : "Click to edit"}
+                                                          title={variant.final_price && variant.final_price < 10 ? "Part not available" : (currentPageName !== 'priced' && currentPageName !== 'completed-quotes' ? "Click to edit" : "")}
                                                         >
                                                           {variant.final_price ? (variant.final_price < 10 ? 'N/A' : `$${variant.final_price.toFixed(2)}`) : 'Not set'}
                                                         </span>
@@ -2910,9 +2919,11 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                                   />
                                                 ) : (
                                                       <span
-                                                        className={`text-sm cursor-pointer hover:bg-gray-100 px-1 py-0.5 rounded transition-colors ${variant.af ? 'text-green-600 font-medium' : 'text-gray-400'}`}
+                                                        className={`text-sm px-1 py-0.5 rounded transition-colors ${
+                                                          currentPageName !== 'priced' && currentPageName !== 'completed-quotes' ? 'cursor-pointer hover:bg-gray-100' : 'cursor-default'
+                                                        } ${variant.af ? 'text-green-600 font-medium' : 'text-gray-400'}`}
                                                         onClick={() => handleDirectEdit(quote.id, part.id, variant.id, 'af')}
-                                                        title="Click to edit"
+                                                        title={currentPageName !== 'priced' && currentPageName !== 'completed-quotes' ? "Click to edit" : ""}
                                                       >
                                                         {variant.af ? (
                                                           <span className='bg-green-500 text-white rounded-full px-2 py-1 text-xs font-bold shadow-md border-2 border-green-600'>
@@ -2943,9 +2954,11 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                                             return (
                                                               <>
                                                                 <span
-                                                                  className={`text-sm cursor-pointer hover:bg-gray-100 px-1 py-0.5 rounded transition-colors ${combinedNote ? 'text-gray-700' : 'text-gray-400'}`}
+                                                                  className={`text-sm px-1 py-0.5 rounded transition-colors ${
+                                                                    currentPageName !== 'priced' && currentPageName !== 'completed-quotes' ? 'cursor-pointer hover:bg-gray-100' : 'cursor-default'
+                                                                  } ${combinedNote ? 'text-gray-700' : 'text-gray-400'}`}
                                                                   onClick={() => handleDirectEdit(quote.id, part.id, variant.id, 'note')}
-                                                                  title="Click to edit"
+                                                                  title={currentPageName !== 'priced' && currentPageName !== 'completed-quotes' ? "Click to edit" : ""}
                                                                 >
                                                                   {combinedNote || 'No notes'}
                                                     </span>
@@ -3340,7 +3353,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                 {quoteParts.length === 0 && (
                                   <span className="text-sm text-gray-500">No parts linked to this quote</span>
                                 )}
-                          {quoteParts.length > 0 && editingParts !== quote.id && quote.status !== 'completed' && (
+                          {quoteParts.length > 0 && editingParts !== quote.id && quote.status !== 'completed' && currentPageName !== 'priced' && currentPageName !== 'completed-quotes' && (
                             <div className="flex space-x-2">
                                   <button
                               onClick={(e) => {
@@ -3585,9 +3598,11 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                               />
                                             ) : (
                                               <span
-                                                className={`text-sm cursor-pointer hover:bg-gray-100 px-1 py-0.5 rounded transition-colors ${part.af ? 'text-green-600 font-medium' : 'text-gray-400'}`}
+                                                className={`text-sm px-1 py-0.5 rounded transition-colors ${
+                                                  currentPageName !== 'priced' && currentPageName !== 'completed-quotes' ? 'cursor-pointer hover:bg-gray-100' : 'cursor-default'
+                                                } ${part.af ? 'text-green-600 font-medium' : 'text-gray-400'}`}
                                                 onClick={() => handleDirectEdit(quote.id, part.id, 'mobile', 'af')}
-                                                title="Click to edit"
+                                                title={currentPageName !== 'priced' && currentPageName !== 'completed-quotes' ? "Click to edit" : ""}
                                               >
                                                 {part.af ? (
                                                   <span className='bg-green-500 text-white rounded-full px-2 py-1 text-xs font-bold shadow-md border-2 border-green-600'>

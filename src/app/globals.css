@@ -57,27 +57,6 @@
   }
 }
 
-@keyframes swing {
-  0%, 100% {
-    transform: rotate(0deg);
-  }
-  10% {
-    transform: rotate(8deg);
-  }
-  30% {
-    transform: rotate(-8deg);
-  }
-  50% {
-    transform: rotate(5deg);
-  }
-  70% {
-    transform: rotate(-5deg);
-  }
-  90% {
-    transform: rotate(0deg);
-  }
-}
-
 @keyframes gradient-border {
   0% {
     background: linear-gradient(0deg, #ff6b6b, #4ecdc4, #45b7d1, #96ceb4, #feca57, #ff9ff3, #54a0ff, #ff6b6b);

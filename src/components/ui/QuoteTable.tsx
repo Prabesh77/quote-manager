@@ -91,9 +91,6 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
     }
     return false;
   });
-  
-  // Track which quotes have their ETA confirmed (only for priced page)
-  const [etaConfirmed, setEtaConfirmed] = useState<Set<string>>(new Set());
 
   // Use external search term when server-side search is enabled
   const effectiveSearchTerm = useServerSideSearch ? externalSearchTerm || '' : searchTerm;
@@ -413,26 +410,9 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
   // Helper function to combine quote notes with part notes
   // ETA is excluded from part notes and only shown in the badge
   const getCombinedNotes = (quoteNotes: string | undefined, partNote: string | undefined): string => {
-    // Remove ETA from quote notes before combining
-    const notesWithoutETA = removeETAFromNotes(quoteNotes);
-    
-    if (!notesWithoutETA) return partNote || '';
-    if (!partNote) return notesWithoutETA;
-    // If both exist, combine them with a separator
-    return `${notesWithoutETA} | ${partNote}`;
-  };
-
-  // Helper function to extract ETA from quote notes
-  const extractETA = (notes: string | undefined): string | null => {
-    if (!notes) return null;
-    const etaMatch = notes.match(/ETA\s+([^|]+)/i);
-    return etaMatch ? etaMatch[1].trim() : null;
-  };
-
-  // Helper function to remove ETA from notes (to avoid duplication)
-  const removeETAFromNotes = (notes: string | undefined): string => {
-    if (!notes) return '';
-    return notes.replace(/ETA\s+[^|]+\s*\|?\s*/gi, '').replace(/\|\s*\|/g, '|').replace(/^\s*\|\s*|\s*\|\s*$/g, '').trim();
+    if (!quoteNotes) return partNote || '';
+    if (!partNote) return quoteNotes;
+    return `${quoteNotes} | ${partNote}`;
   };
 
   // Function to get parts with notes for a specific quote (synchronous)
@@ -2553,51 +2533,9 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                     placeholder="Enter notes for all parts..."
                                     textMode={true}
                                     loading={quoteNotesLoading[quote.id] || false}
-                                    hideETA={true}
                                   />
                                 </div>
                               </div>
-                              
-                              {/* ETA Badge - Displayed inline with notes */}
-                              {(() => {
-                                const eta = extractETA(quote.notes);
-                                if (!eta) return null;
-                                
-                                const isEtaConfirmed = etaConfirmed.has(quote.id);
-                                const isPricedPage = currentPageName === 'priced';
-                               
-                                return (
-                                  <div className="flex items-center space-x-2 z-50 ml-16">
-                                    <div className="flex items-center space-x-1 px-2 py-1 bg-amber-100 border border-amber-300 rounded shadow-sm text-xs">
-                                      <span className="text-amber-900 font-bold text-xs inline-flex items-center">
-                                        <span className="inline-block animate-[swing_1s_ease-in-out_infinite] origin-top">⏰</span>
-                                        <span className="ml-1">Est. Delivery:</span>
-                                      </span>
-                                      <span className="text-amber-900 font-semibold text-xs">{eta}</span>
-                                    </div>
-                                    {isPricedPage && (
-                                      <label className="flex items-center space-x-1 cursor-pointer">
-                                        <input
-                                          type="checkbox"
-                                          checked={isEtaConfirmed}
-                                          onChange={(e) => {
-                                            e.stopPropagation();
-                                            const newSet = new Set(etaConfirmed);
-                                            if (e.target.checked) {
-                                              newSet.add(quote.id);
-                                            } else {
-                                              newSet.delete(quote.id);
-                                            }
-                                            setEtaConfirmed(newSet);
-                                          }}
-                                          className="w-4 h-4 rounded-md text-amber-600 bg-white cursor-pointer"
-                                        />
-                                        <span className="text-xs text-gray-700 font-medium">Confirmed</span>
-                                      </label>
-                                    )}
-                                  </div>
-                                );
-                              })()}
                             </div>
                         {quoteParts.length === 0 && (
                           <span className="text-sm text-gray-500">No parts linked to this quote</span>
@@ -2694,11 +2632,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                         <>
                           {/* Desktop Table View */}
                               <div className="hidden md:block">
-                            <div className={`bg-white rounded-lg border border-gray-200 overflow-hidden relative ${
-                              currentPageName === 'priced' && extractETA(quote.notes) && !etaConfirmed.has(quote.id) 
-                                ? 'blur-xs pointer-events-none select-none' 
-                                : ''
-                            }`}>
+                            <div className="bg-white rounded-lg border border-gray-200 overflow-hidden relative">
                               <table className="w-full">
                                     <thead className="bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200">
                                       <tr>
@@ -3429,11 +3363,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                               </div>
                               
                               {quoteParts.length > 0 && (
-                          <div className={`space-y-3 ${
-                            currentPageName === 'priced' && extractETA(quote.notes) && !etaConfirmed.has(quote.id) 
-                              ? 'blur-sm pointer-events-none select-none' 
-                              : ''
-                          }`}>
+                          <div className="space-y-3">
                                   {quoteParts.map((part) => {
                               const isPartEditing = editingParts === quote.id;
                                     

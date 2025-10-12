@@ -1,10 +1,27 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
 
+export async function OPTIONS(req: NextRequest) {
+  // Handle preflight requests
+  const res = NextResponse.json({});
+  res.headers.set('Access-Control-Allow-Origin', '*'); // or restrict to your domain
+  res.headers.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.headers.set('Access-Control-Allow-Headers', 'Content-Type');
+  return res;
+}
+
 export async function POST(req: NextRequest) {
   try {
+    // --- CORS headers ---
+    const headers = new Headers({
+      'Access-Control-Allow-Origin': '*', // or your domain
+      'Access-Control-Allow-Methods': 'POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type',
+      'Content-Type': 'application/json',
+    });
+
     const { partText } = await req.json();
 
     const prompt = `
@@ -52,9 +69,13 @@ Part Text: "${partText}"
     const result = await model.generateContent(prompt);
 
     const text = result.response.text().trim();
-    return Response.json({ part: text });
+
+    return new Response(JSON.stringify({ part: text }), { headers });
   } catch (err) {
     console.error("AI error:", err);
-    return Response.json({ part: "Ignore", error: err instanceof Error ? err.message : 'Unknown error' }, { status: 500 });
+    return new Response(JSON.stringify({
+      part: "Ignore",
+      error: err instanceof Error ? err.message : 'Unknown error'
+    }), { status: 500, headers: { 'Access-Control-Allow-Origin': '*' } });
   }
 }

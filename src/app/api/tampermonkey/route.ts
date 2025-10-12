@@ -65,9 +65,14 @@ export async function POST(req: NextRequest) {
       };
     });
 
-    // 4️⃣ AI detection for each userPartName
-    const aiResults = await Promise.all(userPartNames.map(async (userPartName: string) => {
-      const prompt = `
+    // 4️⃣ AI detection for each userPartName (with graceful error handling)
+    let aiResults: any[] = [];
+    let aiError: string | null = null;
+    
+    try {
+      aiResults = await Promise.all(userPartNames.map(async (userPartName: string) => {
+        try {
+          const prompt = `
 You are an expert automotive parts specialist trained to identify front-end car parts from short, often incomplete or abbreviated text inputs.
 
 Valid part names:
@@ -93,27 +98,51 @@ Determine the correct part name for this input:
 Part Text: "${userPartName}"
 `;
 
-      const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
-      const result = await model.generateContent(prompt);
-      const realPartName = result.response.text().trim();
+          const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
+          const result = await model.generateContent(prompt);
+          const realPartName = result.response.text().trim();
 
-      // Strict, case-insensitive match with mergedParts
-      const matchedPart = mergedParts.find((p: any) =>
-        (p.part_name || '').trim().toLowerCase() === realPartName.toLowerCase()
-      ) || null;
+          // Strict, case-insensitive match with mergedParts
+          const matchedPart = mergedParts.find((p: any) =>
+            (p.part_name || '').trim().toLowerCase() === realPartName.toLowerCase()
+          ) || null;
 
-      return {
+          return {
+            userPartName,
+            realPartName,
+            partsData: matchedPart,
+            error: null
+          };
+        } catch (partError) {
+          // If individual part AI fails, return error for that part only
+          console.error(`AI error for "${userPartName}":`, partError);
+          return {
+            userPartName,
+            realPartName: null,
+            partsData: null,
+            error: partError instanceof Error ? partError.message : 'AI processing failed'
+          };
+        }
+      }));
+    } catch (err) {
+      // If the entire AI process fails, log it but continue
+      console.error('AI detection failed:', err);
+      aiError = err instanceof Error ? err.message : 'AI service unavailable';
+      // Return empty results for each user part name
+      aiResults = userPartNames.map((userPartName: string) => ({
         userPartName,
-        realPartName,
-        partsData: matchedPart
-      };
-    }));
+        realPartName: null,
+        partsData: null,
+        error: aiError
+      }));
+    }
 
-    // 5️⃣ Return all results
+    // 5️⃣ Return all results (always successful, even if AI failed)
     return NextResponse.json({
       quoteNotes: quote.notes || '',
       aiParts: aiResults,
-      allPartsInQuote: mergedParts  // All parts from quote for manual selection
+      allPartsInQuote: mergedParts,  // All parts from quote for manual selection
+      aiError: aiError  // Include error if AI completely failed
     }, { headers: CORS_HEADERS });
 
   } catch (err) {

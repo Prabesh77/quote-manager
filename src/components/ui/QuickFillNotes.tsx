@@ -337,12 +337,23 @@ const QuickFillNotes: React.FC<QuickFillNotesProps> = ({
   return createPortal(
     <div
       ref={popupRef}
-      className="fixed z-[9999] w-[800px] bg-white border border-gray-200 rounded-lg shadow-lg max-h-200 overflow-y-auto"
+      className="fixed z-[9999] w-[700px] bg-white border border-gray-200 rounded-lg shadow-lg max-h-200 overflow-y-auto"
       style={{
         top: position.top,
         left: position.left,
       }}
     >
+      {/* Close Button */}
+      <button
+        onClick={onClose}
+        className="cursor-pointer absolute top-1 right-2 z-10 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full p-1 transition-colors"
+        title="Close"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+          <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+        </svg>
+      </button>
+
       {/* Editable Preview Area */}
       <div className="p-2 border-b border-gray-100 bg-gray-50">
         <h3 className="text-xs font-semibold text-gray-700 mb-2">NOTES PREVIEW</h3>
@@ -416,54 +427,60 @@ const QuickFillNotes: React.FC<QuickFillNotesProps> = ({
       </div>
 
       {/* Main Sections Grid */}
-      <div className="grid grid-cols-5 gap-2 p-3">
-        {/* Ex Section */}
-        <div className="border border-gray-200 rounded-lg p-2 bg-blue-50 min-w-0">
-          <h3 className="text-xs font-semibold text-blue-700 mb-2 text-center">EX</h3>
-          <div className="space-y-1">
-            {['SYDNEY', 'BRISBANE', 'MELBOURNE', 'PERTH', 'WESTERN AUSTRALIA', 'VICTORIA', 'QUEENSLAND', 'EAST COAST'].map((location) => (
-              <button
-                key={location}
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  handleSelect('location', location, location);
-                }}
-                className={`w-full px-2 py-1 text-xs rounded-md transition-colors truncate ${
-                  selectedItems.location === location
-                    ? 'bg-blue-200 text-blue-800'
-                    : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
-                }`}
-                title={location}
-              >
-                {location}
-              </button>
-            ))}
+      <div className="grid grid-cols-4 gap-2 p-3">
+        {/* Combined EX & AVAILABLE IN Section */}
+        <div className="border border-gray-200 rounded-lg p-2 bg-gradient-to-b from-blue-50 to-green-50 min-w-0">
+          {/* EX Group */}
+          <div className="mb-3">
+            <h3 className="text-xs font-semibold text-blue-700 mb-1 text-center">EX</h3>
+            <div className="space-y-1">
+              {['SYDNEY', 'BRISBANE', 'MELBOURNE', 'PERTH', 'EAST COAST'].map((location) => (
+                <button
+                  key={`ex-${location}`}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    handleSelect('location', location, location);
+                  }}
+                  className={`w-full px-2 py-1 text-xs rounded-md transition-colors truncate ${
+                    selectedItems.location === location
+                      ? 'bg-blue-200 text-blue-800'
+                      : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
+                  }`}
+                  title={location}
+                >
+                  {location}
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
 
-        {/* Available In Section */}
-        <div className="border border-gray-200 rounded-lg p-2 bg-green-50 min-w-0">
-          <h3 className="text-xs font-semibold text-green-700 mb-2 text-center">AVAILABLE IN</h3>
-          <div className="space-y-1">
-            {['SYDNEY', 'BRISBANE', 'MELBOURNE', 'PERTH', 'WESTERN AUSTRALIA', 'VICTORIA', 'QUEENSLAND', 'EAST COAST'].map((location) => (
-              <button
-                key={location}
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  handleSelect('availableIn', location, location);
-                }}
-                className={`w-full px-2 py-1 text-xs rounded-md transition-colors truncate ${
-                  selectedItems.availableIn === location
-                    ? 'bg-green-200 text-green-800'
-                    : 'bg-green-100 text-green-700 hover:bg-green-200'
-                }`}
-                title={location}
-              >
-                {location}
-              </button>
-            ))}
+          {/* Divider */}
+          <div className="border-t border-gray-300 my-2"></div>
+
+          {/* AVAILABLE IN Group */}
+          <div>
+            <h3 className="text-xs font-semibold text-green-700 mb-1 text-center">AVAILABLE IN</h3>
+            <div className="space-y-1">
+              {['SYDNEY', 'BRISBANE', 'MELBOURNE', 'PERTH', 'EAST COAST'].map((location) => (
+                <button
+                  key={`avail-${location}`}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    handleSelect('availableIn', location, location);
+                  }}
+                  className={`w-full px-2 py-1 text-xs rounded-md transition-colors truncate ${
+                    selectedItems.availableIn === location
+                      ? 'bg-green-200 text-green-800'
+                      : 'bg-green-100 text-green-700 hover:bg-green-200'
+                  }`}
+                  title={location}
+                >
+                  {location}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 

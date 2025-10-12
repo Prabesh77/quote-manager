@@ -633,8 +633,16 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
         Object.keys(partEditData).forEach(partId => {
           const partEditDataForPart = partEditData[partId];
           if (partEditDataForPart) {
-            const quotePart = quote.partsRequested?.find(qp => qp.part_id === partId);
-            const existingVariants = quotePart?.variants || [];
+            // CRITICAL FIX: Use ORIGINAL quote from database (quotes prop), not local state
+            // This ensures we correctly detect new variants that don't exist in DB yet
+            const originalQuote = quotes.find(q => q.id === quoteId);
+            const originalQuotePart = originalQuote?.partsRequested?.find(qp => qp.part_id === partId);
+            const existingVariants = originalQuotePart?.variants || [];
+            
+            // Also get current local state for comparison
+            const localQuotePart = quote.partsRequested?.find(qp => qp.part_id === partId);
+            const currentVariants = localQuotePart?.variants || [];
+            
             const actualPart = parts.find(p => p.id === partId);
 
             // Check if editData has variant structure
@@ -643,35 +651,87 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
             );
 
             if (hasVariantStructure) {
-              // Process ALL variants for this part
-              Object.keys(partEditDataForPart).forEach(variantId => {
-                if (variantId === 'note' || variantId === 'price' || variantId === 'list_price' || variantId === 'af' || variantId === 'number') return;
-                
-                const variantEditData = partEditDataForPart[variantId];
-                const variant = existingVariants.find(v => v.id === variantId);
-                
-                const hasChanges = (
-                  (variantEditData.note !== undefined && variantEditData.note !== variant?.note) ||
-                  (variantEditData.final_price !== undefined && variantEditData.final_price !== variant?.final_price) ||
-                  (variantEditData.list_price !== undefined && variantEditData.list_price !== variant?.list_price) ||
-                  (variantEditData.af !== undefined && variantEditData.af !== variant?.af) ||
-                  (variantEditData.number !== undefined && variantEditData.number !== actualPart?.number)
-                );
+              // Process ALL existing variants first
+              existingVariants.forEach(variant => {
+                const variantEditData = partEditDataForPart[variant.id];
+                if (variantEditData) {
+                  // Check if there are actual changes compared to current values
+                  const hasChanges = (
+                    (variantEditData.note !== undefined && variantEditData.note !== variant.note) ||
+                    (variantEditData.final_price !== undefined && variantEditData.final_price !== variant.final_price) ||
+                    (variantEditData.list_price !== undefined && variantEditData.list_price !== variant.list_price) ||
+                    (variantEditData.af !== undefined && variantEditData.af !== variant.af) ||
+                    (variantEditData.number !== undefined && variantEditData.number !== actualPart?.number)
+                  );
 
-                if (hasChanges || !variant) {
-                  updates.push({
-                    id: partId,
-                    updates: {
-                      variantId,
-                      note: variantEditData.note ?? variant?.note ?? '',
-                      price: variantEditData.final_price ?? variant?.final_price ?? null,
-                      list_price: variantEditData.list_price ?? variant?.list_price ?? null,
-                      af: variantEditData.af ?? variant?.af ?? false,
-                      number: variantEditData.number ?? variant?.number ?? actualPart?.number ?? ''
-                    }
-                  } as any);
+                  if (hasChanges) {
+                    updates.push({
+                      id: partId,
+                      updates: {
+                        variantId: variant.id,
+                        number: variantEditData.number !== undefined ? variantEditData.number : actualPart?.number || '',
+                        note: variantEditData.note !== undefined ? variantEditData.note : variant.note,
+                        price: variantEditData.final_price !== undefined ? variantEditData.final_price : variant.final_price,
+                        list_price: variantEditData.list_price !== undefined ? variantEditData.list_price : variant.list_price,
+                        af: variantEditData.af !== undefined ? variantEditData.af : variant.af
+                      }
+                    } as any);
+                  }
                 }
               });
+              
+              // IMPORTANT FIX: Process new variants that don't exist in DB yet
+              // By using originalQuote above, existingVariants only contains DB variants
+              // Any variant in partEditDataForPart that's not in existingVariants is NEW
+              const newVariants: string[] = [];
+              Object.keys(partEditDataForPart).forEach(variantId => {
+                // Skip non-variant keys and variants we already processed
+                if (variantId === 'number') return; // Skip part-level number field
+                
+                const alreadyProcessed = existingVariants.some(v => v.id === variantId);
+                if (!alreadyProcessed) {
+                  newVariants.push(variantId);
+                  const variantEditData = partEditDataForPart[variantId];
+                  // For new variants, save them even if fields are empty (to create the variant)
+                  if (variantEditData) {
+                    updates.push({
+                      id: partId,
+                      updates: {
+                        variantId: variantId,
+                        number: variantEditData.number !== undefined ? variantEditData.number : actualPart?.number || '',
+                        note: variantEditData.note !== undefined ? variantEditData.note : '',
+                        price: variantEditData.final_price !== undefined ? variantEditData.final_price : null,
+                        list_price: variantEditData.list_price !== undefined ? variantEditData.list_price : null,
+                        af: variantEditData.af !== undefined ? variantEditData.af : false
+                      }
+                    } as any);
+                  }
+                }
+              });
+
+              // CRITICAL FIX: If new variants were added, we MUST also save all existing variants
+              // from the current local state, even if they weren't edited
+              // This ensures the complete variant list is sent to the backend
+              if (newVariants.length > 0 && currentVariants.length > 0) {
+                // Process ALL current variants to ensure they're all in the updates
+                currentVariants.forEach(variant => {
+                  // Skip if we already added this variant
+                  const alreadyInUpdates = updates.some(u => u.id === partId && (u.updates as any).variantId === variant.id);
+                  if (!alreadyInUpdates) {
+                    updates.push({
+                      id: partId,
+                      updates: {
+                        variantId: variant.id,
+                        number: actualPart?.number || '',
+                        note: variant.note || '',
+                        price: variant.final_price,
+                        list_price: variant.list_price,
+                        af: variant.af || false
+                      }
+                    } as any);
+                  }
+                });
+              }
             } else {
               // Part-level data (no variants)
               const part = quoteParts.find(p => p.id === partId);

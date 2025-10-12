@@ -112,7 +112,8 @@ Part Text: "${userPartName}"
     // 5️⃣ Return all results
     return NextResponse.json({
       quoteNotes: quote.notes || '',
-      aiParts: aiResults
+      aiParts: aiResults,
+      allPartsInQuote: mergedParts  // All parts from quote for manual selection
     }, { headers: CORS_HEADERS });
 
   } catch (err) {

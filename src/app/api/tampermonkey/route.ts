@@ -57,7 +57,7 @@ Valid part names:
    - OIL COOLER, ENG OIL COOLER → Oil Cooler
    - RADAR, SENSOR, WAVE SENSOR, CRUISE SENSOR, GRILL SENSOR, SPEED SENSOR → Radar Sensor
    - AUX RAD, AUXILIARY RADIATOR, SUB RAD → Auxiliary Radiator
-4. If multiple possibilities exist or the text is ambiguous or incomplete such that you are **less than 80% confident**, return "Ignore" instead of guessing.
+4. If multiple possibilities exist or the text is ambiguous or incomplete such that you are **less than 30% confident**, return "Ignore" instead of guessing.
 5. Do not add explanations, reasoning, or extra words — return only the final label.
 
 Now determine the correct part name for this input:

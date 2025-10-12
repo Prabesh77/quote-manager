@@ -47,7 +47,7 @@ const getOppositeSidePart = (partName: string): string => {
   return partMappings[partName] || partName;
 };
 
-const getPartIcon = (partName: string): string | null => {
+const getPartIcon = (partName: string): string => {
   const iconMap: Record<string, string> = {
     'Radiator': '/part-icons/radiator.png',
     'Left Headlamp': '/part-icons/headlight-left.png',
@@ -67,7 +67,7 @@ const getPartIcon = (partName: string): string | null => {
     'Right Blindspot Sensor': '/part-icons/blindspot.png',
   };
 
-  return iconMap[partName] || null;
+  return iconMap[partName] || '/part-icons/car-parts.png';
 };
 
 const PART_OPTIONS = [
@@ -141,15 +141,13 @@ export default function PartsSection({
                     : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
                 }`}
               >
-                {iconUrl && (
-                  <div className={`w-6 h-6 p-0.5 rounded-full flex items-center justify-center shadow-sm border ${
-                    isSelected 
-                      ? 'bg-white border-white' 
-                      : 'bg-white border-gray-200'
-                  }`}>
-                    <img src={iconUrl} alt={part.name} className="object-contain" />
-                  </div>
-                )}
+                <div className={`w-6 h-6 p-0.5 rounded-full flex items-center justify-center shadow-sm border ${
+                  isSelected 
+                    ? 'bg-white border-white' 
+                    : 'bg-white border-gray-200'
+                }`}>
+                  <img src={iconUrl} alt={part.name} className="object-contain" />
+                </div>
                 <span className="text-sm font-medium">{part.name}</span>
               </button>
             );
@@ -186,11 +184,9 @@ export default function PartsSection({
                 <div key={partName} className="bg-gray-50 rounded-lg p-4 border border-gray-200">
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center space-x-2">
-                      {iconUrl && (
-                        <div className="w-6 h-6 bg-white rounded-full flex items-center justify-center shadow-sm border border-gray-200">
-                          <img src={iconUrl} alt={partName} className="h-4 w-4 object-contain" />
-                        </div>
-                      )}
+                      <div className="w-6 h-6 bg-white rounded-full flex items-center justify-center shadow-sm border border-gray-200">
+                        <img src={iconUrl} alt={partName} className="h-4 w-4 object-contain" />
+                      </div>
                       <span className="font-medium text-gray-900">{partName}</span>
                     </div>
                     <div className="flex items-center space-x-1">

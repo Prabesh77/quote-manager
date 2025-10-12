@@ -1486,7 +1486,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
     return logos[make?.toLowerCase()] || '/car-logos/default.png'; // Default to Toyota if make not found
   };
 
-  const getPartIcon = (partName: string): string | null => {
+  const getPartIcon = (partName: string): string => {
     const iconMap: Record<string, string> = {
       'Radiator': '/part-icons/radiator.png',
       'Left Headlamp': '/part-icons/headlight-left.png',
@@ -1503,7 +1503,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
       'Right Rear Lamp': '/part-icons/headlight-right.png',
     };
     
-    return iconMap[partName] || null;
+    return iconMap[partName] || '/part-icons/car-parts.png';
   };
 
     const getDeadlineIndicator = (requiredBy: string | undefined) => {
@@ -2761,14 +2761,11 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                                   <div className="flex items-center space-x-3">
                                                     {index === 0 ? (
                                                       <>
-                                                        {getPartIcon(part.name) && (
-                                                          <div className="flex-shrink-0 w-8 h-8 bg-white rounded-lg p-1.5 shadow-md border border-gray-200 hover:border-gray-300 transition-all duration-200">
-                                                            <img src={getPartIcon(part.name)!} alt={part.name} className="w-full h-full object-contain filter contrast-125 brightness-110" />
-                                                          </div>
-                                                )}
-                                                <div className="flex-1">
+                                                        <div className="flex-shrink-0 w-8 h-8 bg-white rounded-lg p-1.5 shadow-md border border-gray-200 hover:border-gray-300 transition-all duration-200">
+                                                          <img src={getPartIcon(part.name)} alt={part.name} className="w-full h-full object-contain filter contrast-125 brightness-110" />
+                                                        </div>
+                                                        <div className="flex-1">
                                                           <span className={`text-sm font-semibold ${variant.final_price && variant.final_price < 10 ? 'text-red-600 line-through' : 'text-gray-900'}`}>{part.name}</span>
-
                                                         </div>
                                                       </>
                                                     ) : (
@@ -3453,11 +3450,9 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                     return (
                                 <div key={part.id} className={`${part.price && part.price < 10 ? 'bg-red-50 border-red-200' : 'bg-white border-gray-200'} rounded-lg border p-3 shadow-sm`}>
                                   <div className="relative">
-                                    {getPartIcon(part.name) && (
-                                      <div className="absolute top-2 right-2 bg-white rounded-full p-2 shadow-md border border-gray-200 hover:border-gray-300 transition-all duration-200">
-                                        <img src={getPartIcon(part.name)!} alt={part.name} className="h-6 w-6 object-contain filter contrast-125 brightness-110" />
-                                      </div>
-                                    )}
+                                    <div className="absolute top-2 right-2 bg-white rounded-full p-2 shadow-md border border-gray-200 hover:border-gray-300 transition-all duration-200">
+                                      <img src={getPartIcon(part.name)} alt={part.name} className="h-6 w-6 object-contain filter contrast-125 brightness-110" />
+                                    </div>
                                     <div className="space-y-3 pr-12">
                                       <div className="grid grid-cols-2 gap-3">
                                             <div>

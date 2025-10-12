@@ -2,40 +2,79 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import { NextRequest, NextResponse } from "next/server";
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
+const SUPABASE_URL = 'https://ofpvxrsvnmgktypwluoo.supabase.co';
+const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY;
+
+const CORS_HEADERS = {
+  'Access-Control-Allow-Origin': '*', // or restrict to your domain
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type',
+  'Content-Type': 'application/json',
+};
 
 export async function OPTIONS(req: NextRequest) {
-  // Handle preflight requests
-  const res = NextResponse.json({});
-  res.headers.set('Access-Control-Allow-Origin', '*'); // or restrict to your domain
-  res.headers.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.headers.set('Access-Control-Allow-Headers', 'Content-Type');
-  return res;
+  return NextResponse.json({}, { status: 200, headers: CORS_HEADERS });
 }
 
 export async function POST(req: NextRequest) {
   try {
-    // --- CORS headers ---
-    const headers = new Headers({
-      'Access-Control-Allow-Origin': '*', // or your domain
-      'Access-Control-Allow-Methods': 'POST, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type',
-      'Content-Type': 'application/json',
+    const { quoteRef, userPartNames } = await req.json();
+
+    if (!quoteRef || !Array.isArray(userPartNames) || !userPartNames.length) {
+      return NextResponse.json(
+        { error: 'quoteRef and userPartNames are required' },
+        { status: 400, headers: CORS_HEADERS }
+      );
+    }
+
+    // 1️⃣ Fetch quote
+    const quoteRes = await fetch(
+      `${SUPABASE_URL}/rest/v1/quotes?select=id,quote_ref,notes,parts_requested&quote_ref=eq.${quoteRef}`,
+      { headers: { apikey: SUPABASE_ANON_KEY || '', Authorization: `Bearer ${SUPABASE_ANON_KEY}` } }
+    );
+    const quote = (await quoteRes.json())[0];
+    if (!quote) return NextResponse.json({ error: 'Quote not found' }, { status: 404, headers: CORS_HEADERS });
+
+    // 2️⃣ Fetch parts by IDs
+    const partsRequested = Array.isArray(quote.parts_requested) ? quote.parts_requested : [];
+    const partIds = partsRequested.map((p: any) => p.part_id).filter(Boolean);
+
+    let fetchedParts: any[] = [];
+    if (partIds.length) {
+      const partsRes = await fetch(
+        `${SUPABASE_URL}/rest/v1/parts?id=in.(${partIds.join(',')})&select=id,part_name,part_number,note`,
+        { headers: { apikey: SUPABASE_ANON_KEY || '', Authorization: `Bearer ${SUPABASE_ANON_KEY}` } }
+      );
+      const data = await partsRes.json();
+      fetchedParts = Array.isArray(data) ? data : [];
+    }
+
+    // 3️⃣ Merge partsRequested with fetchedParts
+    const partsMap: Record<string, any> = {};
+    fetchedParts.forEach(p => { partsMap[p.id] = p; });
+
+    const mergedParts = partsRequested.map((pr: any) => {
+      const fetchedPart = partsMap[pr.part_id] || {};
+      return {
+        ...fetchedPart,              // Base part data from parts table (id, part_name, part_number, etc.)
+        part_id: pr.part_id,         // Keep the part_id from parts_requested
+        notes: pr.notes,             // Override with notes from parts_requested
+        price: pr.price,             // Override with price from parts_requested
+        list_price: pr.list_price,   // Override with list_price from parts_requested
+        variants: pr.variants || fetchedPart.variants || []
+      };
     });
 
-    const { partText } = await req.json();
-
-    const prompt = `
+    // 4️⃣ AI detection for each userPartName
+    const aiResults = await Promise.all(userPartNames.map(async (userPartName: string) => {
+      const prompt = `
 You are an expert automotive parts specialist trained to identify front-end car parts from short, often incomplete or abbreviated text inputs.
-
-You will receive a short text describing or abbreviating a car part (for example: "RH HLAMP", "LH RAD", "COND", "RADAR", "AUX RAD", etc.).
-
-Your goal is to determine which exact part the user is referring to and return ONLY one standardized part name from the list below — or "Ignore" if the meaning is not clear with at least 80% confidence.
 
 Valid part names:
 - Right Headlamp
 - Left Headlamp
-- Right Daytime Lamp
-- Left Daytime Lamp
+- Right DayLight
+- Left DayLight
 - Radiator
 - Condenser
 - Intercooler
@@ -43,39 +82,44 @@ Valid part names:
 - Radar Sensor
 - Auxiliary Radiator
 
-### Rules:
-1. Return only **one** of the exact part names above, or "Ignore".
+Rules:
+1. Return only **one** of the exact part names above.
 2. Ignore any special symbols (*, -, ., #, etc.) and spacing differences.
-3. Understand common abbreviations and shorthand:
-   - RH / R / RIGHT → Right side
-   - LH / L / LEFT → Left side
-   - H/LAMP, HLAMP, HEADLAMP, HEAD LIGHT → Headlamp
-   - DRL, D/LAMP, DAYLAMP, DAYTIME → Daytime Lamp
-   - RAD, RADIATOR, COOLER (for coolant), MAIN COOLER → Radiator
-   - CON, COND, CONDENSER → Condenser
-   - I/C, INTERCOOLER, CHARGE AIR COOLER, ADD COOLER → Intercooler
-   - OIL COOLER, ENG OIL COOLER → Oil Cooler
-   - RADAR, SENSOR, WAVE SENSOR, CRUISE SENSOR, GRILL SENSOR, SPEED SENSOR → Radar Sensor
-   - AUX RAD, AUXILIARY RADIATOR, SUB RAD → Auxiliary Radiator
-4. If multiple possibilities exist or the text is ambiguous or incomplete such that you are **less than 30% confident**, return "Ignore" instead of guessing.
-5. Do not add explanations, reasoning, or extra words — return only the final label.
+3. Understand common abbreviations and shorthand.
+4. Do not add explanations, reasoning, or extra words — return only the final label.
 
-Now determine the correct part name for this input:
+Determine the correct part name for this input:
 
-Part Text: "${partText}"
+Part Text: "${userPartName}"
 `;
 
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
-    const result = await model.generateContent(prompt);
+      const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
+      const result = await model.generateContent(prompt);
+      const realPartName = result.response.text().trim();
 
-    const text = result.response.text().trim();
+      // Strict, case-insensitive match with mergedParts
+      const matchedPart = mergedParts.find((p: any) =>
+        (p.part_name || '').trim().toLowerCase() === realPartName.toLowerCase()
+      ) || null;
 
-    return new Response(JSON.stringify({ part: text }), { headers });
+      return {
+        userPartName,
+        realPartName,
+        partsData: matchedPart
+      };
+    }));
+
+    // 5️⃣ Return all results
+    return NextResponse.json({
+      quoteNotes: quote.notes || '',
+      aiParts: aiResults
+    }, { headers: CORS_HEADERS });
+
   } catch (err) {
-    console.error("AI error:", err);
-    return new Response(JSON.stringify({
-      part: "Ignore",
-      error: err instanceof Error ? err.message : 'Unknown error'
-    }), { status: 500, headers: { 'Access-Control-Allow-Origin': '*' } });
+    console.error(err);
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : 'Unknown error' },
+      { status: 500, headers: CORS_HEADERS }
+    );
   }
 }

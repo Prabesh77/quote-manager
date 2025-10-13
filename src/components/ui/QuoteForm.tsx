@@ -79,6 +79,7 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
   const [validationMessage, setValidationMessage] = useState('');
   const [isFormAccordionOpen, setIsFormAccordionOpen] = useState(false);
   const [showPartsSection, setShowPartsSection] = useState(false);
+  const [showDoubleQuoteAlert, setShowDoubleQuoteAlert] = useState(false);
 
   // Ref for ImagePasteArea to reset images when form is cleared
   const imagePasteAreaRef = useRef<ImagePasteAreaRef>(null);
@@ -524,6 +525,12 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
                   
                   // Use our new parser to extract data
                   const parsedData = parseQuoteData(pastedText);
+                        
+                  // Check if special characters were detected in quoteRef
+                  if (parsedData.hasSpecialCharsInQuoteRef) {
+                    // Show alert for potential double quote
+                    setShowDoubleQuoteAlert(true);
+                  }
                   
                   // Update form fields with parsed data
                   setFields(prevFields => ({
@@ -959,6 +966,29 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
                 className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-md transition-colors duration-200"
               >
                 OK
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Double Quote Alert */}
+      {showDoubleQuoteAlert && (
+        <div className="fixed inset-0 backdrop-blur-sm bg-white/30 flex items-center justify-center z-50 animate-in fade-in duration-200">
+          <div className="bg-white rounded-lg p-8 max-w-md w-full mx-4 shadow-2xl border-2 border-amber-400 animate-in zoom-in duration-200">
+            <div className="flex flex-col items-center text-center">
+              <div className="w-16 h-16 bg-gradient-to-br from-amber-100 to-amber-200 rounded-full flex items-center justify-center mb-4 shadow-lg">
+                <AlertCircle className="h-10 w-10 text-amber-600 animate-pulse" />
+              </div>
+              <h3 className="text-xl font-bold text-gray-900 mb-3">⚠️ Double Quote Warning</h3>
+              <p className="text-gray-700 text-lg mb-6 leading-relaxed">
+                Please make sure you <span className="font-semibold text-amber-600">check for double quote</span>
+              </p>
+              <Button
+                onClick={() => setShowDoubleQuoteAlert(false)}
+                className="bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white px-8 py-3 rounded-lg font-semibold shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105"
+              >
+                OK, I'll Check
               </Button>
             </div>
           </div>

@@ -254,13 +254,14 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
       }
     }
 
-    // Get the list price from the first variant to sync
-    const firstVariant = existingVariants[0];
-    const syncedListPrice = firstVariant?.list_price ?? null;
-
     // Add the new variant to partEditData
     setPartEditData(prev => {
       const existingPartData = prev[partId] || {};
+      
+      // Get the list price from the first variant in partEditData (current editing state)
+      // This ensures we get the latest value even if it hasn't been saved yet
+      const firstVariantId = Object.keys(existingPartData).find(key => key !== 'number');
+      const syncedListPrice = firstVariantId ? existingPartData[firstVariantId]?.list_price : null;
       
       return {
         ...prev,
@@ -271,7 +272,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
             number: actualPart?.number || '',
             note: '', 
             final_price: null, 
-            list_price: syncedListPrice, // Sync list price from first variant
+            list_price: syncedListPrice ?? null, // Sync list price from first variant
             af: false 
           }
         }
@@ -280,6 +281,11 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
 
     // Add to local quote state for display - use functional update for consistency
     setLocalQuotes(prev => {
+      // Get the synced list price from the current state
+      const currentQuote = prev.find(q => q.id === quoteId);
+      const currentPart = currentQuote?.partsRequested?.find(p => p.part_id === partId);
+      const currentListPrice = currentPart?.variants?.[0]?.list_price ?? null;
+      
       const updatedQuotes = prev.map(q => 
         q.id === quoteId 
           ? {
@@ -297,7 +303,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                           number: actualPart?.number || '',
                           note: '',
                           final_price: null,
-                          list_price: syncedListPrice, // Sync list price from first variant
+                          list_price: currentListPrice, // Use list price from current state
                           af: false,
                           created_at: new Date().toISOString(),
                           is_default: false
@@ -3035,7 +3041,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                                 {isPartEditing ? (
                                                         <QuickFillInput
                                                           ref={(el) => { focusRefs.current[`${part.id}_${variant.id}_note`] = el; }}
-                                                          value={getCombinedNotes(quote.notes, partEditData[part.id]?.[variant.id]?.note ?? variant.note)}
+                                                          value={partEditData[part.id]?.[variant.id]?.note ?? variant.note ?? ''}
                                                           onChange={(value) => handleVariantEditChange(part.id, variant.id, 'note', value)}
                                                           placeholder="Add notes..."
                                                           className={`flex-1 ${index === 0 ? 'bg-white' : 'bg-gray-50'}`}

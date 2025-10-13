@@ -21,6 +21,7 @@ import {
 import { getAvailablePartsForBrand, getPartDescriptionForBrand } from '@/config/brandPartRules';
 import { parseQuoteData } from '@/utils/quoteDataParser';
 import PartsSection from './PartsSection';
+import CopyButton from './CopyButton';
 
 // Function to clean part numbers by removing special characters and replacing O with 0
 const cleanPartNumber = (partNumber: string): string => {
@@ -980,16 +981,41 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
               <div className="w-16 h-16 bg-gradient-to-br from-amber-100 to-amber-200 rounded-full flex items-center justify-center mb-4 shadow-lg">
                 <AlertCircle className="h-10 w-10 text-amber-600 animate-pulse" />
               </div>
-              <h3 className="text-xl font-bold text-gray-900 mb-3">⚠️ Double Quote Warning</h3>
+              <h3 className="text-xl font-bold text-gray-900 mb-3">Double Quote Warning</h3>
               <p className="text-gray-700 text-lg mb-6 leading-relaxed">
                 Please make sure you <span className="font-semibold text-amber-600">check for double quote</span>
               </p>
-              <Button
-                onClick={() => setShowDoubleQuoteAlert(false)}
-                className="bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white px-8 py-3 rounded-lg font-semibold shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105"
-              >
-                OK, I'll Check
-              </Button>
+              
+              {/* Quote Reference Display with Copy */}
+              {fields.quoteRef && (() => {
+                // Extract the part before the first special character
+                const beforeSpecialChars = fields.quoteRef.split(/[#\/.]/, 1)[0];
+                
+                return (
+                  <div className="mb-6 w-full">
+                    <label className="block text-xs font-medium text-gray-600 mb-2">Quote Ref</label>
+                    <div className="flex items-center space-x-2 bg-gray-50 border border-gray-300 rounded-lg">
+                      <span className="flex-1 text-lg font-mono font-semibold text-gray-900">{beforeSpecialChars}</span>
+                      <CopyButton
+                        text={beforeSpecialChars}
+                        title="Copy quote reference"
+                        size="lg"
+                        className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-200 rounded-md transition-all duration-200 cursor-pointer"
+                        iconClassName="h-5 w-5"
+                      />
+                    </div>
+                  </div>
+                );
+              })()}
+              
+              <div className="flex items-center space-x-3 w-full">
+                <Button
+                  onClick={() => setShowDoubleQuoteAlert(false)}
+                  className="flex-1 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white px-6 py-3 rounded-lg font-semibold shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105"
+                >
+                  OK, I'll Check
+                </Button>
+              </div>
             </div>
           </div>
         </div>

@@ -20,6 +20,16 @@ interface AIPartExtraction {
   list_price?: number;
 }
 
+// Helper function to clean part numbers
+function cleanPartNumber(partNumber: string): string {
+  if (!partNumber) return '';
+  // Remove all whitespaces and special characters, keep only letters and numbers
+  return partNumber
+    .replace(/\s+/g, '') // Remove all whitespaces
+    .replace(/[^a-zA-Z0-9]/g, '') // Remove ALL special chars including hyphens
+    .toUpperCase(); // Ensure uppercase
+}
+
 export async function POST(request: NextRequest) {
   try {
     const { ocrText } = await request.json();
@@ -58,7 +68,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ useFallback: true });
     }
     
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash-lite' });
 
     const prompt = `
 You are an expert automotive parts analyst. Analyze the provided OCR text and extract ONLY the MAIN automotive parts according to the rules below.
@@ -219,7 +229,7 @@ Output: { "partName": "Condenser", "partNumber": "26060-5X00B", "context": null 
     
     const extractedParts: AIPartExtraction[] = aiResponse.parts.map(part => ({
       partName: part.partName,
-      partNumber: part.partNumber,
+      partNumber: cleanPartNumber(part.partNumber),
       confidence: 1.0,
       rawText: ocrText,
       context: part.context || undefined,
@@ -256,7 +266,7 @@ Output: { "partName": "Condenser", "partNumber": "26060-5X00B", "context": null 
       } else {
         finalParts.push({
           ...groupData.part,
-          partNumber: groupData.partNumbers.join(', '),
+          partNumber: groupData.partNumbers.join(','), // No spaces in joined part numbers
           context: groupData.part.context
         });
       }

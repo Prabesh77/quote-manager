@@ -254,6 +254,10 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
       }
     }
 
+    // Get the list price from the first variant to sync
+    const firstVariant = existingVariants[0];
+    const syncedListPrice = firstVariant?.list_price ?? null;
+
     // Add the new variant to partEditData
     setPartEditData(prev => {
       const existingPartData = prev[partId] || {};
@@ -267,7 +271,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
             number: actualPart?.number || '',
             note: '', 
             final_price: null, 
-            list_price: null, 
+            list_price: syncedListPrice, // Sync list price from first variant
             af: false 
           }
         }
@@ -293,7 +297,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                           number: actualPart?.number || '',
                           note: '',
                           final_price: null,
-                          list_price: null,
+                          list_price: syncedListPrice, // Sync list price from first variant
                           af: false,
                           created_at: new Date().toISOString(),
                           is_default: false
@@ -1479,16 +1483,41 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
   };
 
   const handleVariantEditChange = (partId: string, variantId: string, field: string, value: string | number | boolean | null) => {
-    setPartEditData(prev => ({
-      ...prev,
-      [partId]: {
-        ...prev[partId],
-        [variantId]: {
-          ...prev[partId]?.[variantId],
-          [field]: value
-        }
+    setPartEditData(prev => {
+      const partData = prev[partId] || {};
+      
+      // If list_price is being changed, sync it across ALL variants for this part
+      if (field === 'list_price') {
+        const updatedPartData = { ...partData };
+        
+        // Update all variant list prices
+        Object.keys(updatedPartData).forEach(vId => {
+          if (vId !== 'number') { // Skip non-variant keys
+            updatedPartData[vId] = {
+              ...updatedPartData[vId],
+              list_price: value
+            };
+          }
+        });
+        
+        return {
+          ...prev,
+          [partId]: updatedPartData
+        };
       }
-    }));
+      
+      // For other fields, only update the specific variant
+      return {
+        ...prev,
+        [partId]: {
+          ...partData,
+          [variantId]: {
+            ...partData?.[variantId],
+            [field]: value
+          }
+        }
+      };
+    });
   };
 
   const getQuoteStatus = (quoteParts: Part[], quoteStatus?: string): QuoteStatus => {

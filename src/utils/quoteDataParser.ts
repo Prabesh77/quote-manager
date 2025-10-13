@@ -19,6 +19,7 @@ export interface ParsedQuoteData {
   settlement: number;
   notes: string;
   source: 'partscheck' | 'repairconnection' | 'unknown';
+  hasSpecialCharsInQuoteRef?: boolean; // Flag to indicate special chars were found
 }
 
 // List of known vehicle makes/brands for parsing
@@ -114,6 +115,23 @@ function parseSettlement(settlementString: string): number {
 }
 
 /**
+ * Clean quote reference by removing warning icons and text after them
+ * @param quoteRef - Raw quote reference
+ * @returns Object with cleaned quote reference and flag for special chars
+ */
+function cleanQuoteRef(quoteRef: string): { cleaned: string; hasSpecialChars: boolean } {
+  if (!quoteRef) return { cleaned: '', hasSpecialChars: false };
+  
+  // Check if it has special characters like #, /, . (potential double quote indicators)
+  const hasSpecialChars = /[#\/.]/.test(quoteRef);
+  
+  // Remove warning icon (⚠) and everything after it
+  const cleaned = quoteRef.split('⚠')[0].trim();
+  
+  return { cleaned, hasSpecialChars };
+}
+
+/**
  * Clean and format date strings
  * @param dateString - Raw date string
  * @returns Formatted date string or original if parsing fails
@@ -168,7 +186,7 @@ function detectFormat(text: string): 'partscheck' | 'repairconnection' | 'unknow
  */
 function parsePartscheckFormat(text: string): Partial<ParsedQuoteData> {
   const lines = text.split('\n').map(line => line.trim()).filter(line => line);
-  const data: Partial<ParsedQuoteData> = { source: 'partscheck' };
+  const data: Partial<ParsedQuoteData> = { source: 'partscheck', hasSpecialCharsInQuoteRef: false };
   
   for (const line of lines) {
     const [key, ...valueParts] = line.split(':');
@@ -194,7 +212,9 @@ function parsePartscheckFormat(text: string): Partial<ParsedQuoteData> {
         data.notes = `Estimator: ${value}`;
         break;
       case 'reference':
-        data.quoteRef = value;
+        const { cleaned, hasSpecialChars } = cleanQuoteRef(value);
+        data.quoteRef = cleaned;
+        data.hasSpecialCharsInQuoteRef = hasSpecialChars;
         break;
       case 'make':
         data.make = value;
@@ -242,7 +262,7 @@ function parsePartscheckFormat(text: string): Partial<ParsedQuoteData> {
  */
 function parseRepairConnectionFormat(text: string): Partial<ParsedQuoteData> {
   const lines = text.split('\n').map(line => line.trim()).filter(line => line);
-  const data: Partial<ParsedQuoteData> = { source: 'repairconnection' };
+  const data: Partial<ParsedQuoteData> = { source: 'repairconnection', hasSpecialCharsInQuoteRef: false };
   
   for (const line of lines) {
     const [key, ...valueParts] = line.split(':');
@@ -271,7 +291,9 @@ function parseRepairConnectionFormat(text: string): Partial<ParsedQuoteData> {
         data.notes = (data.notes || '') + (data.notes ? ' | ' : '') + `Email: ${value}`;
         break;
       case 'estimate number':
-        data.quoteRef = value;
+        const rcResult = cleanQuoteRef(value);
+        data.quoteRef = rcResult.cleaned;
+        data.hasSpecialCharsInQuoteRef = rcResult.hasSpecialChars;
         break;
       case 'insurer':
         data.notes = (data.notes || '') + (data.notes ? ' | ' : '') + `Insurer: ${value}`;
@@ -400,7 +422,8 @@ export function parseQuoteData(text: string): ParsedQuoteData {
     phone: parsedData.phone || '',
     settlement: parsedData.settlement || 0,
     notes: parsedData.notes || '',
-    source: parsedData.source || 'unknown'
+    source: parsedData.source || 'unknown',
+    hasSpecialCharsInQuoteRef: parsedData.hasSpecialCharsInQuoteRef || false
   };
 
   // Append "RC" to quoteRef if source is repairconnection

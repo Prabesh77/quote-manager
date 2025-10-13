@@ -258,6 +258,11 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
     setPartEditData(prev => {
       const existingPartData = prev[partId] || {};
       
+      // Get the list price from the first variant in partEditData (current editing state)
+      // This ensures we get the latest value even if it hasn't been saved yet
+      const firstVariantId = Object.keys(existingPartData).find(key => key !== 'number');
+      const syncedListPrice = firstVariantId ? existingPartData[firstVariantId]?.list_price : null;
+      
       return {
         ...prev,
         [partId]: {
@@ -267,7 +272,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
             number: actualPart?.number || '',
             note: '', 
             final_price: null, 
-            list_price: null, 
+            list_price: syncedListPrice ?? null, // Sync list price from first variant
             af: false 
           }
         }
@@ -276,6 +281,11 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
 
     // Add to local quote state for display - use functional update for consistency
     setLocalQuotes(prev => {
+      // Get the synced list price from the current state
+      const currentQuote = prev.find(q => q.id === quoteId);
+      const currentPart = currentQuote?.partsRequested?.find(p => p.part_id === partId);
+      const currentListPrice = currentPart?.variants?.[0]?.list_price ?? null;
+      
       const updatedQuotes = prev.map(q => 
         q.id === quoteId 
           ? {
@@ -293,7 +303,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                           number: actualPart?.number || '',
                           note: '',
                           final_price: null,
-                          list_price: null,
+                          list_price: currentListPrice, // Use list price from current state
                           af: false,
                           created_at: new Date().toISOString(),
                           is_default: false
@@ -1479,16 +1489,48 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
   };
 
   const handleVariantEditChange = (partId: string, variantId: string, field: string, value: string | number | boolean | null) => {
-    setPartEditData(prev => ({
-      ...prev,
-      [partId]: {
-        ...prev[partId],
-        [variantId]: {
-          ...prev[partId]?.[variantId],
-          [field]: value
-        }
+    setPartEditData(prev => {
+      const partData = prev[partId] || {};
+      
+      // If list_price is being changed, sync it across ALL variants for this part
+      if (field === 'list_price') {
+        const updatedPartData = { ...partData };
+        
+        // Update all variant list prices
+        Object.keys(updatedPartData).forEach(vId => {
+          if (vId !== 'number') { // Skip non-variant keys
+            updatedPartData[vId] = {
+              ...updatedPartData[vId],
+              list_price: value
+            };
+          }
+        });
+        
+        return {
+          ...prev,
+          [partId]: updatedPartData
+        };
       }
-    }));
+      
+      // Clean part number - remove whitespaces and special characters
+      if (field === 'number' && typeof value === 'string') {
+        value = value
+          .replace(/\s+/g, '') // Remove all whitespaces
+          .toUpperCase(); // Ensure uppercase
+      }
+      
+      // For other fields, only update the specific variant
+      return {
+        ...prev,
+        [partId]: {
+          ...partData,
+          [variantId]: {
+            ...partData?.[variantId],
+            [field]: value
+          }
+        }
+      };
+    });
   };
 
   const getQuoteStatus = (quoteParts: Part[], quoteStatus?: string): QuoteStatus => {
@@ -2999,7 +3041,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                                 {isPartEditing ? (
                                                         <QuickFillInput
                                                           ref={(el) => { focusRefs.current[`${part.id}_${variant.id}_note`] = el; }}
-                                                          value={getCombinedNotes(quote.notes, partEditData[part.id]?.[variant.id]?.note ?? variant.note)}
+                                                          value={partEditData[part.id]?.[variant.id]?.note ?? variant.note ?? ''}
                                                           onChange={(value) => handleVariantEditChange(part.id, variant.id, 'note', value)}
                                                           placeholder="Add notes..."
                                                           className={`flex-1 ${index === 0 ? 'bg-white' : 'bg-gray-50'}`}

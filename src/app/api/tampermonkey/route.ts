@@ -98,7 +98,7 @@ Determine the correct part name for this input:
 Part Text: "${userPartName}"
 `;
 
-          const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
+          const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
           const result = await model.generateContent(prompt);
           const realPartName = result.response.text().trim();
 

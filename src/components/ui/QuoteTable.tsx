@@ -2915,9 +2915,9 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                                           ) : (
                                                             // Single part number - show with same box styling as multiple
                                                             <div className="flex items-center space-x-1 bg-gray-50 px-2 py-1 rounded-md border border-gray-200">
-                                                              <span className="text-sm font-medium text-gray-900 font-mono">{part.number.trim() || '-'}</span>
+                                                              <span className="text-sm font-medium text-gray-900 font-mono">{part.number.replace(/\s/g, "") || '-'}</span>
                                                               <CopyButton
-                                                                text={part.number.trim() || ''}
+                                                                text={part.number.replace(/\s/g, "") || ''}
                                                       title="Copy to clipboard"
                                                                 size="sm"
                                                                 className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-all duration-200 cursor-pointer"

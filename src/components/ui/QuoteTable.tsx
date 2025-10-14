@@ -2917,7 +2917,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                                             <div className="flex items-center space-x-1 bg-gray-50 px-2 py-1 rounded-md border border-gray-200">
                                                               <span className="text-sm font-medium text-gray-900 font-mono">{part.number.trim() || '-'}</span>
                                                               <CopyButton
-                                                                text={part.number || ''}
+                                                                text={part.number.trim() || ''}
                                                       title="Copy to clipboard"
                                                                 size="sm"
                                                                 className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-all duration-200 cursor-pointer"

@@ -27,13 +27,13 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 1️⃣ Fetch quote
+    // 1️⃣ Fetch quote (only if status is 'priced')
     const quoteRes = await fetch(
-      `${SUPABASE_URL}/rest/v1/quotes?select=id,quote_ref,notes,parts_requested&quote_ref=eq.${quoteRef}`,
+      `${SUPABASE_URL}/rest/v1/quotes?select=id,quote_ref,notes,parts_requested,status&quote_ref=eq.${quoteRef}&status=eq.priced`,
       { headers: { apikey: SUPABASE_ANON_KEY || '', Authorization: `Bearer ${SUPABASE_ANON_KEY}` } }
     );
     const quote = (await quoteRes.json())[0];
-    if (!quote) return NextResponse.json({ error: 'Quote not found' }, { status: 404, headers: CORS_HEADERS });
+    if (!quote) return NextResponse.json({ error: 'Quote not found or not in priced status' }, { status: 404, headers: CORS_HEADERS });
 
     // 2️⃣ Fetch parts by IDs
     const partsRequested = Array.isArray(quote.parts_requested) ? quote.parts_requested : [];

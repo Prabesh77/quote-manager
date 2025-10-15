@@ -1514,9 +1514,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
       
       // Clean part number - remove whitespaces and special characters
       if (field === 'number' && typeof value === 'string') {
-        value = value
-          .replace(/\s+/g, '') // Remove all whitespaces
-          .toUpperCase(); // Ensure uppercase
+        value = value.toUpperCase(); // Ensure uppercase
       }
       
       // For other fields, only update the specific variant

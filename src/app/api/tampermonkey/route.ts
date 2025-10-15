@@ -27,9 +27,10 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 1️⃣ Fetch quote (only if status is 'priced')
+    // 1️⃣ Fetch quote
+    const encodedQuoteRef = encodeURIComponent(quoteRef);
     const quoteRes = await fetch(
-      `${SUPABASE_URL}/rest/v1/quotes?select=id,quote_ref,notes,parts_requested,status&quote_ref=eq.${quoteRef}&status=eq.priced`,
+      `${SUPABASE_URL}/rest/v1/quotes?select=id,quote_ref,notes,parts_requested&quote_ref=eq.${encodedQuoteRef}&status=eq.priced`,
       { headers: { apikey: SUPABASE_ANON_KEY || '', Authorization: `Bearer ${SUPABASE_ANON_KEY}` } }
     );
     const quote = (await quoteRes.json())[0];

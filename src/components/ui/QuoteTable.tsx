@@ -2902,9 +2902,9 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                                             <div className="flex flex-wrap items-center gap-1">
                                                               {part.number.split(',').map((pn, pnIndex) => (
                                                                 <div key={pnIndex} className="flex items-center space-x-1 bg-gray-50 px-2 py-1 rounded-md border border-gray-200">
-                                                                  <span className="text-sm font-medium text-gray-900 font-mono">{pn.trim()}</span>
+                                                                  <span className="text-sm font-medium text-gray-900 font-mono">{pn.replace(/\s/g, "")}</span>
                                                                   <CopyButton
-                                                                    text={pn.trim()}
+                                                                    text={pn.replace(/\s/g, "")}
                                                                     title={`Copy ${pn.trim()} to clipboard`}
                                                                     size="sm"
                                                                     className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-all duration-200 cursor-pointer"

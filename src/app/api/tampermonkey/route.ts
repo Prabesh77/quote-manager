@@ -18,7 +18,7 @@ export async function OPTIONS(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const { quoteRef, userPartNames } = await req.json();
+    const { quoteRef, vin, userPartNames } = await req.json();
 
     if (!quoteRef || !Array.isArray(userPartNames) || !userPartNames.length) {
       return NextResponse.json(
@@ -27,14 +27,58 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 1️⃣ Fetch quote
+    // 1️⃣ Fetch quote (with VIN for more accurate matching if provided)
     const encodedQuoteRef = encodeURIComponent(quoteRef);
-    const quoteRes = await fetch(
-      `${SUPABASE_URL}/rest/v1/quotes?select=id,quote_ref,notes,parts_requested&quote_ref=eq.${encodedQuoteRef}&status=eq.priced`,
-      { headers: { apikey: SUPABASE_ANON_KEY || '', Authorization: `Bearer ${SUPABASE_ANON_KEY}` } }
-    );
-    const quote = (await quoteRes.json())[0];
-    if (!quote) return NextResponse.json({ error: 'Quote not found or not in priced status' }, { status: 404, headers: CORS_HEADERS });
+    
+    let quote;
+    
+    // If VIN is provided (and not empty/falsy), use it for more accurate matching
+    if (vin && vin.trim()) {
+      // First get the vehicle_id from the vehicle table
+      const vehicleRes = await fetch(
+        `${SUPABASE_URL}/rest/v1/vehicles?select=id&vin=eq.${encodeURIComponent(vin)}`,
+        { headers: { apikey: SUPABASE_ANON_KEY || '', Authorization: `Bearer ${SUPABASE_ANON_KEY}` } }
+      );
+      
+      const vehicles = await vehicleRes.json();
+      if (!Array.isArray(vehicles) || vehicles.length === 0) {
+        return NextResponse.json({ 
+          error: 'Vehicle with provided VIN not found' 
+        }, { status: 404, headers: CORS_HEADERS });
+      }
+      
+      const vehicleId = vehicles[0].id;
+      
+      // Now fetch quote with both quote_ref and vehicle_id for bulletproof matching
+      const quoteRes = await fetch(
+        `${SUPABASE_URL}/rest/v1/quotes?select=id,quote_ref,notes,parts_requested&quote_ref=eq.${encodedQuoteRef}&vehicle_id=eq.${vehicleId}&status=eq.priced`,
+        { headers: { apikey: SUPABASE_ANON_KEY || '', Authorization: `Bearer ${SUPABASE_ANON_KEY}` } }
+      );
+      
+      const quotes = await quoteRes.json();
+      quote = Array.isArray(quotes) ? quotes[0] : null;
+      
+      if (!quote) {
+        return NextResponse.json({ 
+          error: 'Quote not found with matching quote_ref, VIN, and priced status' 
+        }, { status: 404, headers: CORS_HEADERS });
+      }
+    } else {
+      // No VIN provided (or empty), just fetch by quote_ref (previous version behavior)
+      const quoteRes = await fetch(
+        `${SUPABASE_URL}/rest/v1/quotes?select=id,quote_ref,notes,parts_requested&quote_ref=eq.${encodedQuoteRef}&status=eq.priced`,
+        { headers: { apikey: SUPABASE_ANON_KEY || '', Authorization: `Bearer ${SUPABASE_ANON_KEY}` } }
+      );
+      
+      const quotes = await quoteRes.json();
+      quote = Array.isArray(quotes) ? quotes[0] : null;
+      
+      if (!quote) {
+        return NextResponse.json({ 
+          error: 'Quote not found or not in priced status' 
+        }, { status: 404, headers: CORS_HEADERS });
+      }
+    }
 
     // 2️⃣ Fetch parts by IDs
     const partsRequested = Array.isArray(quote.parts_requested) ? quote.parts_requested : [];

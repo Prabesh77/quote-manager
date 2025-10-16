@@ -63,7 +63,7 @@ export class PartsListPriceService {
         }
       }
 
-      console.log(`No list price found for part number: ${partNumber} (tried ${variations.length} variations)`);
+      console.log(`No list price found for part number: ${partNumber} (tried ${variations.size} variations)`);
       return null;
     } catch (error) {
       console.error('Error in fetchSellPrice:', error);

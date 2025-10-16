@@ -245,6 +245,9 @@ export const createNormalizedQuote = async (quoteData: QuoteData) => {
     for (let i = 0; i < quoteData.parts.length; i++) {
       const partData = quoteData.parts[i];
       
+      // Use the list price from the part data (already fetched in QuoteForm when part number was entered)
+      const listPriceToUse = partData.list_price || null;
+      
       // Always create new parts for each quote to avoid conflicts
       // Each quote should have its own unique parts
       const { data: part, error: partError } = await supabase
@@ -263,12 +266,22 @@ export const createNormalizedQuote = async (quoteData: QuoteData) => {
         throw partError;
       }
 
-      // Add to final JSON array
+      // Add to final JSON array with fetched list price
       finalPartsRequested.push({
         part_id: part.id,
         note: partData.note || '',
         final_price: null, // Initially null, will be set during pricing
-        list_price: partData.list_price || null
+        list_price: listPriceToUse,
+        variants: [{
+          id: `variant_${Date.now()}_${i}`,
+          number: partData.number || '',
+          note: partData.note || '',
+          final_price: null,
+          list_price: listPriceToUse,
+          af: partData.af || false,
+          created_at: new Date().toISOString(),
+          is_default: true
+        }]
       });
     }
 

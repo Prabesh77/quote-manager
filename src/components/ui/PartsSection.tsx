@@ -3,6 +3,7 @@
 import React from 'react';
 import { X, Plus, ArrowLeftRight } from 'lucide-react';
 import { getAvailablePartsForBrand } from '@/config/brandPartRules';
+import { PartsListPriceService } from '@/services/partsListPriceService';
 
 interface PartDetails {
   name: string;
@@ -220,7 +221,18 @@ export default function PartsSection({
                       <input
                         type="text"
                         value={partDetails[partName]?.number || ''}
-                        onChange={(e) => onUpdatePartDetails(partName, 'number', e.target.value)}
+                        onChange={async (e) => {
+                          const newPartNumber = e.target.value;
+                          onUpdatePartDetails(partName, 'number', newPartNumber);
+                          
+                          // Fetch list price when part number is entered (with debounce check)
+                          if (newPartNumber && newPartNumber.trim().length >= 3) {
+                            const listPrice = await PartsListPriceService.fetchSellPrice(newPartNumber);
+                            if (listPrice !== null) {
+                              onUpdatePartDetails(partName, 'list_price', listPrice);
+                            }
+                          }
+                        }}
                         placeholder="Enter part number"
                         className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                       />

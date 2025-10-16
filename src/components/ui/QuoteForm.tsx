@@ -243,16 +243,35 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
       }
 
       // Populate part details with confidence information
-        setPartDetails(prev => ({
-          ...prev,
+      const partNumber = part.partNumber !== 'Not found' ? cleanPartNumber(part.partNumber) : '';
+      
+      setPartDetails(prev => ({
+        ...prev,
         [finalPartName]: {
           name: finalPartName,
-          number: part.partNumber !== 'Not found' ? cleanPartNumber(part.partNumber) : '',
+          number: partNumber,
           price: null,
           list_price: part.list_price || null,
           note: ''
+        }
+      }));
+      
+      // Fetch list price for the extracted part number
+      if (partNumber && partNumber.trim()) {
+        (async () => {
+          const { PartsListPriceService } = await import('@/services/partsListPriceService');
+          const listPrice = await PartsListPriceService.fetchSellPrice(partNumber);
+          if (listPrice !== null) {
+            setPartDetails(prev => ({
+              ...prev,
+              [finalPartName]: {
+                ...prev[finalPartName],
+                list_price: listPrice
+              }
+            }));
           }
-        }));
+        })();
+      }
     });
 
 

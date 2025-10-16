@@ -836,6 +836,14 @@ export const useUpdatePartInQuoteJsonMutation = () => {
   return useMutation({
     mutationFn: async ({ quoteId, partId, updates, changeStatus = true }: { quoteId: string; partId: string; updates: any; changeStatus?: boolean }) => {
       
+      // If part number is being updated, fetch the list price from parts_list_price table
+      let fetchedListPrice: number | null = null;
+      if (updates.number !== undefined && updates.number) {
+        const { PartsListPriceService } = await import('@/services/partsListPriceService');
+        fetchedListPrice = await PartsListPriceService.fetchSellPrice(updates.number);
+        console.log(`Fetched list price for part number ${updates.number}:`, fetchedListPrice);
+      }
+      
       // Get the current quote's parts_requested JSON
       const { data: quote, error: quoteError } = await supabase
         .from('quotes')
@@ -878,7 +886,9 @@ export const useUpdatePartInQuoteJsonMutation = () => {
                   ...(updates.note !== undefined && { note: updates.note }),
                   ...(updates.price !== undefined && { final_price: updates.price }),
                   ...(updates.list_price !== undefined && { list_price: updates.list_price }),
+                  ...(fetchedListPrice !== null && { list_price: fetchedListPrice }), // Auto-fill from parts_list_price
                   ...(updates.af !== undefined && { af: updates.af }),
+                  ...(updates.number !== undefined && { number: updates.number }),
                 };
                 updatedPart.variants = updatedVariants;
               } else {
@@ -887,8 +897,9 @@ export const useUpdatePartInQuoteJsonMutation = () => {
                   id: updates.variantId,
                   note: updates.note || '',
                   final_price: updates.price || null,
-                  list_price: updates.list_price || null,
+                  list_price: fetchedListPrice || updates.list_price || null, // Auto-fill from parts_list_price
                   af: updates.af || false,
+                  number: updates.number || '',
                   created_at: new Date().toISOString(),
                   is_default: false
                 };
@@ -904,8 +915,9 @@ export const useUpdatePartInQuoteJsonMutation = () => {
                   id: `var_${partId}_${Date.now()}`,
                   note: updates.note || '',
                   final_price: updates.price || null,
-                  list_price: updates.list_price || null,
+                  list_price: fetchedListPrice || updates.list_price || null, // Auto-fill from parts_list_price
                   af: updates.af || false,
+                  number: updates.number || '',
                   created_at: new Date().toISOString(),
                   is_default: true
                 };
@@ -918,7 +930,9 @@ export const useUpdatePartInQuoteJsonMutation = () => {
                   ...(updates.note !== undefined && { note: updates.note }),
                   ...(updates.price !== undefined && { final_price: updates.price }),
                   ...(updates.list_price !== undefined && { list_price: updates.list_price }),
+                  ...(fetchedListPrice !== null && { list_price: fetchedListPrice }), // Auto-fill from parts_list_price
                   ...(updates.af !== undefined && { af: updates.af }),
+                  ...(updates.number !== undefined && { number: updates.number }),
                 };
                 updatedPart.variants = updatedVariants;
               }
@@ -1229,12 +1243,12 @@ export const useUpdateMultiplePartsInQuoteJsonMutation = () => {
       }
 
       // Single update to quotes table
-      const { error: updateError } = await supabase
-        .from('quotes')
+        const { error: updateError } = await supabase
+          .from('quotes')
         .update(updateData)
         .eq('id', quoteId);
 
-      if (updateError) {
+        if (updateError) {
         throw new Error(`Error updating quote: ${updateError.message}`);
       }
 

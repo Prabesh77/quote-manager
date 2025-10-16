@@ -435,6 +435,65 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
     return notes.replace(/ETA\s+[^|]+\s*\|?\s*/gi, '').replace(/\|\s*\|/g, '|').replace(/^\s*\|\s*|\s*\|\s*$/g, '').trim();
   };
 
+  // Helper function to extract state from address (only NSW, VIC, QLD, WA)
+  const extractStateFromAddress = (address: string | undefined): string | null => {
+    if (!address) return null;
+    const stateMatch = address.match(/\b(NSW|VIC|QLD|WA)\b/i);
+    return stateMatch ? stateMatch[1].toUpperCase() : null;
+  };
+
+  // Helper function to toggle text in global notes (add if not present, remove if present)
+  const toggleGlobalNotes = async (quoteId: string, textToToggle: string) => {
+    const quote = localQuotes.find(q => q.id === quoteId);
+    if (!quote) return;
+
+    const currentNotes = quote.notes || '';
+    let newNotes = currentNotes;
+
+    // Check if the text already exists in notes (case-insensitive)
+    const regex = new RegExp(`\\b${textToToggle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i');
+    
+    if (regex.test(currentNotes)) {
+      // Remove the text and clean up separators
+      newNotes = currentNotes
+        .replace(regex, '')
+        .replace(/\s*\|\s*\|\s*/g, ' | ') // Clean up double separators
+        .replace(/^\s*\|\s*|\s*\|\s*$/g, '') // Remove leading/trailing separators
+        .trim();
+    } else {
+      // Add to beginning of notes
+      newNotes = currentNotes ? `${textToToggle} | ${currentNotes}` : textToToggle;
+    }
+
+    // Update in edit data
+    setQuoteNotesEditData(prev => ({
+      ...prev,
+      [quoteId]: newNotes
+    }));
+
+    // Save immediately
+    try {
+      setQuoteNotesLoading(prev => ({ ...prev, [quoteId]: true }));
+      await onUpdateQuote(quoteId, { notes: newNotes });
+      
+      // Update local state
+      setLocalQuotes(prev => prev.map(q => 
+        q.id === quoteId ? { ...q, notes: newNotes } : q
+      ));
+    } catch (error) {
+      console.error('Error updating notes:', error);
+    } finally {
+      setQuoteNotesLoading(prev => ({ ...prev, [quoteId]: false }));
+    }
+  };
+
+  // Helper function to check if text exists in notes
+  const isInGlobalNotes = (notes: string | undefined, text: string): boolean => {
+    if (!notes) return false;
+    const regex = new RegExp(`\\b${text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i');
+    return regex.test(notes);
+  };
+
   // Function to get parts with notes for a specific quote (synchronous)
   const getQuotePartsWithNotesSync = (quoteId: string): Part[] => {
     // First try to find the quote with JSON structure
@@ -2633,11 +2692,50 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                           <span>Parts Details ({quoteParts.length})</span>
                         </h4>
                               {/* Quote Notes Field */}
-                              <div className="flex items-center">
+                              <div className="flex items-center gap-2">
+                                
                                 <label className="flex items-center space-x-1">
                                   <img src="/icons/notepad.png" height={20} width={20} alt="Notes" />
                                   <p>Note:</p>
                                 </label>
+                                {/* Quick action chips */}
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    toggleGlobalNotes(quote.id, 'GENUINE');
+                                  }}
+                                  className={`text-xs font-bold px-2 py-1 rounded border transition-all cursor-pointer ${
+                                    isInGlobalNotes(quote.notes, 'GENUINE')
+                                      ? 'bg-green-500 text-white border-green-600 shadow-md'
+                                      : 'bg-green-100 text-green-700 hover:bg-green-200 border-green-300'
+                                  }`}
+                                  title={isInGlobalNotes(quote.notes, 'GENUINE') ? 'Remove GENUINE from global notes' : 'Add GENUINE to global notes'}
+                                >
+                                  G
+                                </button>
+                                {extractStateFromAddress(quote.address) && (
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      const state = extractStateFromAddress(quote.address);
+                                      if (state) {
+                                        toggleGlobalNotes(quote.id, `AVAILABLE IN ${state}`);
+                                      }
+                                    }}
+                                    className={`text-xs font-bold px-2 py-1 rounded border transition-all cursor-pointer ${
+                                      isInGlobalNotes(quote.notes, `AVAILABLE IN ${extractStateFromAddress(quote.address)}`)
+                                        ? 'bg-purple-500 text-white border-purple-600 shadow-md'
+                                        : 'bg-purple-100 text-purple-700 hover:bg-purple-200 border-purple-300'
+                                    }`}
+                                    title={
+                                      isInGlobalNotes(quote.notes, `AVAILABLE IN ${extractStateFromAddress(quote.address)}`)
+                                        ? `Remove AVAILABLE IN ${extractStateFromAddress(quote.address)} from global notes`
+                                        : `Add AVAILABLE IN ${extractStateFromAddress(quote.address)} to global notes`
+                                    }
+                                  >
+                                    {extractStateFromAddress(quote.address)}
+                                  </button>
+                                )}
                                 <div className="relative flex items-center">
                                   <QuickFillInput
                                     value={quoteNotesEditData[quote.id] !== undefined ? quoteNotesEditData[quote.id] : (quote.notes || '')}
@@ -2650,6 +2748,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                     loading={quoteNotesLoading[quote.id] || false}
                                   />
                                 </div>
+                                
                               </div>
                             </div>
                         {quoteParts.length === 0 && (
@@ -3385,7 +3484,48 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                 </h4>
                             {/* Quote Notes Field - Mobile */}
                             <div className="flex flex-col space-y-1">
-                              <label className="text-xs font-medium text-gray-500">Quote Notes:</label>
+                              <div className="flex items-center justify-between">
+                                <label className="text-xs font-medium text-gray-500">Quote Notes:</label>
+                                <div className="flex items-center gap-1">
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      toggleGlobalNotes(quote.id, 'GENUINE');
+                                    }}
+                                    className={`text-xs font-bold px-2 py-1 rounded border transition-all cursor-pointer ${
+                                      isInGlobalNotes(quote.notes, 'GENUINE')
+                                        ? 'bg-green-500 text-white border-green-600 shadow-md'
+                                        : 'bg-green-100 text-green-700 hover:bg-green-200 border-green-300'
+                                    }`}
+                                    title={isInGlobalNotes(quote.notes, 'GENUINE') ? 'Remove GENUINE from global notes' : 'Add GENUINE to global notes'}
+                                  >
+                                    G
+                                  </button>
+                                  {extractStateFromAddress(quote.address) && (
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        const state = extractStateFromAddress(quote.address);
+                                        if (state) {
+                                          toggleGlobalNotes(quote.id, `AVAILABLE IN ${state}`);
+                                        }
+                                      }}
+                                      className={`text-xs font-bold px-2 py-1 rounded border transition-all cursor-pointer ${
+                                        isInGlobalNotes(quote.notes, `AVAILABLE IN ${extractStateFromAddress(quote.address)}`)
+                                          ? 'bg-purple-500 text-white border-purple-600 shadow-md'
+                                          : 'bg-purple-100 text-purple-700 hover:bg-purple-200 border-purple-300'
+                                      }`}
+                                      title={
+                                        isInGlobalNotes(quote.notes, `AVAILABLE IN ${extractStateFromAddress(quote.address)}`)
+                                          ? `Remove AVAILABLE IN ${extractStateFromAddress(quote.address)} from global notes`
+                                          : `Add AVAILABLE IN ${extractStateFromAddress(quote.address)} to global notes`
+                                      }
+                                    >
+                                      {extractStateFromAddress(quote.address)}
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
                               <QuickFillInput
                                 value={quoteNotesEditData[quote.id] !== undefined ? quoteNotesEditData[quote.id] : (quote.notes || '')}
                                 onChange={(value) => handleQuoteNotesChange(quote.id, value)}

@@ -38,7 +38,13 @@ const QuickFillNotes: React.FC<QuickFillNotesProps> = ({
           items.availableIn = part.replace('AVAILABLE IN ', '').trim();
         } else if (part.startsWith('ETA ')) {
           items.eta = part.replace('ETA ', '').trim();
-        } else if (['STOCK ARRIVING', 'ON BACKORDER', 'INVOICE PRICE: $', 'COMPLETE FAN ASSEMBLY', 'GENUINE WITH BRACKET', 'GENUINE WITHOUT BRACKET'].includes(part.toUpperCase())) {
+        } else if (part.toUpperCase() === 'INVOICE PRICE: $') {
+          // Only recognize INVOICE PRICE: $ if it's exactly that, without additional content
+          if (!items.info) items.info = [];
+          if (!items.info.includes('INVOICE PRICE: $')) {
+            items.info.push('INVOICE PRICE: $');
+          }
+        } else if (['STOCK ARRIVING', 'ON BACKORDER', 'COMPLETE FAN ASSEMBLY', 'GENUINE WITH BRACKET', 'GENUINE WITHOUT BRACKET'].includes(part.toUpperCase())) {
           if (!items.info) items.info = [];
           if (!items.info.includes(part.toUpperCase())) {
             items.info.push(part.toUpperCase());
@@ -170,7 +176,7 @@ const QuickFillNotes: React.FC<QuickFillNotesProps> = ({
         /GENUINE\s+WITHOUT\s+BRACKET/g,
         /STOCK\s+ARRIVING/g,
         /ON\s+BACKORDER/g,
-        /INVOICE\s+PRICE:\s+\$/g,
+        /INVOICE\s+PRICE:\s+\$(?=\s*\||$)/g, // Only match if followed by separator or end
         /COMPLETE\s+FAN\s+ASSEMBLY/g,
         /GENUINE\s+WITH\s+LOGO/g,
         /\bGENUINE\b/g,
@@ -250,7 +256,7 @@ const QuickFillNotes: React.FC<QuickFillNotesProps> = ({
         /GENUINE\s+WITHOUT\s+BRACKET/g,
         /STOCK\s+ARRIVING/g,
         /ON\s+BACKORDER/g,
-        /INVOICE\s+PRICE:\s+\$/g,
+        /INVOICE\s+PRICE:\s+\$(?=\s*\||$)/g, // Only match if followed by separator or end
         /COMPLETE\s+FAN\s+ASSEMBLY/g,
         /GENUINE\s+WITH\s+LOGO/g,
         /\bGENUINE\b/g,

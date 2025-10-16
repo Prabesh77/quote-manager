@@ -71,6 +71,7 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
     phone: '',
     settlement: '0',
     notes: '',
+    pcParts: '',
   });
   const [selectedParts, setSelectedParts] = useState<string[]>([]);
   const [partDetails, setPartDetails] = useState<Record<string, PartDetails>>({});
@@ -318,6 +319,7 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
       phone: '',
       settlement: '0',
       notes: '',
+      pcParts: '',
     });
     setSelectedParts([]);
     setPartDetails({});
@@ -448,7 +450,7 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const { quoteRef, vin, make, model, series, auto, body, mthyr, rego, requiredBy, customer, address, phone, settlement } = fields;
+    const { quoteRef, vin, make, model, series, auto, body, mthyr, rego, requiredBy, customer, address, phone, settlement, pcParts } = fields;
     if (!quoteRef) return;
     if (selectedParts.length === 0) {
       setValidationMessage('Please select at least one part');
@@ -489,6 +491,7 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
         address,
         phone,
         settlement,
+        pcParts,
       }, partsArray);
       clearForm();
     } catch (error) {
@@ -553,6 +556,7 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
                     phone: parsedData.phone || prevFields.phone,
                     settlement: parsedData.settlement?.toString() || prevFields.settlement,
                     notes: parsedData.notes || prevFields.notes,
+                    pcParts: parsedData.pcParts || prevFields.pcParts,
                   }));
 
                   // Show parts section when data is populated

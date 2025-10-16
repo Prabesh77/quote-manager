@@ -20,6 +20,7 @@ export interface ParsedQuoteData {
   notes: string;
   source: 'partscheck' | 'repairconnection' | 'unknown';
   hasSpecialCharsInQuoteRef?: boolean; // Flag to indicate special chars were found
+  pcParts?: string; // PartsCheck format parts (comma-separated)
 }
 
 // List of known vehicle makes/brands for parsing
@@ -249,6 +250,9 @@ function parsePartscheckFormat(text: string): Partial<ParsedQuoteData> {
       case 'settlement':
         data.settlement = parseSettlement(value);
         break;
+      case 'parts':
+        data.pcParts = value;
+        break;
     }
   }
   
@@ -423,7 +427,8 @@ export function parseQuoteData(text: string): ParsedQuoteData {
     settlement: parsedData.settlement || 0,
     notes: parsedData.notes || '',
     source: parsedData.source || 'unknown',
-    hasSpecialCharsInQuoteRef: parsedData.hasSpecialCharsInQuoteRef || false
+    hasSpecialCharsInQuoteRef: parsedData.hasSpecialCharsInQuoteRef || false,
+    pcParts: parsedData.pcParts || ''
   };
 
   // Append "RC" to quoteRef if source is repairconnection

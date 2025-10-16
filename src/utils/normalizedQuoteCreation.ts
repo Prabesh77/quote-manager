@@ -121,6 +121,7 @@ interface QuoteData {
   requiredBy?: string;
   quoteRef: string; // User-provided quote reference
   settlement?: number; // Settlement percentage for the quote
+  pcParts?: string; // PartsCheck format parts (comma-separated)
 }
 
 export const createNormalizedQuote = async (quoteData: QuoteData) => {
@@ -283,6 +284,7 @@ export const createNormalizedQuote = async (quoteData: QuoteData) => {
         quote_ref: quoteData.quoteRef, // Store user-provided quote reference
         settlement: quoteData.settlement || 0, // Add settlement field
         parts_requested: finalPartsRequested, // Create with complete data
+        pc_parts: quoteData.pcParts || null, // Store PartsCheck format parts
       })
       .select()
       .single();

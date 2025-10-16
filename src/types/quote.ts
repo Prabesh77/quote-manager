@@ -20,6 +20,7 @@ export interface Quote {
   phone?: string; // Customer phone
   status: QuoteStatus;
   taxInvoiceNumber?: string; // Tax invoice number for orders
+  pc_parts?: string; // PartsCheck format parts (comma-separated)
   [key: string]: any; // Allow string indexing
 }
 

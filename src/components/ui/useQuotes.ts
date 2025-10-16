@@ -118,6 +118,7 @@ export interface Quote {
   status: 'active' | 'completed' | 'unpriced' | 'waiting_verification' | 'priced' | 'ordered' | 'delivered'; // Updated status field
   taxInvoiceNumber?: string; // Tax invoice number for orders
   source?: 'partscheck' | 'repairconnection' | 'unknown'; // Source platform for the quote
+  pc_parts?: string; // PartsCheck format parts (comma-separated from PC paste)
   [key: string]: any; // Allow string indexing
 }
 

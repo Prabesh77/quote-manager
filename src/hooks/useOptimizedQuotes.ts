@@ -31,6 +31,7 @@ export interface Quote {
   phone?: string;
   status: 'active' | 'completed' | 'unpriced' | 'priced' | 'ordered' | 'delivered';
   taxInvoiceNumber?: string;
+  pc_parts?: string;
 }
 
 interface CacheEntry<T> {

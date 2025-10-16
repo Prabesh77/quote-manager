@@ -91,9 +91,6 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
     }
     return false;
   });
-  
-  // Track which quotes have their ETA confirmed (only for priced page)
-  const [etaConfirmed, setEtaConfirmed] = useState<Set<string>>(new Set());
 
   // Use external search term when server-side search is enabled
   const effectiveSearchTerm = useServerSideSearch ? externalSearchTerm || '' : searchTerm;
@@ -432,17 +429,69 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
     return `${notesWithoutETA} | ${partNote}`;
   };
 
-  // Helper function to extract ETA from quote notes
-  const extractETA = (notes: string | undefined): string | null => {
-    if (!notes) return null;
-    const etaMatch = notes.match(/ETA\s+([^|]+)/i);
-    return etaMatch ? etaMatch[1].trim() : null;
-  };
-
   // Helper function to remove ETA from notes (to avoid duplication)
   const removeETAFromNotes = (notes: string | undefined): string => {
     if (!notes) return '';
     return notes.replace(/ETA\s+[^|]+\s*\|?\s*/gi, '').replace(/\|\s*\|/g, '|').replace(/^\s*\|\s*|\s*\|\s*$/g, '').trim();
+  };
+
+  // Helper function to extract state from address (only NSW, VIC, QLD, WA)
+  const extractStateFromAddress = (address: string | undefined): string | null => {
+    if (!address) return null;
+    const stateMatch = address.match(/\b(NSW|VIC|QLD|WA)\b/i);
+    return stateMatch ? stateMatch[1].toUpperCase() : null;
+  };
+
+  // Helper function to toggle text in global notes (add if not present, remove if present)
+  const toggleGlobalNotes = async (quoteId: string, textToToggle: string) => {
+    const quote = localQuotes.find(q => q.id === quoteId);
+    if (!quote) return;
+
+    const currentNotes = quote.notes || '';
+    let newNotes = currentNotes;
+
+    // Check if the text already exists in notes (case-insensitive)
+    const regex = new RegExp(`\\b${textToToggle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i');
+    
+    if (regex.test(currentNotes)) {
+      // Remove the text and clean up separators
+      newNotes = currentNotes
+        .replace(regex, '')
+        .replace(/\s*\|\s*\|\s*/g, ' | ') // Clean up double separators
+        .replace(/^\s*\|\s*|\s*\|\s*$/g, '') // Remove leading/trailing separators
+        .trim();
+    } else {
+      // Add to beginning of notes
+      newNotes = currentNotes ? `${textToToggle} | ${currentNotes}` : textToToggle;
+    }
+
+    // Update in edit data
+    setQuoteNotesEditData(prev => ({
+      ...prev,
+      [quoteId]: newNotes
+    }));
+
+    // Save immediately
+    try {
+      setQuoteNotesLoading(prev => ({ ...prev, [quoteId]: true }));
+      await onUpdateQuote(quoteId, { notes: newNotes });
+      
+      // Update local state
+      setLocalQuotes(prev => prev.map(q => 
+        q.id === quoteId ? { ...q, notes: newNotes } : q
+      ));
+    } catch (error) {
+      console.error('Error updating notes:', error);
+    } finally {
+      setQuoteNotesLoading(prev => ({ ...prev, [quoteId]: false }));
+    }
+  };
+
+  // Helper function to check if text exists in notes
+  const isInGlobalNotes = (notes: string | undefined, text: string): boolean => {
+    if (!notes) return false;
+    const regex = new RegExp(`\\b${text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i');
+    return regex.test(notes);
   };
 
   // Function to get parts with notes for a specific quote (synchronous)
@@ -2643,11 +2692,54 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                           <span>Parts Details ({quoteParts.length})</span>
                         </h4>
                               {/* Quote Notes Field */}
-                              <div className="flex items-center">
+                              <div className="flex items-center gap-2">
+                                
                                 <label className="flex items-center space-x-1">
                                   <img src="/icons/notepad.png" height={20} width={20} alt="Notes" />
                                   <p>Note:</p>
                                 </label>
+                                {/* Quick action chips - only show on pricing page */}
+                                {currentPageName === 'pricing' && (
+                                  <>
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        toggleGlobalNotes(quote.id, 'GENUINE');
+                                      }}
+                                      className={`text-xs font-bold px-2 py-1 rounded border transition-all cursor-pointer ${
+                                        isInGlobalNotes(quote.notes, 'GENUINE')
+                                          ? 'bg-green-500 text-white border-green-600 shadow-md'
+                                          : 'bg-green-100 text-green-700 hover:bg-green-200 border-green-300'
+                                      }`}
+                                      title={isInGlobalNotes(quote.notes, 'GENUINE') ? 'Remove GENUINE from global notes' : 'Add GENUINE to global notes'}
+                                    >
+                                      G
+                                    </button>
+                                    {extractStateFromAddress(quote.address) && (
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          const state = extractStateFromAddress(quote.address);
+                                          if (state) {
+                                            toggleGlobalNotes(quote.id, `AVAILABLE IN ${state}`);
+                                          }
+                                        }}
+                                        className={`text-xs font-bold px-2 py-1 rounded border transition-all cursor-pointer ${
+                                          isInGlobalNotes(quote.notes, `AVAILABLE IN ${extractStateFromAddress(quote.address)}`)
+                                            ? 'bg-purple-500 text-white border-purple-600 shadow-md'
+                                            : 'bg-purple-100 text-purple-700 hover:bg-purple-200 border-purple-300'
+                                        }`}
+                                        title={
+                                          isInGlobalNotes(quote.notes, `AVAILABLE IN ${extractStateFromAddress(quote.address)}`)
+                                            ? `Remove AVAILABLE IN ${extractStateFromAddress(quote.address)} from global notes`
+                                            : `Add AVAILABLE IN ${extractStateFromAddress(quote.address)} to global notes`
+                                        }
+                                      >
+                                        {extractStateFromAddress(quote.address)}
+                                      </button>
+                                    )}
+                                  </>
+                                )}
                                 <div className="relative flex items-center">
                                   <QuickFillInput
                                     value={quoteNotesEditData[quote.id] !== undefined ? quoteNotesEditData[quote.id] : (quote.notes || '')}
@@ -2658,51 +2750,10 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                     placeholder="Enter notes for all parts..."
                                     textMode={true}
                                     loading={quoteNotesLoading[quote.id] || false}
-                                    hideETA={true}
                                   />
                                 </div>
-                              </div>
-                              
-                              {/* ETA Badge - Displayed inline with notes */}
-                              {(() => {
-                                const eta = extractETA(quote.notes);
-                                if (!eta) return null;
                                 
-                                const isEtaConfirmed = etaConfirmed.has(quote.id);
-                                const isPricedPage = currentPageName === 'priced';
-                               
-                                return (
-                                  <div className="flex items-center space-x-2 z-50 ml-16">
-                                    <div className="flex items-center space-x-1 px-2 py-1 bg-amber-100 border border-amber-300 rounded shadow-sm text-xs">
-                                      <span className="text-amber-900 font-bold text-xs inline-flex items-center">
-                                        <span className="inline-block animate-[swing_1s_ease-in-out_infinite] origin-top">⏰</span>
-                                        <span className="ml-1">Est. Delivery:</span>
-                                      </span>
-                                      <span className="text-amber-900 font-semibold text-xs">{eta}</span>
-                                    </div>
-                                    {isPricedPage && (
-                                      <label className="flex items-center space-x-1 cursor-pointer">
-                                        <input
-                                          type="checkbox"
-                                          checked={isEtaConfirmed}
-                                          onChange={(e) => {
-                                            e.stopPropagation();
-                                            const newSet = new Set(etaConfirmed);
-                                            if (e.target.checked) {
-                                              newSet.add(quote.id);
-                                            } else {
-                                              newSet.delete(quote.id);
-                                            }
-                                            setEtaConfirmed(newSet);
-                                          }}
-                                          className="w-4 h-4 rounded-md text-amber-600 bg-white cursor-pointer"
-                                        />
-                                        <span className="text-xs text-gray-700 font-medium">Confirmed</span>
-                                      </label>
-                                    )}
-                                  </div>
-                                );
-                              })()}
+                              </div>
                             </div>
                         {quoteParts.length === 0 && (
                           <span className="text-sm text-gray-500">No parts linked to this quote</span>
@@ -2799,11 +2850,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                         <>
                           {/* Desktop Table View */}
                               <div className="hidden md:block">
-                            <div className={`bg-white rounded-lg border border-gray-200 overflow-hidden relative ${
-                              currentPageName === 'priced' && extractETA(quote.notes) && !etaConfirmed.has(quote.id) 
-                                ? 'blur-xs pointer-events-none select-none' 
-                                : ''
-                            }`}>
+                            <div className="bg-white rounded-lg border border-gray-200 overflow-hidden relative">
                               <table className="w-full">
                                     <thead className="bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200">
                                       <tr>
@@ -3037,13 +3084,20 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                                   <div className="flex items-center justify-between">
                                                     <div className="flex items-center space-x-1 flex-1 min-w-0">
                                                 {isPartEditing ? (
-                                                        <QuickFillInput
-                                                          ref={(el) => { focusRefs.current[`${part.id}_${variant.id}_note`] = el; }}
-                                                          value={partEditData[part.id]?.[variant.id]?.note ?? variant.note ?? ''}
-                                                          onChange={(value) => handleVariantEditChange(part.id, variant.id, 'note', value)}
-                                                          placeholder="Add notes..."
-                                                          className={`flex-1 ${index === 0 ? 'bg-white' : 'bg-gray-50'}`}
-                                                  />
+                                                        <div className="flex-1 flex flex-col space-y-1">
+                                                          {removeETAFromNotes(quote.notes) && (
+                                                            <div className="text-xs text-gray-500 font-medium bg-blue-50 px-2 py-1 rounded border border-blue-200">
+                                                              Global: {removeETAFromNotes(quote.notes)}
+                                                            </div>
+                                                          )}
+                                                          <QuickFillInput
+                                                            ref={(el) => { focusRefs.current[`${part.id}_${variant.id}_note`] = el; }}
+                                                            value={partEditData[part.id]?.[variant.id]?.note ?? variant.note ?? ''}
+                                                            onChange={(value) => handleVariantEditChange(part.id, variant.id, 'note', value)}
+                                                            placeholder="Add part-specific notes..."
+                                                            className={`flex-1 ${index === 0 ? 'bg-white' : 'bg-gray-50'}`}
+                                                          />
+                                                        </div>
                                                 ) : (
                                                   <>
                                                           {(() => {
@@ -3434,7 +3488,51 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                 </h4>
                             {/* Quote Notes Field - Mobile */}
                             <div className="flex flex-col space-y-1">
-                              <label className="text-xs font-medium text-gray-500">Quote Notes:</label>
+                              <div className="flex items-center justify-between">
+                                <label className="text-xs font-medium text-gray-500">Quote Notes:</label>
+                                {/* Quick action chips - only show on pricing page */}
+                                {currentPageName === 'pricing' && (
+                                  <div className="flex items-center gap-1">
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        toggleGlobalNotes(quote.id, 'GENUINE');
+                                      }}
+                                      className={`text-xs font-bold px-2 py-1 rounded border transition-all cursor-pointer ${
+                                        isInGlobalNotes(quote.notes, 'GENUINE')
+                                          ? 'bg-green-500 text-white border-green-600 shadow-md'
+                                          : 'bg-green-100 text-green-700 hover:bg-green-200 border-green-300'
+                                      }`}
+                                      title={isInGlobalNotes(quote.notes, 'GENUINE') ? 'Remove GENUINE from global notes' : 'Add GENUINE to global notes'}
+                                    >
+                                      G
+                                    </button>
+                                    {extractStateFromAddress(quote.address) && (
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          const state = extractStateFromAddress(quote.address);
+                                          if (state) {
+                                            toggleGlobalNotes(quote.id, `AVAILABLE IN ${state}`);
+                                          }
+                                        }}
+                                        className={`text-xs font-bold px-2 py-1 rounded border transition-all cursor-pointer ${
+                                          isInGlobalNotes(quote.notes, `AVAILABLE IN ${extractStateFromAddress(quote.address)}`)
+                                            ? 'bg-purple-500 text-white border-purple-600 shadow-md'
+                                            : 'bg-purple-100 text-purple-700 hover:bg-purple-200 border-purple-300'
+                                        }`}
+                                        title={
+                                          isInGlobalNotes(quote.notes, `AVAILABLE IN ${extractStateFromAddress(quote.address)}`)
+                                            ? `Remove AVAILABLE IN ${extractStateFromAddress(quote.address)} from global notes`
+                                            : `Add AVAILABLE IN ${extractStateFromAddress(quote.address)} to global notes`
+                                        }
+                                      >
+                                        {extractStateFromAddress(quote.address)}
+                                      </button>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
                               <QuickFillInput
                                 value={quoteNotesEditData[quote.id] !== undefined ? quoteNotesEditData[quote.id] : (quote.notes || '')}
                                 onChange={(value) => handleQuoteNotesChange(quote.id, value)}
@@ -3539,11 +3637,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                               </div>
                               
                               {quoteParts.length > 0 && (
-                          <div className={`space-y-3 ${
-                            currentPageName === 'priced' && extractETA(quote.notes) && !etaConfirmed.has(quote.id) 
-                              ? 'blur-sm pointer-events-none select-none' 
-                              : ''
-                          }`}>
+                          <div className="space-y-3">
                                   {quoteParts.map((part) => {
                               const isPartEditing = editingParts === quote.id;
                                     
@@ -3713,16 +3807,24 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
 
                                         <div>
                                           <label className="block text-xs font-medium text-gray-500 mb-1">Notes</label>
-                                          <div className="flex items-center space-x-1 min-w-0">
+                                          <div className="flex flex-col space-y-1 min-w-0">
                                             {isPartEditing ? (
-                                              <QuickFillInput
-                                                ref={(el) => { focusRefs.current[`${part.id}_mobile_note`] = el; }}
-                                                value={partEditData[part.id]?.note ?? ''}
-                                                onChange={(value) => handlePartEditChange(part.id, 'note', value)}
-                                                className="flex-1"
-                                                  />
+                                              <>
+                                                {removeETAFromNotes(quote.notes) && (
+                                                  <div className="text-xs text-gray-500 font-medium bg-blue-50 px-2 py-1 rounded border border-blue-200">
+                                                    Global: {removeETAFromNotes(quote.notes)}
+                                                  </div>
+                                                )}
+                                                <QuickFillInput
+                                                  ref={(el) => { focusRefs.current[`${part.id}_mobile_note`] = el; }}
+                                                  value={partEditData[part.id]?.note ?? ''}
+                                                  onChange={(value) => handlePartEditChange(part.id, 'note', value)}
+                                                  placeholder="Add part-specific notes..."
+                                                  className="flex-1"
+                                                />
+                                              </>
                                                 ) : (
-                                                  <>
+                                                  <div className="flex items-center space-x-1">
                                                 <span
                                                   className="text-sm text-gray-600 cursor-pointer hover:bg-gray-100 px-1 py-0.5 rounded transition-colors"
                                                   onClick={() => handleDirectEdit(quote.id, part.id, 'mobile', 'note')}
@@ -3736,10 +3838,10 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                                   size="sm"
                                                   className="text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
                                                 />
-                                                  </>
+                                                </div>
                                                 )}
                                           </div>
-                                              </div>
+                                        </div>
                                             </div>
                                           </div>
                                         </div>

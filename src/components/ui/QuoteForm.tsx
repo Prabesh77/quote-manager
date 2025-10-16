@@ -244,6 +244,7 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
 
       // Populate part details with confidence information
       const partNumber = part.partNumber !== 'Not found' ? cleanPartNumber(part.partNumber) : '';
+      const extractedListPrice = part.list_price || null;
       
       setPartDetails(prev => ({
         ...prev,
@@ -251,13 +252,13 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
           name: finalPartName,
           number: partNumber,
           price: null,
-          list_price: part.list_price || null,
+          list_price: extractedListPrice,
           note: ''
         }
       }));
       
-      // Fetch list price for the extracted part number
-      if (partNumber && partNumber.trim()) {
+      // Only fetch list price if not already extracted from image
+      if (!extractedListPrice && partNumber && partNumber.trim()) {
         (async () => {
           const { PartsListPriceService } = await import('@/services/partsListPriceService');
           const listPrice = await PartsListPriceService.fetchSellPrice(partNumber);

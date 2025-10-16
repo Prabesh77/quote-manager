@@ -2698,43 +2698,47 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                   <img src="/icons/notepad.png" height={20} width={20} alt="Notes" />
                                   <p>Note:</p>
                                 </label>
-                                {/* Quick action chips */}
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    toggleGlobalNotes(quote.id, 'GENUINE');
-                                  }}
-                                  className={`text-xs font-bold px-2 py-1 rounded border transition-all cursor-pointer ${
-                                    isInGlobalNotes(quote.notes, 'GENUINE')
-                                      ? 'bg-green-500 text-white border-green-600 shadow-md'
-                                      : 'bg-green-100 text-green-700 hover:bg-green-200 border-green-300'
-                                  }`}
-                                  title={isInGlobalNotes(quote.notes, 'GENUINE') ? 'Remove GENUINE from global notes' : 'Add GENUINE to global notes'}
-                                >
-                                  G
-                                </button>
-                                {extractStateFromAddress(quote.address) && (
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      const state = extractStateFromAddress(quote.address);
-                                      if (state) {
-                                        toggleGlobalNotes(quote.id, `AVAILABLE IN ${state}`);
-                                      }
-                                    }}
-                                    className={`text-xs font-bold px-2 py-1 rounded border transition-all cursor-pointer ${
-                                      isInGlobalNotes(quote.notes, `AVAILABLE IN ${extractStateFromAddress(quote.address)}`)
-                                        ? 'bg-purple-500 text-white border-purple-600 shadow-md'
-                                        : 'bg-purple-100 text-purple-700 hover:bg-purple-200 border-purple-300'
-                                    }`}
-                                    title={
-                                      isInGlobalNotes(quote.notes, `AVAILABLE IN ${extractStateFromAddress(quote.address)}`)
-                                        ? `Remove AVAILABLE IN ${extractStateFromAddress(quote.address)} from global notes`
-                                        : `Add AVAILABLE IN ${extractStateFromAddress(quote.address)} to global notes`
-                                    }
-                                  >
-                                    {extractStateFromAddress(quote.address)}
-                                  </button>
+                                {/* Quick action chips - only show on pricing page */}
+                                {currentPageName === 'pricing' && (
+                                  <>
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        toggleGlobalNotes(quote.id, 'GENUINE');
+                                      }}
+                                      className={`text-xs font-bold px-2 py-1 rounded border transition-all cursor-pointer ${
+                                        isInGlobalNotes(quote.notes, 'GENUINE')
+                                          ? 'bg-green-500 text-white border-green-600 shadow-md'
+                                          : 'bg-green-100 text-green-700 hover:bg-green-200 border-green-300'
+                                      }`}
+                                      title={isInGlobalNotes(quote.notes, 'GENUINE') ? 'Remove GENUINE from global notes' : 'Add GENUINE to global notes'}
+                                    >
+                                      G
+                                    </button>
+                                    {extractStateFromAddress(quote.address) && (
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          const state = extractStateFromAddress(quote.address);
+                                          if (state) {
+                                            toggleGlobalNotes(quote.id, `AVAILABLE IN ${state}`);
+                                          }
+                                        }}
+                                        className={`text-xs font-bold px-2 py-1 rounded border transition-all cursor-pointer ${
+                                          isInGlobalNotes(quote.notes, `AVAILABLE IN ${extractStateFromAddress(quote.address)}`)
+                                            ? 'bg-purple-500 text-white border-purple-600 shadow-md'
+                                            : 'bg-purple-100 text-purple-700 hover:bg-purple-200 border-purple-300'
+                                        }`}
+                                        title={
+                                          isInGlobalNotes(quote.notes, `AVAILABLE IN ${extractStateFromAddress(quote.address)}`)
+                                            ? `Remove AVAILABLE IN ${extractStateFromAddress(quote.address)} from global notes`
+                                            : `Add AVAILABLE IN ${extractStateFromAddress(quote.address)} to global notes`
+                                        }
+                                      >
+                                        {extractStateFromAddress(quote.address)}
+                                      </button>
+                                    )}
+                                  </>
                                 )}
                                 <div className="relative flex items-center">
                                   <QuickFillInput
@@ -3486,45 +3490,48 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                             <div className="flex flex-col space-y-1">
                               <div className="flex items-center justify-between">
                                 <label className="text-xs font-medium text-gray-500">Quote Notes:</label>
-                                <div className="flex items-center gap-1">
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      toggleGlobalNotes(quote.id, 'GENUINE');
-                                    }}
-                                    className={`text-xs font-bold px-2 py-1 rounded border transition-all cursor-pointer ${
-                                      isInGlobalNotes(quote.notes, 'GENUINE')
-                                        ? 'bg-green-500 text-white border-green-600 shadow-md'
-                                        : 'bg-green-100 text-green-700 hover:bg-green-200 border-green-300'
-                                    }`}
-                                    title={isInGlobalNotes(quote.notes, 'GENUINE') ? 'Remove GENUINE from global notes' : 'Add GENUINE to global notes'}
-                                  >
-                                    G
-                                  </button>
-                                  {extractStateFromAddress(quote.address) && (
+                                {/* Quick action chips - only show on pricing page */}
+                                {currentPageName === 'pricing' && (
+                                  <div className="flex items-center gap-1">
                                     <button
                                       onClick={(e) => {
                                         e.stopPropagation();
-                                        const state = extractStateFromAddress(quote.address);
-                                        if (state) {
-                                          toggleGlobalNotes(quote.id, `AVAILABLE IN ${state}`);
-                                        }
+                                        toggleGlobalNotes(quote.id, 'GENUINE');
                                       }}
                                       className={`text-xs font-bold px-2 py-1 rounded border transition-all cursor-pointer ${
-                                        isInGlobalNotes(quote.notes, `AVAILABLE IN ${extractStateFromAddress(quote.address)}`)
-                                          ? 'bg-purple-500 text-white border-purple-600 shadow-md'
-                                          : 'bg-purple-100 text-purple-700 hover:bg-purple-200 border-purple-300'
+                                        isInGlobalNotes(quote.notes, 'GENUINE')
+                                          ? 'bg-green-500 text-white border-green-600 shadow-md'
+                                          : 'bg-green-100 text-green-700 hover:bg-green-200 border-green-300'
                                       }`}
-                                      title={
-                                        isInGlobalNotes(quote.notes, `AVAILABLE IN ${extractStateFromAddress(quote.address)}`)
-                                          ? `Remove AVAILABLE IN ${extractStateFromAddress(quote.address)} from global notes`
-                                          : `Add AVAILABLE IN ${extractStateFromAddress(quote.address)} to global notes`
-                                      }
+                                      title={isInGlobalNotes(quote.notes, 'GENUINE') ? 'Remove GENUINE from global notes' : 'Add GENUINE to global notes'}
                                     >
-                                      {extractStateFromAddress(quote.address)}
+                                      G
                                     </button>
-                                  )}
-                                </div>
+                                    {extractStateFromAddress(quote.address) && (
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          const state = extractStateFromAddress(quote.address);
+                                          if (state) {
+                                            toggleGlobalNotes(quote.id, `AVAILABLE IN ${state}`);
+                                          }
+                                        }}
+                                        className={`text-xs font-bold px-2 py-1 rounded border transition-all cursor-pointer ${
+                                          isInGlobalNotes(quote.notes, `AVAILABLE IN ${extractStateFromAddress(quote.address)}`)
+                                            ? 'bg-purple-500 text-white border-purple-600 shadow-md'
+                                            : 'bg-purple-100 text-purple-700 hover:bg-purple-200 border-purple-300'
+                                        }`}
+                                        title={
+                                          isInGlobalNotes(quote.notes, `AVAILABLE IN ${extractStateFromAddress(quote.address)}`)
+                                            ? `Remove AVAILABLE IN ${extractStateFromAddress(quote.address)} from global notes`
+                                            : `Add AVAILABLE IN ${extractStateFromAddress(quote.address)} to global notes`
+                                        }
+                                      >
+                                        {extractStateFromAddress(quote.address)}
+                                      </button>
+                                    )}
+                                  </div>
+                                )}
                               </div>
                               <QuickFillInput
                                 value={quoteNotesEditData[quote.id] !== undefined ? quoteNotesEditData[quote.id] : (quote.notes || '')}

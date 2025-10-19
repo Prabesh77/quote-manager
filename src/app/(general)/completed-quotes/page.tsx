@@ -144,10 +144,8 @@ export default function CompletedQuotesPage() {
       
       // Track quote completion action
       try {
-        console.log('🎯 COMPLETED (Completed Quotes Page): Tracking completion action for quote:', id);
         const { QuoteActionsService } = await import('@/services/quoteActions/quoteActionsService');
         await QuoteActionsService.trackQuoteAction(id, 'COMPLETED');
-        console.log('✅ COMPLETED (Completed Quotes Page): Successfully tracked completion action for quote:', id);
       } catch (trackingError) {
         console.warn('Failed to track quote completion:', trackingError);
         // Don't fail the operation if tracking fails
@@ -156,7 +154,6 @@ export default function CompletedQuotesPage() {
       // Invalidate queries to refresh the UI
       queryClient.invalidateQueries({ queryKey: queryKeys.quotesBase });
       
-      console.log('✅ Quote marked as completed successfully');
       return { error: null };
     } catch (error) {
       console.error('Error marking quote as completed:', error);

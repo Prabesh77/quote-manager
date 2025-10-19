@@ -2,7 +2,6 @@
 
 import React from 'react';
 import { X, Plus, ArrowLeftRight } from 'lucide-react';
-import { getAvailablePartsForBrand } from '@/config/brandPartRules';
 import { PartsListPriceService } from '@/services/partsListPriceService';
 
 interface PartDetails {
@@ -79,8 +78,10 @@ const PART_OPTIONS = [
   { name: 'Radar Sensor', icon: getPartIcon('Radar Sensor') },
   { name: 'Fan Assembly', icon: getPartIcon('Fan Assembly') },
   { name: 'Intercooler', icon: getPartIcon('Intercooler') },
+  { name: 'Add Cooler', icon: getPartIcon('Intercooler') },
   { name: 'Left DayLight', icon: getPartIcon('Left DayLight') },
   { name: 'Right DayLight', icon: getPartIcon('Right DayLight') },
+  { name: 'Center Light', icon: getPartIcon('Center Light') },
   { name: 'Left Rear Lamp', icon: getPartIcon('Left Rear Lamp') },
   { name: 'Right Rear Lamp', icon: getPartIcon('Right Rear Lamp') },
   { name: 'Oil Cooler', icon: getPartIcon('Radiator') },
@@ -104,20 +105,8 @@ export default function PartsSection({
     return null;
   }
 
-  // Filter parts based on selected brand
-  const allPartNames = PART_OPTIONS.map(part => part.name);
-  const availablePartNames = vehicleMake 
-    ? getAvailablePartsForBrand(vehicleMake, allPartNames)
-    : allPartNames;
-  
-  const filteredParts = PART_OPTIONS.filter(part =>
-    availablePartNames.includes(part.name)
-  );
-
-  // Get unavailable parts for info message
-  const unavailableParts = vehicleMake 
-    ? allPartNames.filter(name => !availablePartNames.includes(name))
-    : [];
+  // Show all parts (no filtering by vehicle make)
+  const filteredParts = PART_OPTIONS;
 
   return (
     <div className="space-y-4">
@@ -154,18 +143,6 @@ export default function PartsSection({
             );
           })}
         </div>
-
-        {/* Info message for unavailable parts */}
-        {vehicleMake && unavailableParts.length > 0 && (
-          <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-            <div className="text-sm text-blue-800">
-              <strong>Note:</strong> The following parts are not typically required for {vehicleMake}:
-              <div className="mt-1 text-xs text-blue-600">
-                {unavailableParts.join(', ')}
-              </div>
-            </div>
-          </div>
-        )}
       </div>
 
       {/* Selected Parts Details */}

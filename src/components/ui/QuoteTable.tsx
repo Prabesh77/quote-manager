@@ -2165,7 +2165,8 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
           const historyResult = await updatePriceHistoryForQuote(
             quoteId,
             updatedQuote.partsRequested,
-            updatedQuote.quoteRef || quote.quoteRef
+            updatedQuote.quoteRef || quote.quoteRef,
+            updatedQuote.customer || quote.customer || 'Unknown'
           );
           
           if (historyResult.success) {
@@ -3267,19 +3268,6 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                                   </>
                                                   )}
                                                 </div>
-                                                 {/* Price History - absolutely positioned below input without affecting layout */}
-                                                 {isPartEditing && currentPageName === 'pricing' && partPriceHistory[part.id]?.price_history && partPriceHistory[part.id].price_history.length > 0 && (
-                                                  <div className="text-[11px]">
-                                                    {partPriceHistory[part.id].price_history.map((h: any, idx: number) => (
-                                                      <span key={idx} className="text-gray-800">
-                                                        {idx > 0 && ','}
-                                                        ${h.final_price}
-                                                      </span>
-                                                    ))}
-                                                   
-                                                  </div>
-                                                )}
-                                               
                                               </div>
                                             </td>
                                                 <td className="px-4 py-1">
@@ -3388,6 +3376,27 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
 
                                               </tr>
                                   ))}
+                                  
+                                  {/* Price History Row - Full width below all variants */}
+                                  {isPartEditing && currentPageName === 'pricing' && partPriceHistory[part.id]?.price_history && partPriceHistory[part.id].price_history.length > 0 && (
+                                    <tr>
+                                      <td colSpan={6} className="px-4 py-1">
+                                        <div className="flex items-center gap-2">
+                                          <div className="flex items-center gap-1.5 justify-center w-full">
+                                            {partPriceHistory[part.id].price_history.map((h: any, idx: number) => (
+                                              <div key={idx} className="flex items-center gap-1.5 text-[11px]">
+                                                <span className="text-gray-300">•</span>
+                                                <span className="font-medium text-gray-700 truncate" title={`${h.customer_name || 'Unknown'} (${h.quote_ref})`}>
+                                                  {h.customer_name || 'Unknown'} <span className='text-green-700'>(${h.final_price?.toFixed(2)})</span>
+                                                </span>
+                                              </div>
+                                            ))}
+                                          </div>
+                                        </div>
+                                      </td>
+                                    </tr>
+                                  )}
+                                  
                                           </React.Fragment>
                               );
                             })}

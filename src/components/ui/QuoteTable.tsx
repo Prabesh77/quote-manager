@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/accordion";
 import supabase from '@/utils/supabase';
 import { getQuotePartsFromJson } from '@/utils/quotePartsHelpers';
+import { updatePriceHistoryForQuote } from '@/utils/partHelpers';
 import { QuoteEditModal } from './QuoteEditModal';
 import QuickFillInput from './QuickFillInput';
 import QuoteInfoPopup from '../QuoteInfoPopup';
@@ -135,6 +136,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
   const [editData, setEditData] = useState<Record<string, any>>({});
   const [partEditData, setPartEditData] = useState<Record<string, Record<string, any>>>({});
   const [quoteNotesEditData, setQuoteNotesEditData] = useState<Record<string, string>>({});
+  const [partPriceHistory, setPartPriceHistory] = useState<Record<string, any>>({});
   const [isQuickFillSelecting, setIsQuickFillSelecting] = useState(false);
   const [quoteNotesLoading, setQuoteNotesLoading] = useState<Record<string, boolean>>({});
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
@@ -945,12 +947,42 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
 
       setEditingParts(quoteId);
       setPartEditData(newPartEditData);
+      
+      // Fetch price history for all parts in this quote
+      fetchPriceHistoryForQuote(quoteParts);
     }
 
     // Set focus field for the specific input that was clicked
     // Use unique key that includes partId, variantId, and field
     const focusKey = `${partId}_${variantId}_${field}`;
     setFocusField(focusKey);
+  };
+  
+  // Helper function to fetch price history for parts in a quote
+  const fetchPriceHistoryForQuote = async (quoteParts: Part[]) => {
+    const historyData: Record<string, any> = {};    
+    for (const part of quoteParts) {
+      try {
+        const { data, error } = await supabase
+          .from('parts')
+          .select('last_prices')
+          .eq('id', part.id)
+          .single();
+        
+        if (error) {
+          console.warn(`⚠️ Error fetching price history for part ${part.id}:`, error);
+        } else if (data?.last_prices) {
+          console.log(`✓ Found price history for part ${part.id}:`, data.last_prices);
+          historyData[part.id] = data.last_prices;
+        } else {
+          console.log(`ℹ️ No price history for part ${part.id}`);
+        }
+      } catch (err) {
+        console.warn(`Failed to fetch price history for part ${part.id}:`, err);
+      }
+    }
+    
+    setPartPriceHistory(historyData);
   };
 
   // Focus the appropriate field when focusField changes
@@ -2126,6 +2158,27 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
         ));
       }
 
+      // Update price history for all parts in this quote
+      try {
+        const updatedQuote = localQuotes.find(q => q.id === quoteId);
+        if (updatedQuote?.partsRequested && updatedQuote.partsRequested.length > 0) {
+          const historyResult = await updatePriceHistoryForQuote(
+            quoteId,
+            updatedQuote.partsRequested,
+            updatedQuote.quoteRef || quote.quoteRef
+          );
+          
+          if (historyResult.success) {
+            console.log(`✓ Updated price history for ${historyResult.updatedCount} parts`);
+          } else {
+            console.warn('⚠️ Failed to update price history:', historyResult.error);
+          }
+        }
+      } catch (priceHistoryError) {
+        console.warn('⚠️ Error updating price history:', priceHistoryError);
+        // Don't fail the verification if price history update fails
+      }
+
       // Track VERIFIED action
       try {
         const { QuoteActionsService } = await import('@/services/quoteActions/quoteActionsService');
@@ -3179,18 +3232,31 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                               </div>
                                             </td>
                                                 <td className="px-4 py-1">
-                                              <div className="flex items-center space-x-1">
-                                                {isPartEditing ? (
-                                                  <input
-                                                        ref={(el) => { focusRefs.current[`${part.id}_${variant.id}_final_price`] = el; }}
-                                                        type="number"
-                                                        step="5"
-                                                        value={partEditData[part.id]?.[variant.id]?.final_price !== undefined ? partEditData[part.id][variant.id].final_price : (variant.final_price ?? '')}
-                                                        onChange={(e) => handleVariantEditChange(part.id, variant.id, 'final_price', e.target.value ? Number(e.target.value) : null)}
-                                                        className={`w-full px-2 py-1 border border-gray-300 rounded-sm text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 ${index === 0 ? 'bg-white' : 'bg-gray-50'}`}
-                                                        placeholder="$"
-                                                  />
-                                                ) : (
+                                              <div className="relative">
+                                                 {/* Price History - absolutely positioned below input without affecting layout */}
+                                                 {isPartEditing && currentPageName === 'pricing' && partPriceHistory[part.id]?.price_history && partPriceHistory[part.id].price_history.length > 0 && (
+                                                  <div className="absolute right-0 -top-5 text-xs">
+                                                    {partPriceHistory[part.id].price_history.map((h: any, idx: number) => (
+                                                      <span key={idx} className="text-gray-600">
+                                                        {idx > 0 && ', '}
+                                                        ${h.final_price}
+                                                      </span>
+                                                    ))}
+                                                   
+                                                  </div>
+                                                )}
+                                                <div className="flex items-center space-x-1">
+                                                  {isPartEditing ? (
+                                                    <input
+                                                          ref={(el) => { focusRefs.current[`${part.id}_${variant.id}_final_price`] = el; }}
+                                                          type="number"
+                                                          step="5"
+                                                          value={partEditData[part.id]?.[variant.id]?.final_price !== undefined ? partEditData[part.id][variant.id].final_price : (variant.final_price ?? '')}
+                                                          onChange={(e) => handleVariantEditChange(part.id, variant.id, 'final_price', e.target.value ? Number(e.target.value) : null)}
+                                                          className={`w-full px-2 py-1 border border-gray-300 rounded-sm text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 ${index === 0 ? 'bg-white' : 'bg-gray-50'}`}
+                                                          placeholder="$"
+                                                    />
+                                                  ) : (
                                                   <>
                                                         <span
                                                           className={`text-sm font-medium px-1 py-0.5 rounded transition-colors ${currentPageName !== 'priced' && currentPageName !== 'completed-quotes' ? 'cursor-pointer hover:bg-gray-100' : 'cursor-default'
@@ -3210,7 +3276,9 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                                           />
                                                         )}
                                                   </>
-                                                )}
+                                                  )}
+                                                </div>
+                                               
                                               </div>
                                             </td>
                                                 <td className="px-4 py-1">

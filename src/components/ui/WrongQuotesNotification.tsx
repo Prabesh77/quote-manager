@@ -83,8 +83,11 @@ export default function WrongQuotesNotification({ userId }: WrongQuotesNotificat
       >
         <Bell className="h-5 w-5" />
         {wrongQuotesCount > 0 && (
-          <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center font-bold">
-            {wrongQuotesCount > 9 ? '9+' : wrongQuotesCount}
+          <span className="absolute -top-1 -right-1">
+            <span className="absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75 animate-ping"></span>
+            <span className="relative inline-flex items-center justify-center bg-red-500 text-white text-xs rounded-full h-5 w-5 font-bold">
+              {wrongQuotesCount > 9 ? '9+' : wrongQuotesCount}
+            </span>
           </span>
         )}
       </button>

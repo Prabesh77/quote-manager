@@ -3233,18 +3233,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                             </td>
                                                 <td className="px-4 py-1">
                                               <div className="relative">
-                                                 {/* Price History - absolutely positioned below input without affecting layout */}
-                                                 {isPartEditing && currentPageName === 'pricing' && partPriceHistory[part.id]?.price_history && partPriceHistory[part.id].price_history.length > 0 && (
-                                                  <div className="absolute right-0 -top-5 text-xs">
-                                                    {partPriceHistory[part.id].price_history.map((h: any, idx: number) => (
-                                                      <span key={idx} className="text-gray-600">
-                                                        {idx > 0 && ', '}
-                                                        ${h.final_price}
-                                                      </span>
-                                                    ))}
-                                                   
-                                                  </div>
-                                                )}
+                                                
                                                 <div className="flex items-center space-x-1">
                                                   {isPartEditing ? (
                                                     <input
@@ -3278,6 +3267,18 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                                   </>
                                                   )}
                                                 </div>
+                                                 {/* Price History - absolutely positioned below input without affecting layout */}
+                                                 {isPartEditing && currentPageName === 'pricing' && partPriceHistory[part.id]?.price_history && partPriceHistory[part.id].price_history.length > 0 && (
+                                                  <div className="text-[11px]">
+                                                    {partPriceHistory[part.id].price_history.map((h: any, idx: number) => (
+                                                      <span key={idx} className="text-gray-800">
+                                                        {idx > 0 && ','}
+                                                        ${h.final_price}
+                                                      </span>
+                                                    ))}
+                                                   
+                                                  </div>
+                                                )}
                                                
                                               </div>
                                             </td>

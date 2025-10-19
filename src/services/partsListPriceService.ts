@@ -16,7 +16,8 @@ export class PartsListPriceService {
   /**
    * Fetch sell price for a given part number (Stockcode)
    * Tries multiple variations of the part number to find a match
-   * @param partNumber - The part number to search for
+   * If multiple supersession numbers are provided (comma-separated), uses ONLY the FIRST one
+   * @param partNumber - The part number to search for (can be comma-separated supersessions)
    * @returns Sell price or null if not found
    */
   static async fetchSellPrice(partNumber: string): Promise<number | null> {
@@ -25,18 +26,25 @@ export class PartsListPriceService {
         return null;
       }
 
-      const cleanPartNumber = partNumber.trim().toUpperCase();
-      const normalizedPartNumber = this.normalizePartNumber(partNumber);
-      console.log(`Fetching list price for part number: ${partNumber} (normalized: ${normalizedPartNumber})`);
+      // If multiple part numbers (supersession), use only the FIRST one
+      let partNumberToUse = partNumber.trim();
+      if (partNumberToUse.includes(',')) {
+        const firstNumber = partNumberToUse.split(',')[0].trim();
+        partNumberToUse = firstNumber;
+      }
+
+      const normalizedPartNumber = this.normalizePartNumber(partNumberToUse);
       
-      // Try multiple variations of the part number (avoid duplicates)
-      const variations = new Set([
-        cleanPartNumber, // Original format (uppercase)
-        normalizedPartNumber, // No special chars: ABC123
-        cleanPartNumber.replace(/[\s\-#]/g, '-'), // All with hyphens: ABC-123
-        cleanPartNumber.replace(/[\s\-#]/g, ' '), // All with spaces: ABC 123
-        cleanPartNumber.replace(/[\s\-#]/g, '#'), // All with #: ABC#123
-      ]);
+      // Try only 2 variations (keep it simple)
+      const variations: string[] = [
+        normalizedPartNumber, // 1. Exact match (no special chars)
+      ];
+      
+      // 2. Mazda-specific: Try without last character (Mazda part numbers often vary in last char)
+      if (normalizedPartNumber.length >= 9) {
+        const withoutLastChar = normalizedPartNumber.slice(0, -1);
+        variations.push(withoutLastChar);
+      }
 
       // Try each unique variation until we find a match
       for (const variation of Array.from(variations)) {
@@ -57,13 +65,11 @@ export class PartsListPriceService {
           const priceString = String(parts[0]['Sell Price']).replace(/[$,\s]/g, '');
           const sellPrice = Number(priceString);
           if (!isNaN(sellPrice)) {
-            console.log(`✅ Found match for ${partNumber} using variation "${variation}": $${sellPrice}`);
             return sellPrice;
           }
         }
       }
 
-      console.log(`No list price found for part number: ${partNumber} (tried ${variations.size} variations)`);
       return null;
     } catch (error) {
       console.error('Error in fetchSellPrice:', error);

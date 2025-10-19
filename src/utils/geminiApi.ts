@@ -404,5 +404,28 @@ function fallbackExtraction(ocrText: string): AIPartExtraction[] {
     }
   }
   
+  // If no parts with names were found, extract orphan part numbers
+  if (parts.length === 0 && partNumberPositions.length > 0) {
+    console.log('📝 No part names found, extracting orphan part numbers');
+    
+    // Extract all valid part numbers as standalone items
+    partNumberPositions.forEach(({ number }) => {
+      // Validate: must contain at least one digit and not be all letters
+      const hasDigit = /\d/.test(number);
+      const isAllLetters = /^[A-Z]+$/i.test(number);
+      
+      if (hasDigit && !isAllLetters) {
+        parts.push({
+          partName: 'Part Number',
+          partNumber: number,
+          confidence: 0.6,
+          context: '(Copy to required part)',
+          rawText: ocrText,
+          list_price: undefined
+        });
+      }
+    });
+  }
+  
   return parts;
 }

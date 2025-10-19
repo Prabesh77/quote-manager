@@ -3165,7 +3165,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                                             <div className="flex flex-wrap items-center gap-1">
                                                               {part.number.split(',').map((pn, pnIndex) => (
                                                                 <div key={pnIndex} className="flex items-center space-x-1 bg-gray-50 px-2 py-1 rounded-md border border-gray-200">
-                                                                  <span className="text-sm font-medium text-gray-900 font-mono">{pn.replace(/\s/g, "")}</span>
+                                                                  <span className="text-sm font-medium text-gray-900 font-mono">{pn}</span>
                                                                   <CopyButton
                                                                     text={pn.replace(/\s/g, "")}
                                                                     title={`Copy ${pn.trim()} to clipboard`}
@@ -3178,7 +3178,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                                           ) : (
                                                             // Single part number - show with same box styling as multiple
                                                             <div className="flex items-center space-x-1 bg-gray-50 px-2 py-1 rounded-md border border-gray-200">
-                                                              <span className="text-sm font-medium text-gray-900 font-mono">{part.number.replace(/\s/g, "") || '-'}</span>
+                                                              <span className="text-sm font-medium text-gray-900 font-mono">{part.number|| '-'}</span>
                                                               <CopyButton
                                                                 text={part.number.replace(/\s/g, "") || ''}
                                                       title="Copy to clipboard"

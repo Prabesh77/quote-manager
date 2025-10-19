@@ -74,6 +74,7 @@ interface PriceHistoryEntry {
   list_price: number | null;
   quote_id: string;
   quote_ref: string;
+  customer_name: string;
   priced_at: string;
   variant_id?: string;
 }
@@ -92,6 +93,7 @@ export const addPriceToHistory = async (
   listPrice: number | null,
   quoteId: string,
   quoteRef: string,
+  customerName: string,
   variantId?: string
 ): Promise<{ success: boolean; error: string | null }> => {
   try {
@@ -117,6 +119,7 @@ export const addPriceToHistory = async (
       list_price: listPrice,
       quote_id: quoteId,
       quote_ref: quoteRef,
+      customer_name: customerName,
       priced_at: new Date().toISOString(),
       variant_id: variantId,
     };
@@ -166,7 +169,8 @@ export const updatePriceHistoryForQuote = async (
       is_default?: boolean;
     }>;
   }>,
-  quoteRef: string
+  quoteRef: string,
+  customerName: string
 ): Promise<{ success: boolean; error: string | null; updatedCount: number }> => {
   try {
     let updatedCount = 0;
@@ -187,6 +191,7 @@ export const updatePriceHistoryForQuote = async (
         defaultVariant.list_price,
         quoteId,
         quoteRef,
+        customerName,
         defaultVariant.id
       );
 

@@ -90,13 +90,105 @@ export const extractPartsFromText = async (text: string): Promise<ExtractedPartI
       list_price: aiPart.list_price
     }));
     
+    // If AI found parts with names, return them
+    if (parts.length > 0) {
+      return parts;
+    }
+    
+    // If no parts found, try to extract orphan part numbers (numbers without names)
+    const orphanNumbers = extractOrphanPartNumbers(text);
+    if (orphanNumbers.length > 0) {
+      return orphanNumbers;
+    }
+    
     return parts;
     
   } catch (error) {
     // Fallback to basic extraction if AI fails
-    return fallbackExtraction(text);
+    const fallbackParts = fallbackExtraction(text);
+    if (fallbackParts.length > 0) {
+      return fallbackParts;
+    }
+    
+    // Last resort: try to extract orphan part numbers
+    return extractOrphanPartNumbers(text);
   }
 };
+
+/**
+ * Extract orphan part numbers (numbers without part names)
+ * Used when no parts are detected but there are valid part numbers in the text
+ */
+function extractOrphanPartNumbers(text: string): ExtractedPartInfo[] {
+  const lines = text.split('\n').map(line => line.trim()).filter(line => line);
+  const orphanParts: ExtractedPartInfo[] = [];
+  
+  // Patterns for different part number formats
+  const patterns = [
+    // Mercedes format: Single letter + 9-13 digits
+    /\b([A-Z])\s*(\d{9,13})\b/gi,
+    // Ford format: PREFIX + space + number with optional hyphen
+    /\b([A-Z]{2,4}Z)\s+([A-Z0-9]{5,15}(?:-[A-Z0-9]{1,5})?)\b/gi,
+    // Hyphenated format
+    /\b([A-Z0-9]{3,10}-[A-Z0-9]{3,10})\b/gi,
+    // Alphanumeric (8+ chars, must contain at least one digit)
+    /\b([A-Z0-9]*\d[A-Z0-9]{7,})\b/gi,
+  ];
+  
+  const foundNumbers = new Set<string>();
+  
+  for (const line of lines) {
+    // Skip lines that look like part names or descriptions
+    const lowerLine = line.toLowerCase();
+    if (lowerLine.includes('headlamp') || lowerLine.includes('radiator') || 
+        lowerLine.includes('condenser') || lowerLine.includes('sensor') ||
+        lowerLine.includes('assembly') || lowerLine.includes('assy') ||
+        line.length < 6) {
+      continue;
+    }
+    
+    // Skip lines wrapped in parentheses
+    if (line.startsWith('(') && line.endsWith(')')) {
+      continue;
+    }
+    
+    // Try each pattern
+    for (const pattern of patterns) {
+      const matches = line.matchAll(pattern);
+      for (const match of matches) {
+        let partNumber = '';
+        
+        // Handle different match groups
+        if (match[0].includes(' ') && match[1] && match[2]) {
+          // Ford or Mercedes format with groups
+          partNumber = (match[1] + match[2]).replace(/\s+/g, '');
+        } else {
+          // Single group match
+          partNumber = match[0].replace(/\s+/g, '');
+        }
+        
+        // Validate: must be 8+ chars and contain at least one digit
+        const hasDigit = /\d/.test(partNumber);
+        const isAllLetters = /^[A-Z]+$/i.test(partNumber);
+        
+        if (partNumber.length >= 8 && hasDigit && !isAllLetters && !foundNumbers.has(partNumber)) {
+          foundNumbers.add(partNumber);
+          
+          orphanParts.push({
+            partName: 'Part Number', // Generic placeholder name
+            partNumber: partNumber,
+            confidence: 0.6, // Lower confidence since no part name
+            rawText: text,
+            context: '(Copy to required part)',
+            list_price: undefined
+          });
+        }
+      }
+    }
+  }
+  
+  return orphanParts;
+}
 
 /**
  * Fallback extraction logic for when AI fails

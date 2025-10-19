@@ -23,10 +23,25 @@ interface AIPartExtraction {
 // Helper function to clean part numbers
 function cleanPartNumber(partNumber: string): string {
   if (!partNumber) return '';
-  // Remove all whitespaces and special characters, keep only letters and numbers
+  
+  // Check if this is multiple part numbers (contains comma)
+  if (partNumber.includes(',')) {
+    // Split by comma, clean each part individually, then rejoin with comma
+    return partNumber
+      .split(',')
+      .map(num => num
+        .replace(/\s+/g, '') // Remove whitespaces
+        .replace(/[^a-zA-Z0-9]/g, '') // Remove special chars except comma
+        .toUpperCase()
+      )
+      .filter(num => num.length > 0) // Remove empty strings
+      .join(','); // Rejoin with comma
+  }
+  
+  // Single part number - remove all whitespaces and special characters
   return partNumber
     .replace(/\s+/g, '') // Remove all whitespaces
-    .replace(/[^a-zA-Z0-9]/g, '') // Remove ALL special chars including hyphens
+    .replace(/[^a-zA-Z0-9]/g, '') // Remove ALL special chars
     .toUpperCase(); // Ensure uppercase
 }
 
@@ -41,8 +56,26 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check if this looks like a Nissan layout (complex, scattered format)
+    // Check if this is just a part number without any part description
     const lines = ocrText.split('\n').map(line => line.trim()).filter(line => line);
+    const cleanText = ocrText.trim().toLowerCase();
+    
+    // Check if text contains any part names/descriptions
+    const hasPartDescriptions = 
+      cleanText.includes('headlamp') || cleanText.includes('headlight') ||
+      cleanText.includes('radiator') || cleanText.includes('condenser') ||
+      cleanText.includes('sensor') || cleanText.includes('lamp') ||
+      cleanText.includes('assembly') || cleanText.includes('assy') ||
+      cleanText.includes('cooler') || cleanText.includes('intercooler') ||
+      cleanText.includes('fan') || cleanText.includes('blower') ||
+      cleanText.includes('camera') || cleanText.includes('radar') ||
+      cleanText.includes('bracket') || cleanText.includes('mount');
+    
+    // If no part descriptions and text is short (likely just part numbers), use fallback
+    if (!hasPartDescriptions && ocrText.length < 200) {
+      console.log('📝 Detected orphan part numbers (no descriptions), using fallback');
+      return NextResponse.json({ useFallback: true });
+    }
     
     const hasNissanParts = lines.some(line => 
       line.toLowerCase().includes('headlamp') || 
@@ -73,6 +106,9 @@ export async function POST(request: NextRequest) {
     const prompt = `
 You are an expert automotive parts analyst. Analyze the provided OCR text and extract ONLY the MAIN automotive parts according to the rules below.
 
+⚠️ **CRITICAL MERCEDES RULE - READ THIS FIRST**:
+If you see a SINGLE LETTER (like "A" or "B") followed by SPACES and NUMBERS (like "A 246 500 04 54"), that letter is PART OF THE PART NUMBER. You MUST include it in your output. "A 246 500 04 54" becomes "A2465000454" NOT "2465000454".
+
 TEXT TO ANALYZE:
 """
 ${ocrText}
@@ -80,41 +116,102 @@ ${ocrText}
 
 INSTRUCTIONS:
 1. Identify ONLY MAIN automotive parts. Exclude brackets, mounting hardware, bolts, nuts, clips, and other supporting components.
-2. Extract part numbers for each MAIN part. A valid part number must contain ≥ 8 letters/digits combined (ignore hyphens, spaces, and special characters when counting). Ignore any shorter numbers.
-3. PART-TO-NUMBER PAIRING: In the OCR text, part numbers typically appear on the line DIRECTLY ABOVE or BEFORE the part description. Always pair them together.
-   - Example: "92101P1040\\nLAMP ASSY-HEAD, LH" → Part Number: 92101P1040, Part Name: Left Headlamp
-   - Example: "99110P1000\\nUNIT ASSY-FRONT RADAR" → Part Number: 99110P1000, Part Name: Radar Sensor
-4. Extract prices when available. Look for prices with $ signs (e.g., $125.50, $89.99, A$855.86). These are likely list prices for the parts. Handle various currency formats including A$ (Australian dollars).
-5. Determine Left/Right context (CHECK IN THIS ORDER):
-   - If text contains "LH" or "Left" → Left
-   - If text contains "RH" or "Right" → Right
-   - If text contains standalone "L" (with spaces/newlines around it, not part of a word) → Left
-   - If text contains standalone "R" (with spaces/newlines around it, not part of a word) → Right
-   - If text contains "(L)" or "[L]" → Left
-   - If text contains "(R)" or "[R]" → Right
-   - Examples of standalone detection:
-     * "LAMP ASSY-HEAD L" → Left (L at end)
-     * "L HEADLAMP" → Left (L at start)
-     * "HEADLAMP (L)" → Left (L in parentheses)
-     * "Part L 123456" → Left (standalone L)
-6. Focus on returning 2–9 MAIN parts maximum, but output no more than the first 8 valid parts found in text order.
-7. PART NUMBER PATTERNS: Look for these formats as they are most likely part numbers:
+
+2. **MERCEDES PART NUMBER PREFIX - DO THIS FIRST BEFORE ANYTHING ELSE**:
+   - If you see a SINGLE LETTER (A, B, C, etc.) followed by SPACES and NUMBERS, that letter is PART OF THE PART NUMBER
+   - Pattern: "A 246 500 04 54" or "B 123 456 78 90" or "C 123 456 00 00"
+   - **YOU MUST INCLUDE THE LETTER**: "A2465000454" NOT "2465000454"
+   - This applies to ALL part numbers starting with a single letter + spaces + numbers
+   - Examples:
+     * "A 246 500 04 54" → "A2465000454" (include A)
+     * "A 246 500 00 54" → "A2465000054" (include A)
+     * "B 123 456 78 90" → "B1234567890" (include B)
+
+3. PART NUMBER VALIDATION (CRITICAL):
+   - A valid part number MUST contain at least ONE DIGIT (numbers 0-9)
+   - A valid part number MUST have ≥ 8 total alphanumeric characters (ignore hyphens, spaces when counting)
+   - REJECT any "part number" that is ALL LETTERS (e.g., "Description", "HEADLAMP", "CONDENSER") - these are NOT part numbers
+   - Part numbers can ONLY be: all numbers (e.g., "12345678") OR mixed letters+numbers (e.g., "ABC12345", "A1234567B")
+   - Examples of INVALID part numbers: "DESCRIPTION", "HEADLAMP", "ASSEMBLY", "CONDENSER" (all letters, no digits)
+   - Examples of VALID part numbers: "92101P1040", "A2349013506", "JB3Z13008A", "LR100570", "JB3B13D154AD", "JB3Z13008A", "260106KG0B", "21460-4JA1A"
+
+4. SUPERSESSION DETECTION (CRITICAL):
+   - ALWAYS check if there are MULTIPLE part numbers for the SAME part name
+   - If multiple valid part numbers appear near the same part description, extract ALL of them (they are supersessions)
+   - Look for patterns like:
+     * "JB3B13D154AD\\nJB3Z13008A\\nHEADLAMP ASSY, RH" → Both numbers are for Right Headlamp
+     * "12345678\\n87654321\\nRadiator" → Both numbers are for Radiator
+   - **CRITICAL**: When multiple part numbers found, combine them with commas (NO SPACES): "12345678,87654321"
+   - **IMPORTANT**: Do NOT concatenate without commas. "JB3B13D154AD,JB3Z13008A" is CORRECT. "JB3B13D154ADJB3Z13008A" is WRONG.
+   - Ford vehicles often have 2-5 supersession numbers per part - extract ALL of them separated by commas
+
+5. PART-TO-NUMBER PAIRING AND GROUPING (CRITICAL):
+   - Part numbers appear on the line(s) DIRECTLY ABOVE or BEFORE the part description
+   - **When there are MULTIPLE part descriptions for DIFFERENT sides (LH and RH), distribute the part numbers intelligently:**
+     * If you see 4 part numbers followed by "HEADLAMP RH" and "HEADLAMP LH", the first 2 numbers go to RH, next 2 to LH
+     * If you see 2 part numbers followed by "HEADLAMP RH" and "HEADLAMP LH", the first number goes to RH, second to LH
+     * Example: "NUM1\\nNUM2\\nNUM3\\nNUM4\\nHEADLAMP RH\\nHEADLAMP LH" → RH gets NUM1,NUM2 and LH gets NUM3,NUM4
+   - Basic pairing examples:
+     * "92101P1040\\nLAMP ASSY-HEAD, LH" → Part Number: 92101P1040, Part Name: Left Headlamp
+     * "99110P1000\\nUNIT ASSY-FRONT RADAR" → Part Number: 99110P1000, Part Name: Radar Sensor
+   - Supersession example: "JB3B13D154AD\\nJB3Z13008A\\nHEADLAMP" → Part Numbers: JB3B13D154AD,JB3Z13008A
+
+6. Extract prices when available. Look for prices with $ signs (e.g., $125.50, $89.99, A$855.86). Handle various currency formats including A$ (Australian dollars).
+
+7. Left/Right Detection (CHECK IN THIS ORDER - HIGHEST PRIORITY FIRST):
+   - If text contains "(R)" anywhere (beginning, middle, or end) → Right
+   - If text contains "(L)" anywhere (beginning, middle, or end) → Left
+   - If text contains "[R]" anywhere → Right
+   - If text contains "[L]" anywhere → Left
+   - If text contains "RH" or "(RH)" → Right
+   - If text contains "LH" or "(LH)" → Left
+   - If text contains " R " (R with spaces around it) → Right
+   - If text contains " L " (L with spaces around it) → Left
+   - If text contains "Right" → Right
+   - If text contains "Left" → Left
+   - If text ends with " R" or starts with "R " → Right
+   - If text ends with " L" or starts with "L " → Left
+   - Examples:
+     * "UNIT(R),HEAD LAMP" → Right (R) detected at beginning)
+     * "UNIT(L),HEAD LAMP" → Left ((L) detected)
+     * "LAMP ASSY (L)" → Left
+     * "Condenser (R)" → Right
+     * "(R) HEADLAMP" → Right
+     * "HEADLAMP LH" → Left
+     * "HEADLAMP RH" → Right
+
+8. PART NUMBER IN PARENTHESES RULE:
+   - If a part number appears in parentheses like "(ABC12345)" or "(12345678)", it should be IGNORED
+   - Only extract part numbers that are NOT wrapped in parentheses
+   - Example: "LR100570\\nCondenser\\n(JPLA19C600AC)" → Extract only "LR100570", ignore "(JPLA19C600AC)"
+
+9. Focus on returning 2–9 MAIN parts maximum, but output no more than the first 8 valid parts found in text order.
+
+10. PART NUMBER PATTERNS: Look for these formats as they are most likely part numbers:
+   - **MERCEDES FORMAT**: Single letter + 9-13 digits (e.g., "A2349013506", "B1234567890")
+     * CRITICAL: ALWAYS include the leading letter (A, B, C, etc.)
    - **FORD FORMAT (HIGHEST PRIORITY)**: PREFIX (2-4 letters ending in Z) + SPACE + NUMBER with optional hyphen
-     * Examples: "N1WZ 9E731-D", "ML3Z 9E731-E", "P1WZ 14C022-B", "F1FZ 16607-AA"
-     * CRITICAL: ALWAYS extract the COMPLETE part number INCLUDING the prefix (e.g., "N1WZ 9E731-D" NOT "9E731-D")
-     * Common prefixes: N1WZ, ML3Z, P1WZ, F1FZ, E1FZ, C1FZ, D1FZ, etc.
+     * Examples: "N1WZ 9E731-D", "ML3Z 9E731-E", "P1WZ 14C022-B", "F1FZ 16607-AA", "JB3Z 13008 A"
+     * CRITICAL: ALWAYS extract the COMPLETE part number INCLUDING the prefix
+     * Common prefixes: N1WZ, ML3Z, P1WZ, F1FZ, E1FZ, C1FZ, D1FZ, JB3Z, JB3B, etc.
    - Hyphenated format: "21606-EB405", "26060-5X00B", "92120-EB400"
-   - Alphanumeric codes: "21460EB31B", "8110560K40" (8+ characters)
-8. Ignore irrelevant short codes like "10", "50", "110", "001" (these are quantities or prices, not part numbers).
-9. Keep part numbers clean — e.g., "8110560K40" not "8110560K40 UNIT ASSY".
-10. SINGLE LINE RULE: If multiple keywords appear in one line (e.g., "O FAN & MOTOR ASSY-CONDENSER"), select the LAST keyword as the part name with this priority: Condenser > Oil Cooler > Radiator > Fan > Motor > Assembly.
-11. HEADLAMP DETECTION RULES:
+   - Alphanumeric codes: "21460EB31B", "8110560K40", "LR100570" (8+ characters, must contain digits)
+
+11. Ignore irrelevant short codes like "10", "50", "110", "001" (these are quantities or prices, not part numbers).
+
+12. Keep part numbers clean — e.g., "8110560K40" not "8110560K40 UNIT ASSY".
+
+13. SINGLE LINE RULE: If multiple keywords appear in one line (e.g., "O FAN & MOTOR ASSY-CONDENSER"), select the LAST keyword as the part name with this priority: Condenser > Oil Cooler > Radiator > Fan > Motor > Assembly.
+
+14. HEADLAMP DETECTION RULES:
     - "LAMP ASSY-HEAD" or "HEAD LAMP ASSY" → 'Headlamp' (this is Hyundai/Kia format)
     - If contains "LH" or "L" or "Left" → 'Left Headlamp'
     - If contains "RH" or "R" or "Right" → 'Right Headlamp'
     - DAYTIME HEADLAMP RULE: If a line contains 'headlamp' or 'headlight' WITH 'daytime' or 'combination' → classify as 'DayLight' (NOT 'Headlamp')
-12. CAMERA DETECTION: If text contains 'camera' keyword → classify as 'Camera'. This is definitive and takes priority over other sensor types.
-13. SENSOR DETECTION RULES (PRIORITY ORDER - CHECK IN THIS SEQUENCE):
+
+15. CAMERA DETECTION: If text contains 'camera' keyword → classify as 'Camera'. This is definitive and takes priority over other sensor types.
+
+16. SENSOR DETECTION RULES (PRIORITY ORDER - CHECK IN THIS SEQUENCE):
     - BLINDSPOT SENSOR KEYWORDS: If text contains 'corner', 'rear corner', 'corner radar', 'rear corner radar', 'blindspot', 'blind spot', 'bsd' → classify as 'Blindspot Sensor' (Left or Right based on L/R context)
     - RADAR SENSOR KEYWORDS: If text contains ANY of these keywords → classify as 'Radar Sensor':
       * 'radar', 'radar sensor'
@@ -129,7 +226,8 @@ INSTRUCTIONS:
     - FALLBACK RULE: If text contains 'sensor' but NO specific sensor type keywords above AND NO camera → Default to 'Radar Sensor'
     - PARKING SENSOR: Only classify as 'Parking Sensor' if text explicitly contains 'parking' or 'park assist'
     - For blindspot sensors: Use L/R context to determine 'Left Blindspot Sensor' or 'Right Blindspot Sensor'
-14. FORD-SPECIFIC RULES:
+
+17. FORD-SPECIFIC RULES:
     - FORD PART NUMBER FORMAT: Ford part numbers have a SPECIFIC format: PREFIX (2-4 letters ending in Z) + SPACE + NUMBER (with optional hyphen)
       * Examples: "N1WZ 9E731-D", "ML3Z 9E731-E", "P1WZ 14C022-B", "F1FZ 16607-AA"
       * CRITICAL: ALWAYS extract the COMPLETE part number INCLUDING the prefix
@@ -139,6 +237,13 @@ INSTRUCTIONS:
       * Has spaces in it (e.g., "N1WZ 9E731-D" vs "9E731D")
       * Includes the prefix before the space
     - FORD RADAR SENSOR DETECTION: If text contains 'Sensor Assy' OR 'Less Bracket' OR 'Les Bracket' → classify as 'Radar Sensor' for Ford cars
+
+CRITICAL SUPERSESSION RULES:
+- NEVER leave a part without a part number if there are unused part numbers available
+- If you extract 2 parts (RH and LH) and there are 4 part numbers, BOTH parts should get 2 numbers each
+- If you extract 2 parts (RH and LH) and there are 2 part numbers, each part gets 1 number
+- If there are more part numbers than parts, distribute them evenly or pair them logically
+- Example: 4 numbers + 2 headlamps (RH + LH) → First 2 numbers to RH, last 2 to LH
 
 IMPORTANT RULES:
 - Use these exact standardized part names:
@@ -193,20 +298,77 @@ RESPONSE FORMAT (JSON only):
 }
 
 EXAMPLE EXTRACTIONS:
+
+Basic Examples:
 Input: "92101P1040\\nLAMP ASSY-HEAD, LH"
 Output: { "partName": "Left Headlamp", "partNumber": "92101P1040", "context": "LH" }
 
 Input: "99110P1000\\nUNIT ASSY-FRONT RADAR"
 Output: { "partName": "Radar Sensor", "partNumber": "99110P1000", "context": null }
 
-Input: "N1WZ 9E731-D\\nSENSOR ASSY, LESS BRACKET"
-Output: { "partName": "Radar Sensor", "partNumber": "N1WZ 9E731-D", "context": null }
+Ford Examples with Supersession:
+Input: "JB3B 13D154 AD\\nJB3Z 13008 A\\nHEADLAMP ASSY, RH (PTD)"
+Output: { "partName": "Right Headlamp", "partNumber": "JB3B13D154AD,JB3Z13008A", "context": "RH" }
+Note: COMMA separates the two numbers. NOT "JB3B13D154ADJB3Z13008A"
 
-Input: "25380N9600\\nBLOWER ASSY"
-Output: { "partName": "Fan Assembly", "partNumber": "25380N9600", "context": null }
+Input: "JB3B 13D154 AD\\nJB3Z 13008 A\\nJB3B 13D155 AD\\nJB3Z 13008 E\\nHEADLAMP ASSY, RH\\nHEADLAMP ASSY, LH"
+Output: [
+  { "partName": "Right Headlamp", "partNumber": "JB3B13D154AD,JB3Z13008A", "context": "RH" },
+  { "partName": "Left Headlamp", "partNumber": "JB3B13D155AD,JB3Z13008E", "context": "LH" }
+]
+Note: 4 numbers total, first 2 for RH, last 2 for LH, each pair comma-separated
 
-Input: "26060-5X00B\\nCONDENSER ASSY-COOLER"
-Output: { "partName": "Condenser", "partNumber": "26060-5X00B", "context": null }
+Input: "N1WZ 9E731-D\\nML3Z 9E731-E\\nSENSOR ASSY"
+Output: { "partName": "Radar Sensor", "partNumber": "N1WZ9E731D,ML3Z9E731E", "context": null }
+Note: Multiple Ford supersessions, both complete prefixes included, comma-separated
+
+Mercedes Examples (CRITICAL - Study These Carefully):
+Input: "A 246 500 04 54\\nREFRIGERANT CONDENSER"
+Output: { "partName": "Condenser", "partNumber": "A2465000454", "context": null }
+Note: "A" is MANDATORY. Do NOT return "2465000454"
+
+Input: "A 246 500 04 54\\nREFRIGERANT CONDENSER\\nA 246 500 00 54\\nCONDENSOR"
+Output: [
+  { "partName": "Condenser", "partNumber": "A2465000454", "context": null },
+  { "partName": "Condenser", "partNumber": "A2465000054", "context": null }
+]
+Note: BOTH start with "A", BOTH must include the "A" prefix
+
+Input: "B 123 456 78 90\\nRadiator"
+Output: { "partName": "Radiator", "partNumber": "B1234567890", "context": null }
+Note: "B" prefix included
+
+L/R Detection Examples:
+Input: "UNIT(R),HEAD LAMP\\nDB3P-51-0K0G"
+Output: { "partName": "Right Headlamp", "partNumber": "DB3P510K0G", "context": "R" }
+Note: (R) at beginning detected for Right
+
+Input: "UNIT(L),HEAD LAMP\\nDB3P-51-0K0D"
+Output: { "partName": "Left Headlamp", "partNumber": "DB3P510K0D", "context": "L" }
+Note: (L) at beginning detected for Left
+
+Input: "LR100570\\nCondenser\\n(L)"
+Output: { "partName": "Left Condenser", "partNumber": "LR100570", "context": "L" }
+Note: (L) at end detected for Left
+
+Input: "Part Number: 12345678\\nHeadlamp (R)"
+Output: { "partName": "Right Headlamp", "partNumber": "12345678", "context": "R" }
+Note: (R) at end detected for Right
+
+Parentheses Ignore Example:
+Input: "LR100570\\nCondenser\\nUJ\\nA$870.34\\n(JPLA19C600AC)"
+Output: { "partName": "Condenser", "partNumber": "LR100570", "context": null, "list_price": 870.34 }
+Note: (JPLA19C600AC) ignored because it's in parentheses
+
+Invalid Part Number Examples (REJECTED):
+Input: "DESCRIPTION\\nHEADLAMP"
+Output: NO OUTPUT - "DESCRIPTION" is all letters, no digits
+
+Input: "CONDENSER\\nRadiator"
+Output: NO OUTPUT - "CONDENSER" is all letters, no digits
+
+Input: "ASSEMBLY\\nFan"
+Output: NO OUTPUT - "ASSEMBLY" is all letters, no digits
 `;
 
     const result = await model.generateContent(prompt);

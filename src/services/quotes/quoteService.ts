@@ -3,6 +3,7 @@ import { Quote, QuoteFormData, QuoteUpdateData, QuoteWithParts } from '@/types/q
 import { Part } from '@/types/part';
 import { ApiResponse } from '@/types/common';
 import { QuoteActionsService } from '@/services/quoteActions/quoteActionsService';
+import { findOrCreatePart } from '@/utils/partHelpers';
 
 // Parse Australian-style dates like "19/08/2025" or "19/08/2025 12:00pm" into ISO8601
 function parseAustralianDateTime(input?: string): string | null {
@@ -405,28 +406,36 @@ export class QuoteService {
       if (quoteError) throw quoteError;
       const quoteId = quote.id;
 
-      // Step 4: Create parts and parts_requested JSON structure
+      // Step 4: Create or reuse parts and parts_requested JSON structure
       if (quoteData.parts && quoteData.parts.length > 0) {
         const createdParts: Array<{ id: string; name: string; number: string }> = [];
         
-        // Create parts in parts table
+        // Create or reuse parts in parts table using generic helper
         for (const partData of quoteData.parts) {
-          const { data: part, error: partError } = await supabase
+          const { partId, error: partError } = await findOrCreatePart(
+            {
+              name: partData.name,
+              number: partData.number,
+              price: partData.price,
+            },
+            vehicleId
+          );
+          
+          if (partError) throw new Error(partError);
+          
+          // Fetch part details for the response
+          const { data: partDetails, error: fetchError } = await supabase
             .from('parts')
-            .insert({
-              vehicle_id: vehicleId,
-              part_name: partData.name,
-              part_number: partData.number,
-              price: partData.price
-            })
-            .select('id, part_name, part_number')
+            .select('part_name, part_number')
+            .eq('id', partId)
             .single();
           
-          if (partError) throw partError;
+          if (fetchError) throw fetchError;
+          
           createdParts.push({
-            id: part.id,
-            name: part.part_name,
-            number: part.part_number
+            id: partId,
+            name: partDetails.part_name,
+            number: partDetails.part_number
           });
         }
 

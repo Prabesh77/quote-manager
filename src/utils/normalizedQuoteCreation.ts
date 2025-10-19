@@ -1,5 +1,6 @@
 import supabase from '@/utils/supabase';
 import { QuoteActionsService } from '@/services/quoteActions/quoteActionsService';
+import { findOrCreatePart } from '@/utils/partHelpers';
 
 // Helper function to convert Australian date format (DD/MM/YYYY) to correct format
 const convertAustralianDateToISO = (dateString: string | undefined): string | null => {
@@ -239,7 +240,7 @@ export const createNormalizedQuote = async (quoteData: QuoteData) => {
       vehicleId = newVehicle.id;
     }
 
-    // Step 3: Create parts first, then create quote with complete data
+    // Step 3: Create or reuse parts, then create quote with complete data
     const finalPartsRequested = [];
     
     for (let i = 0; i < quoteData.parts.length; i++) {
@@ -248,27 +249,24 @@ export const createNormalizedQuote = async (quoteData: QuoteData) => {
       // Use the list price from the part data (already fetched in QuoteForm when part number was entered)
       const listPriceToUse = partData.list_price || null;
       
-      // Always create new parts for each quote to avoid conflicts
-      // Each quote should have its own unique parts
-      const { data: part, error: partError } = await supabase
-        .from('parts')
-        .insert({
-          vehicle_id: vehicleId,
-          part_name: partData.name,
-          part_number: partData.number || null,
-          price: partData.price || null,
-        })
-        .select()
-        .single();
+      // Find existing part or create new one using generic helper
+      const { partId, error: partError } = await findOrCreatePart(
+        {
+          name: partData.name,
+          number: partData.number,
+          price: partData.price,
+        },
+        vehicleId
+      );
 
       if (partError) {
-        console.error('Error creating part:', partError);
-        throw partError;
+        console.error('Error in findOrCreatePart:', partError);
+        throw new Error(partError);
       }
 
       // Add to final JSON array with fetched list price
       finalPartsRequested.push({
-        part_id: part.id,
+        part_id: partId,
         note: partData.note || '',
         final_price: null, // Initially null, will be set during pricing
         list_price: listPriceToUse,

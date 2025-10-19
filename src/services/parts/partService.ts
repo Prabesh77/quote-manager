@@ -1,6 +1,7 @@
 import supabase from '@/utils/supabase';
 import { Part, PartFormData, PartUpdateData } from '@/types/part';
 import { ApiResponse } from '@/types/common';
+import { findOrCreatePart } from '@/utils/partHelpers';
 
 export class PartService {
   /**
@@ -36,40 +37,44 @@ export class PartService {
   }
 
   /**
-   * Add a new part
+   * Add a new part (or return existing if same number and name exists)
    */
   static async addPart(partData: PartFormData): Promise<ApiResponse<Part>> {
     try {
-      // Convert legacy part format to normalized format
-      const normalizedPart = {
-        part_name: partData.name,
-        part_number: partData.number,
+      // Use generic helper to find or create part
+      const { partId, error: helperError } = await findOrCreatePart({
+        name: partData.name,
+        number: partData.number,
         price: partData.price,
         note: partData.note,
-        created_at: new Date().toISOString(),
-      };
-      
-      const { data, error } = await supabase.from('parts').insert(normalizedPart).select();
-      
+      });
+
+      if (helperError) {
+        return { data: null, error: helperError };
+      }
+
+      // Fetch the full part data to return
+      const { data, error } = await supabase
+        .from('parts')
+        .select('*')
+        .eq('id', partId)
+        .single();
+
       if (error) {
-        console.error('Error adding part:', error);
+        console.error('Error fetching part after creation:', error);
         return { data: null, error: error.message };
       }
 
-      if (!data || data.length === 0) {
-        return { data: null, error: 'No part data returned' };
-      }
-
-      const newPart: Part = {
-        id: data[0].id,
-        name: data[0].part_name,
-        number: data[0].part_number || '',
-        price: data[0].price,
-        note: data[0].note || '',
-        createdAt: data[0].created_at,
+      const part: Part = {
+        id: data.id,
+        name: data.part_name,
+        number: data.part_number || '',
+        price: data.price,
+        note: data.note || '',
+        createdAt: data.created_at,
       };
 
-      return { data: newPart, error: null };
+      return { data: part, error: null };
     } catch (error) {
       console.error('Error adding part:', error);
       return { data: null, error: 'Failed to add part' };

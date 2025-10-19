@@ -237,7 +237,7 @@ INSTRUCTIONS:
       * Has spaces in it (e.g., "N1WZ 9E731-D" vs "9E731D")
       * Includes the prefix before the space
     - FORD RADAR SENSOR DETECTION: If text contains 'Sensor Assy' OR 'Less Bracket' OR 'Les Bracket' → classify as 'Radar Sensor' for Ford cars
-
+18. Honda part numbers are always connected by hyphens .e.g 80110-SNL-A03. You can ignore rest of the numbers and only use hyphen connected chars as part number. For example in this case ‘0 80110-SNL-A03’, only ‘80110-SNL-A03’ is part number.
 CRITICAL SUPERSESSION RULES:
 - NEVER leave a part without a part number if there are unused part numbers available
 - If you extract 2 parts (RH and LH) and there are 4 part numbers, BOTH parts should get 2 numbers each

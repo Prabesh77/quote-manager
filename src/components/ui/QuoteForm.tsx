@@ -493,8 +493,14 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
 
     setIsLoading(true);
     try {
-      // Convert part details to array
-      const partsArray = selectedParts.map(partName => partDetails[partName]);
+      // Convert part details to array and clean part numbers
+      const partsArray = selectedParts.map(partName => {
+        const part = partDetails[partName];
+        return {
+          ...part,
+          number: cleanPartNumber(part.number) // Clean part number before submission
+        };
+      });
 
       await onSubmit({
         quoteRef,

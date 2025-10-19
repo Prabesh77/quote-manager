@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { X, Plus, ArrowLeftRight } from 'lucide-react';
+import { getAvailablePartsForBrand } from '@/config/brandPartRules';
 import { PartsListPriceService } from '@/services/partsListPriceService';
 
 interface PartDetails {
@@ -105,8 +106,20 @@ export default function PartsSection({
     return null;
   }
 
-  // Show all parts (no filtering by vehicle make)
-  const filteredParts = PART_OPTIONS;
+  // Filter parts based on selected brand
+  const allPartNames = PART_OPTIONS.map(part => part.name);
+  const availablePartNames = vehicleMake 
+    ? getAvailablePartsForBrand(vehicleMake, allPartNames)
+    : allPartNames;
+  
+  const filteredParts = PART_OPTIONS.filter(part =>
+    availablePartNames.includes(part.name)
+  );
+
+  // Get unavailable parts for info message
+  const unavailableParts = vehicleMake 
+    ? allPartNames.filter(name => !availablePartNames.includes(name))
+    : [];
 
   return (
     <div className="space-y-4">
@@ -143,6 +156,18 @@ export default function PartsSection({
             );
           })}
         </div>
+
+        {/* Info message for unavailable parts */}
+        {vehicleMake && unavailableParts.length > 0 && (
+          <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+            <div className="text-sm text-blue-800">
+              <strong>Note:</strong> The following parts are not typically required for {vehicleMake}:
+              <div className="mt-1 text-xs text-blue-600">
+                {unavailableParts.join(', ')}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Selected Parts Details */}

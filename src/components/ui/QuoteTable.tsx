@@ -15,10 +15,11 @@ const getQuoteRefDisplay = (quoteRef: string, source?: string) => {
 
 // Helper function to calculate settlement price (rounded to nearest 5)
 const calculateSettlementPrice = (price: number | null, settlement: number | undefined): number | null => {
-  if (!price || price < 10 || !settlement || settlement <= 0) return null;
-  const calculated = price * (1 + settlement / 100);
-  return Math.round(calculated / 5) * 5;
+  if (price === null || price < 10 || settlement === undefined || settlement <= 0) return null;
+  const calculated = price * (1 - settlement / 100);
+  return Math.round(calculated);
 };
+
 
 import { useQueryClient } from '@tanstack/react-query';
 import { Quote, Part } from './useQuotes';

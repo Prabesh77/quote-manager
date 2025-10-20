@@ -3282,13 +3282,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                                       {currentPageName === 'verify-price' && variant.final_price && variant.final_price >= 10 && quote.settlement && quote.settlement > 0 && (
                                                         <div 
                                                           className="ml-1 text-xs text-green-600 font-medium cursor-pointer hover:bg-green-50 px-1 py-0.5 rounded transition-colors"
-                                                          onClick={() => {
-                                                            const settlementPrice = calculateSettlementPrice(variant.final_price, quote.settlement);
-                                                            if (settlementPrice) {
-                                                              handleVariantEditChange(part.id, variant.id, 'final_price', settlementPrice);
-                                                            }
-                                                          }}
-                                                          title="Click to fill with settlement price"
+                                                         
                                                         >
                                                           ${calculateSettlementPrice(variant.final_price, quote.settlement)}
                                                         </div>
@@ -4045,13 +4039,6 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                                     {currentPageName === 'verify-price' && part.price && part.price >= 10 && quote.settlement && quote.settlement > 0 && (
                                                       <div 
                                                         className="ml-1 text-xs text-green-600 font-medium cursor-pointer hover:bg-green-50 px-1 py-0.5 rounded transition-colors"
-                                                        onClick={() => {
-                                                          const settlementPrice = calculateSettlementPrice(part.price, quote.settlement);
-                                                          if (settlementPrice) {
-                                                            handlePartEditChange(part.id, 'price', settlementPrice);
-                                                          }
-                                                        }}
-                                                        title="Click to fill with settlement price"
                                                       >
                                                         ${calculateSettlementPrice(part.price, quote.settlement)}
                                                       </div>

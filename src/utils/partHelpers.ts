@@ -75,6 +75,7 @@ interface PriceHistoryEntry {
   quote_id: string;
   quote_ref: string;
   customer_name: string;
+  settlement?: number;
   priced_at: string;
   variant_id?: string;
 }
@@ -94,6 +95,7 @@ export const addPriceToHistory = async (
   quoteId: string,
   quoteRef: string,
   customerName: string,
+  settlement?: number,
   variantId?: string
 ): Promise<{ success: boolean; error: string | null }> => {
   try {
@@ -120,6 +122,7 @@ export const addPriceToHistory = async (
       quote_id: quoteId,
       quote_ref: quoteRef,
       customer_name: customerName,
+      settlement: settlement,
       priced_at: new Date().toISOString(),
       variant_id: variantId,
     };
@@ -170,7 +173,8 @@ export const updatePriceHistoryForQuote = async (
     }>;
   }>,
   quoteRef: string,
-  customerName: string
+  customerName: string,
+  settlement?: number
 ): Promise<{ success: boolean; error: string | null; updatedCount: number }> => {
   try {
     let updatedCount = 0;
@@ -184,6 +188,30 @@ export const updatePriceHistoryForQuote = async (
         continue;
       }
 
+      // Fetch part number to validate length
+      try {
+        const { data: part, error: partError } = await supabase
+          .from('parts')
+          .select('part_number')
+          .eq('id', partItem.part_id)
+          .single();
+        
+        if (partError) {
+          console.warn(`Failed to fetch part number for ${partItem.part_id}:`, partError);
+          continue;
+        }
+
+        // Skip if part number is less than 5 characters (ignore short/invalid numbers)
+        const partNumber = part?.part_number || '';
+        if (partNumber.length < 5) {
+          console.log(`⏭️ Skipping price history for part ${partItem.part_id} - part number too short (${partNumber.length} chars)`);
+          continue;
+        }
+      } catch (err) {
+        console.warn(`Error checking part number length for ${partItem.part_id}:`, err);
+        continue;
+      }
+
       // Add to price history
       const result = await addPriceToHistory(
         partItem.part_id,
@@ -192,6 +220,7 @@ export const updatePriceHistoryForQuote = async (
         quoteId,
         quoteRef,
         customerName,
+        settlement,
         defaultVariant.id
       );
 

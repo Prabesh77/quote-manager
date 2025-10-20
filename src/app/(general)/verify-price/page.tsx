@@ -272,6 +272,7 @@ export default function VerifyPricePage() {
           searchTerm={searchTerm}
           onSearchChange={setSearchTerm}
           useServerSideSearch={true}
+          currentPageName="verify-price"
       />
     </div>
     </ProtectedRoute>

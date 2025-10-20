@@ -13,6 +13,13 @@ const getQuoteRefDisplay = (quoteRef: string, source?: string) => {
   return { displayRef, isRepairConnection };
 };
 
+// Helper function to calculate settlement price (rounded to nearest 5)
+const calculateSettlementPrice = (price: number | null, settlement: number | undefined): number | null => {
+  if (!price || price < 10 || !settlement || settlement <= 0) return null;
+  const calculated = price * (1 + settlement / 100);
+  return Math.round(calculated / 5) * 5;
+};
+
 import { useQueryClient } from '@tanstack/react-query';
 import { Quote, Part } from './useQuotes';
 
@@ -972,7 +979,6 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
         if (error) {
           console.warn(`⚠️ Error fetching price history for part ${part.id}:`, error);
         } else if (data?.last_prices) {
-          console.log(`✓ Found price history for part ${part.id}:`, data.last_prices);
           historyData[part.id] = data.last_prices;
         } else {
           console.log(`ℹ️ No price history for part ${part.id}`);
@@ -3243,7 +3249,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                                         >
                                                           {variant.list_price ? (variant.list_price < 10 ? 'N/A' : `$${variant.list_price.toFixed(2)}`) : 'Not set'}
                                                     </span>
-                                                        {variant.list_price && variant.list_price >= 10 && (
+                                                        {variant.list_price && variant.list_price >= 10 && currentPageName !== 'verify-price' && (
                                                           <CopyButton
                                                             text={variant.list_price.toString()}
                                                       title="Copy to clipboard"
@@ -3261,15 +3267,32 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                                 
                                                 <div className="flex items-center space-x-1">
                                                   {isPartEditing ? (
-                                                    <input
-                                                          ref={(el) => { focusRefs.current[`${part.id}_${variant.id}_final_price`] = el; }}
-                                                          type="number"
-                                                          step="5"
-                                                          value={partEditData[part.id]?.[variant.id]?.final_price !== undefined ? partEditData[part.id][variant.id].final_price : (variant.final_price ?? '')}
-                                                          onChange={(e) => handleVariantEditChange(part.id, variant.id, 'final_price', e.target.value ? Number(e.target.value) : null)}
-                                                          className={`w-full px-2 py-1 border border-gray-300 rounded-sm text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 ${index === 0 ? 'bg-white' : 'bg-gray-50'}`}
-                                                          placeholder="$"
-                                                    />
+                                                    <div className="flex items-center space-x-1">
+                                                      <input
+                                                            ref={(el) => { focusRefs.current[`${part.id}_${variant.id}_final_price`] = el; }}
+                                                            type="number"
+                                                            step="5"
+                                                            value={partEditData[part.id]?.[variant.id]?.final_price !== undefined ? partEditData[part.id][variant.id].final_price : (variant.final_price ?? '')}
+                                                            onChange={(e) => handleVariantEditChange(part.id, variant.id, 'final_price', e.target.value ? Number(e.target.value) : null)}
+                                                            className={`min-w-20 max-w-20 w-full px-2 py-1 border border-gray-300 rounded-sm text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 ${index === 0 ? 'bg-white' : 'bg-gray-50'}`}
+                                                            placeholder="$"
+                                                      />
+                                                      {/* Settlement calculation for editing mode - final price only */}
+                                                      {currentPageName === 'verify-price' && variant.final_price && variant.final_price >= 10 && quote.settlement && quote.settlement > 0 && (
+                                                        <div 
+                                                          className="ml-1 text-xs text-green-600 font-medium cursor-pointer hover:bg-green-50 px-1 py-0.5 rounded transition-colors"
+                                                          onClick={() => {
+                                                            const settlementPrice = calculateSettlementPrice(variant.final_price, quote.settlement);
+                                                            if (settlementPrice) {
+                                                              handleVariantEditChange(part.id, variant.id, 'final_price', settlementPrice);
+                                                            }
+                                                          }}
+                                                          title="Click to fill with settlement price"
+                                                        >
+                                                          ${calculateSettlementPrice(variant.final_price, quote.settlement)}
+                                                        </div>
+                                                      )}
+                                                    </div>
                                                   ) : (
                                                   <>
                                                         <span
@@ -3280,7 +3303,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                                         >
                                                           {variant.final_price ? (variant.final_price < 10 ? 'N/A' : `$${variant.final_price.toFixed(2)}`) : 'Not set'}
                                                         </span>
-                                                        {variant.final_price && variant.final_price >= 10 && (
+                                                        {variant.final_price && variant.final_price >= 10 && currentPageName !== 'verify-price' && (
                                                           <CopyButton
                                                             text={variant.final_price.toString()}
                                                             title="Copy to clipboard"
@@ -3289,6 +3312,12 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                                             iconClassName="h-3.5 w-3.5"
                                                           />
                                                         )}
+                                                        {/* Settlement calculation for verify-price page */}
+                                                        {currentPageName === 'verify-price' && variant.final_price && variant.final_price >= 10 && quote.settlement && quote.settlement > 0 ? (
+                                                          <div className="ml-1 text-xs text-green-600 font-medium">
+                                                          ${calculateSettlementPrice(variant.final_price, quote.settlement)}
+                                                          </div>
+                                                        ): null}
                                                   </>
                                                   )}
                                                 </div>
@@ -3985,7 +4014,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                                 >
                                                   {part.list_price ? (part.list_price < 10 ? 'N/A' : `$${part.list_price.toFixed(2)}`) : '-'}
                                                     </span>
-                                                {part.list_price && part.list_price >= 10 && (
+                                                {part.list_price && part.list_price >= 10 && currentPageName !== 'verify-price' && (
                                                   <CopyButton
                                                     text={part.list_price ? part.list_price.toString() : ''}
                                                       title="Copy to clipboard"
@@ -4002,14 +4031,31 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                           <label className="block text-xs font-medium text-gray-500 mb-1">Price</label>
                                               <div className="flex items-center space-x-1">
                                                 {isPartEditing ? (
-                                                  <input
-                                                ref={(el) => { focusRefs.current[`${part.id}_mobile_price`] = el; }}
-                                                type="number"
-                                                step="5"
-                                                value={partEditData[part.id]?.price ?? ''}
-                                                onChange={(e) => handlePartEditChange(part.id, 'price', e.target.value ? Number(e.target.value) : null)}
-                                                className="flex-1 px-2 py-1 border border-gray-300 rounded-md text-sm focus:ring-1 focus:ring-red-500 focus:border-transparent"
-                                                  />
+                                                  <div className="flex items-center space-x-1">
+                                                    <input
+                                                  ref={(el) => { focusRefs.current[`${part.id}_mobile_price`] = el; }}
+                                                  type="number"
+                                                  step="5"
+                                                  value={partEditData[part.id]?.price ?? ''}
+                                                  onChange={(e) => handlePartEditChange(part.id, 'price', e.target.value ? Number(e.target.value) : null)}
+                                                  className="flex-1 px-2 py-1 border border-gray-300 rounded-md text-sm focus:ring-1 focus:ring-red-500 focus:border-transparent"
+                                                    />
+                                                    {/* Settlement calculation for editing mode - final price only */}
+                                                    {currentPageName === 'verify-price' && part.price && part.price >= 10 && quote.settlement && quote.settlement > 0 && (
+                                                      <div 
+                                                        className="ml-1 text-xs text-green-600 font-medium cursor-pointer hover:bg-green-50 px-1 py-0.5 rounded transition-colors"
+                                                        onClick={() => {
+                                                          const settlementPrice = calculateSettlementPrice(part.price, quote.settlement);
+                                                          if (settlementPrice) {
+                                                            handlePartEditChange(part.id, 'price', settlementPrice);
+                                                          }
+                                                        }}
+                                                        title="Click to fill with settlement price"
+                                                      >
+                                                        ${calculateSettlementPrice(part.price, quote.settlement)}
+                                                      </div>
+                                                    )}
+                                                  </div>
                                                 ) : (
                                                   <>
                                                 <span
@@ -4018,14 +4064,20 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                                   title={part.price && part.price < 10 ? "Part not available" : "Click to edit"}
                                                 >
                                                   {part.price ? (part.price < 10 ? 'N/A' : `$${part.price.toFixed(2)}`) : '-'}
-                                                </span>
-                                                {part.price && part.price >= 10 && (
+                                                  </span>
+                                                  {part.price && part.price >= 10 && currentPageName !== 'verify-price' && (
                                                   <CopyButton
                                                     text={part.price ? part.price.toString() : ''}
                                                       title="Copy to clipboard"
                                                     size="sm"
                                                     className="text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
                                                   />
+                                                )}
+                                                {/* Settlement calculation for verify-price page */}
+                                                {currentPageName === 'verify-price' && part.price && part.price >= 10 && quote.settlement && quote.settlement > 0 && (
+                                                  <div className="ml-2 text-xs text-blue-600 font-medium">
+                                                  ${calculateSettlementPrice(part.price, quote.settlement)}
+                                                  </div>
                                                 )}
                                               </>
                                             )}

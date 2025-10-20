@@ -2116,10 +2116,13 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
         });
 
         // Use comprehensive batch mutation (don't change status yet)
+        let freshPartsRequested = quote.partsRequested; // Default to existing
+        
         if (updates.length > 0) {
           const result = await onUpdateMultipleParts(updates, quoteId, false);
           
           if (result?.updatedQuote) {
+            freshPartsRequested = result.updatedQuote.parts_requested; // Get fresh data
             setLocalQuotes(prev => prev.map(q =>
               q.id === quoteId
                 ? { ...q, partsRequested: result.updatedQuote.parts_requested }
@@ -2136,6 +2139,27 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
             ? { ...q, status: 'priced' as any }
             : q
         ));
+
+        // Update price history using the FRESH data from the parts update
+        try {
+          if (freshPartsRequested && freshPartsRequested.length > 0) {
+            const historyResult = await updatePriceHistoryForQuote(
+              quoteId,
+              freshPartsRequested,
+              quote.quoteRef,
+              quote.customer || 'Unknown',
+              quote.settlement || 0
+            );
+            
+            if (historyResult.success) {
+              console.log(`✓ Updated price history for ${historyResult.updatedCount} parts (from fresh data)`);
+            } else {
+              console.warn('⚠️ Failed to update price history:', historyResult.error);
+            }
+          }
+        } catch (priceHistoryError) {
+          console.warn('⚠️ Error updating price history:', priceHistoryError);
+        }
 
         // Exit editing mode
         setEditingParts(null);
@@ -2156,28 +2180,28 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
             ? { ...q, status: 'priced' as any }
             : q
         ));
-      }
 
-      // Update price history for all parts in this quote
-      try {
-        const updatedQuote = localQuotes.find(q => q.id === quoteId);
-        if (updatedQuote?.partsRequested && updatedQuote.partsRequested.length > 0) {
-          const historyResult = await updatePriceHistoryForQuote(
-            quoteId,
-            updatedQuote.partsRequested,
-            updatedQuote.quoteRef || quote.quoteRef,
-            updatedQuote.customer || quote.customer || 'Unknown'
-          );
-          
-          if (historyResult.success) {
-            console.log(`✓ Updated price history for ${historyResult.updatedCount} parts`);
-          } else {
-            console.warn('⚠️ Failed to update price history:', historyResult.error);
+        // Update price history for non-editing mode
+        try {
+          const currentQuote = localQuotes.find(q => q.id === quoteId);
+          if (currentQuote?.partsRequested && currentQuote.partsRequested.length > 0) {
+            const historyResult = await updatePriceHistoryForQuote(
+              quoteId,
+              currentQuote.partsRequested,
+              currentQuote.quoteRef || quote.quoteRef,
+              currentQuote.customer || quote.customer || 'Unknown',
+              currentQuote.settlement || quote.settlement || 0
+            );
+            
+            if (historyResult.success) {
+              console.log(`✓ Updated price history for ${historyResult.updatedCount} parts`);
+            } else {
+              console.warn('⚠️ Failed to update price history:', historyResult.error);
+            }
           }
+        } catch (priceHistoryError) {
+          console.warn('⚠️ Error updating price history:', priceHistoryError);
         }
-      } catch (priceHistoryError) {
-        console.warn('⚠️ Error updating price history:', priceHistoryError);
-        // Don't fail the verification if price history update fails
       }
 
       // Track VERIFIED action
@@ -3378,7 +3402,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                   ))}
                                   
                                   {/* Price History Row - Full width below all variants */}
-                                  {isPartEditing && currentPageName === 'pricing' && partPriceHistory[part.id]?.price_history && partPriceHistory[part.id].price_history.length > 0 && (
+                                  {isPartEditing && currentPageName === 'pricing' && part.number && part.number.length >= 5 && partPriceHistory[part.id]?.price_history && partPriceHistory[part.id].price_history.length > 0 && (
                                     <tr>
                                       <td colSpan={6} className="px-4 py-1">
                                         <div className="flex items-center gap-2">
@@ -3386,8 +3410,8 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                             {partPriceHistory[part.id].price_history.map((h: any, idx: number) => (
                                               <div key={idx} className="flex items-center gap-1.5 text-[11px]">
                                                 <span className="text-gray-300">•</span>
-                                                <span className="font-medium text-gray-700 truncate" title={`${h.customer_name || 'Unknown'} (${h.quote_ref})`}>
-                                                  {h.customer_name || 'Unknown'} <span className='text-green-700'>(${h.final_price?.toFixed(2)})</span>
+                                                <span className="font-medium text-gray-700 truncate" title={`${h.customer_name || 'Unknown'}${h.settlement !== undefined && h.settlement !== null ? ` (${h.settlement}%)` : ''} - ${h.quote_ref}`}>
+                                                  {h.customer_name || 'Unknown'}{h.settlement !== undefined && h.settlement !== null && <span className='text-blue-600'> ({h.settlement}%)</span>} <span className='text-green-700'>(${h.final_price?.toFixed(2)})</span>
                                                 </span>
                                               </div>
                                             ))}

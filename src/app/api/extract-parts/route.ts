@@ -117,16 +117,6 @@ ${ocrText}
 INSTRUCTIONS:
 1. Identify ONLY MAIN automotive parts. Exclude brackets, mounting hardware, bolts, nuts, clips, and other supporting components.
 
-2. **MERCEDES PART NUMBER PREFIX - DO THIS FIRST BEFORE ANYTHING ELSE**:
-   - If you see a SINGLE LETTER (A, B, C, etc.) followed by SPACES and NUMBERS, that letter is PART OF THE PART NUMBER
-   - Pattern: "A 246 500 04 54" or "B 123 456 78 90" or "C 123 456 00 00"
-   - **YOU MUST INCLUDE THE LETTER**: "A2465000454" NOT "2465000454"
-   - This applies to ALL part numbers starting with a single letter + spaces + numbers
-   - Examples:
-     * "A 246 500 04 54" → "A2465000454" (include A)
-     * "A 246 500 00 54" → "A2465000054" (include A)
-     * "B 123 456 78 90" → "B1234567890" (include B)
-
 3. PART NUMBER VALIDATION (CRITICAL):
    - A valid part number MUST contain at least ONE DIGIT (numbers 0-9)
    - A valid part number MUST have ≥ 8 total alphanumeric characters (ignore hyphens, spaces when counting)
@@ -240,6 +230,8 @@ INSTRUCTIONS:
 18. Honda part numbers are always connected by hyphens .e.g 80110-SNL-A03. You can ignore rest of the numbers and only use hyphen connected chars as part number. For example in this case ‘0 80110-SNL-A03’, only ‘80110-SNL-A03’ is part number.
 CRITICAL SUPERSESSION RULES:
 19. BMW rules:The part numbers of BMW looks like this, 63 117 478 153. The part number is never less than 10 chars in BMW and part numbers includes white space in between. Please make sure you capture all part numbers (normally 8 to 11) characters. Don’t miss the part number as it might be a bit confusing because of white space in between.
+
+GENERAL
 - NEVER leave a part without a part number if there are unused part numbers available
 - If you extract 2 parts (RH and LH) and there are 4 part numbers, BOTH parts should get 2 numbers each
 - If you extract 2 parts (RH and LH) and there are 2 part numbers, each part gets 1 number

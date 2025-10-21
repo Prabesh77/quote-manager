@@ -106,9 +106,6 @@ export async function POST(request: NextRequest) {
     const prompt = `
 You are an expert automotive parts analyst. Analyze the provided OCR text and extract ONLY the MAIN automotive parts according to the rules below.
 
-⚠️ **CRITICAL MERCEDES RULE - READ THIS FIRST**:
-If you see a SINGLE LETTER (like "A" or "B") followed by SPACES and NUMBERS (like "A 246 500 04 54"), that letter is PART OF THE PART NUMBER. You MUST include it in your output. "A 246 500 04 54" becomes "A2465000454" NOT "2465000454".
-
 TEXT TO ANALYZE:
 """
 ${ocrText}
@@ -117,13 +114,26 @@ ${ocrText}
 INSTRUCTIONS:
 1. Identify ONLY MAIN automotive parts. Exclude brackets, mounting hardware, bolts, nuts, clips, and other supporting components.
 
+2. **MERCEDES PART NUMBER PREFIX RULE (VERY SPECIFIC - ONLY APPLY IF THIS EXACT PATTERN IS PRESENT)**:
+   - ONLY Mercedes: A single letter (A, B, C, etc.) followed by EXACTLY 3 DIGITS, then SPACES, then more digits
+   - Pattern MUST be: LETTER + 3_DIGITS + SPACE + MORE_DIGITS
+   - Examples that MATCH this pattern:
+     * "A 246 500 04 54" → "A2465000454" (A + 246 + space + numbers) ✓
+     * "B 123 456 78 90" → "B1234567890" (B + 123 + space + numbers) ✓
+   - Examples that DO NOT match (DO NOT apply this rule):
+     * "66 31 5 A38 7E7" → "66315A387E7" (A is in middle, not at start) ✗
+     * "A$6,172.13" → This is a PRICE, not a part number ✗
+     * "FRR-02" → No letter+3digits pattern ✗
+   - **CRITICAL**: DO NOT use example part numbers from instructions. ONLY extract numbers that ACTUALLY EXIST in the text above.
+
 3. PART NUMBER VALIDATION (CRITICAL):
    - A valid part number MUST contain at least ONE DIGIT (numbers 0-9)
-   - A valid part number MUST have ≥ 8 total alphanumeric characters (ignore hyphens, spaces when counting)
-   - REJECT any "part number" that is ALL LETTERS (e.g., "Description", "HEADLAMP", "CONDENSER") - these are NOT part numbers
-   - Part numbers can ONLY be: all numbers (e.g., "12345678") OR mixed letters+numbers
-   - Examples of INVALID part numbers: "DESCRIPTION", "HEADLAMP", "ASSEMBLY", "CONDENSER" (all letters, no digits)
-   - Examples of VALID part numbers: "92101P1040", "A2349013506", "JB3Z13008A", "LR100570", "JB3B13D154AD", "JB3Z13008A", "260106KG0B", "21460-4JA1A"
+   - A valid part number MUST have ≥ 7 total alphanumeric characters (not counting hyphens, spaces, or special chars)
+   - REJECT any "part number" that is ALL LETTERS (e.g., "Description", "HEADLAMP", "CONDENSER", "FRR") - these are NOT part numbers
+   - Part numbers can ONLY be: all numbers (e.g., "12345678") OR mixed letters+numbers (e.g., "66315A387E7")
+   - Examples of INVALID part numbers: "DESCRIPTION", "HEADLAMP", "ASSEMBLY", "CONDENSER", "FRR-02", "FRR02" (too short or all letters)
+   - Examples of VALID part numbers: "92101P1040", "66315A387E7", "JB3Z13008A", "LR100570", "JB3B13D154AD", "260106KG0B", "21460-4JA1A"
+   - **CRITICAL**: Extract ONLY part numbers that ACTUALLY APPEAR in the text. DO NOT use example numbers from these instructions.
 
 4. SUPERSESSION DETECTION (CRITICAL):
    - ALWAYS check if there are MULTIPLE part numbers for the SAME part name
@@ -134,6 +144,7 @@ INSTRUCTIONS:
    - **CRITICAL**: When multiple part numbers found, combine them with commas (NO SPACES): "12345678,87654321"
    - **IMPORTANT**: Do NOT concatenate without commas. "JB3B13D154AD,JB3Z13008A" is CORRECT. "JB3B13D154ADJB3Z13008A" is WRONG.
    - Ford vehicles often have 2-5 supersession numbers per part - extract ALL of them separated by commas
+   - **CRITICAL**: DO NOT use example part numbers from instructions. ONLY extract numbers that ACTUALLY EXIST in the text above.
 
 5. PART-TO-NUMBER PAIRING AND GROUPING (CRITICAL):
    - Part numbers appear on the line(s) DIRECTLY ABOVE or BEFORE the part description
@@ -178,14 +189,17 @@ INSTRUCTIONS:
 9. Focus on returning 2–9 MAIN parts maximum, but output no more than the first 8 valid parts found in text order.
 
 10. PART NUMBER PATTERNS: Look for these formats as they are most likely part numbers:
-   - **MERCEDES FORMAT**: Single letter + 9-13 digits (e.g., "A2349013506", "B1234567890")
-     * CRITICAL: ALWAYS include the leading letter (A, B, C, etc.)
+   - **BMW/MERCEDES FORMAT**: ONLY if pattern "LETTER + 3_DIGITS + SPACE + MORE_DIGITS" exists (see rule 2 above)
+     * Examples: "A 246 500 04 54", "B 123 456 78 90"
+     * **CRITICAL**: DO NOT use example numbers "A2349013506" or "B1234567890" - these are NOT in the text
    - **FORD FORMAT (HIGHEST PRIORITY)**: PREFIX (2-4 letters ending in Z) + SPACE + NUMBER with optional hyphen
      * Examples: "N1WZ 9E731-D", "ML3Z 9E731-E", "P1WZ 14C022-B", "F1FZ 16607-AA", "JB3Z 13008 A"
      * CRITICAL: ALWAYS extract the COMPLETE part number INCLUDING the prefix
      * Common prefixes: N1WZ, ML3Z, P1WZ, F1FZ, E1FZ, C1FZ, D1FZ, JB3Z, JB3B, etc.
+   - **BMW FORMAT**: Numbers with spaces like "66 31 5 A38 7E7" → Extract as "66315A387E7" (remove spaces, keep all characters)
    - Hyphenated format: "21606-EB405", "26060-5X00B", "92120-EB400"
-   - Alphanumeric codes: "21460EB31B", "8110560K40", "LR100570" (8+ characters, must contain digits)
+   - Alphanumeric codes: "21460EB31B", "8110560K40", "LR100570" (7+ characters, must contain digits)
+   - **CRITICAL**: Extract ONLY numbers that ACTUALLY APPEAR in the text. DO NOT use examples from these instructions.
 
 11. Ignore irrelevant short codes like "10", "50", "110", "001" (these are quantities or prices, not part numbers).
 
@@ -315,16 +329,25 @@ Input: "N1WZ 9E731-D\\nML3Z 9E731-E\\nSENSOR ASSY"
 Output: { "partName": "Radar Sensor", "partNumber": "N1WZ9E731D,ML3Z9E731E", "context": null }
 Note: Multiple Ford supersessions, both complete prefixes included, comma-separated
 
-Input: "A 246 500 04 54\\nREFRIGERANT CONDENSER\\nA 246 500 00 54\\nCONDENSOR"
-Output: [
-  { "partName": "Condenser", "partNumber": "A2465000454", "context": null },
-  { "partName": "Condenser", "partNumber": "A2465000054", "context": null }
-]
-REMEMBER, PART NUM DOESN'T INCLUDE $. IF ITS $ ITS PRICE NOT PART NUMBER. A IS ALWAYS FOLLOWED BY A NUMBER IN MERCEDES. IF THIS ALPHABET OR OTHER CHARS, THATS NOT A PART NUMBER.
+BMW Examples:
+Input: "66 31 5 A38 7E7\\nFront radar sensor long\\nrange\\nFRR-02\\nA$6,172.13"
+Output: { "partName": "Radar Sensor", "partNumber": "66315A387E7", "list_price": 6172.13 }
+Note: "66 31 5 A38 7E7" becomes "66315A387E7" (remove spaces). "FRR-02" is REJECTED (too short, < 7 chars). "A$6,172.13" is a PRICE not a part number.
+
+Input: "66 31 5 A38 7E7\\nFront radar sensor\\n66 31 5 A58 DA3\\nSupersession\\nA$6,172.13\\nA$6,538.39"
+Output: { "partName": "Radar Sensor", "partNumber": "66315A387E7,66315A58DA3", "list_price": 6172.13 }
+Note: Two BMW part numbers extracted and comma-separated. First price used.
+
+Mercedes Examples (ONLY if "LETTER + 3_DIGITS + SPACE" pattern exists):
+Input: "A 246 500 04 54\\nREFRIGERANT CONDENSER"
+Output: { "partName": "Condenser", "partNumber": "A2465000454", "context": null }
+Note: Pattern matches "A + 246 + space + numbers", so "A" is included
 
 Input: "B 123 456 78 90\\nRadiator"
 Output: { "partName": "Radiator", "partNumber": "B1234567890", "context": null }
-Note: "B" prefix included
+Note: Pattern matches "B + 123 + space + numbers", so "B" is included
+
+**CRITICAL REMINDER**: A$ followed by numbers like "A$6,172.13" is a PRICE (Australian dollars), NOT a part number. The $ symbol indicates currency.
 
 L/R Detection Examples:
 Input: "UNIT(R),HEAD LAMP\\nDB3P-51-0K0G"

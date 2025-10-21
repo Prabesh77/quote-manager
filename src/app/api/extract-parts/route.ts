@@ -121,7 +121,7 @@ INSTRUCTIONS:
    - A valid part number MUST contain at least ONE DIGIT (numbers 0-9)
    - A valid part number MUST have ≥ 8 total alphanumeric characters (ignore hyphens, spaces when counting)
    - REJECT any "part number" that is ALL LETTERS (e.g., "Description", "HEADLAMP", "CONDENSER") - these are NOT part numbers
-   - Part numbers can ONLY be: all numbers (e.g., "12345678") OR mixed letters+numbers (e.g., "ABC12345", "A1234567B")
+   - Part numbers can ONLY be: all numbers (e.g., "12345678") OR mixed letters+numbers
    - Examples of INVALID part numbers: "DESCRIPTION", "HEADLAMP", "ASSEMBLY", "CONDENSER" (all letters, no digits)
    - Examples of VALID part numbers: "92101P1040", "A2349013506", "JB3Z13008A", "LR100570", "JB3B13D154AD", "JB3Z13008A", "260106KG0B", "21460-4JA1A"
 
@@ -325,7 +325,7 @@ Output: [
   { "partName": "Condenser", "partNumber": "A2465000454", "context": null },
   { "partName": "Condenser", "partNumber": "A2465000054", "context": null }
 ]
-Note: BOTH start with "A", BOTH must include the "A" prefix
+REMEMBER, PART NUM DOESN'T INCLUDE $. IF ITS $ ITS PRICE NOT PART NUMBER;
 
 Input: "B 123 456 78 90\\nRadiator"
 Output: { "partName": "Radiator", "partNumber": "B1234567890", "context": null }

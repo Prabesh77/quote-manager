@@ -315,17 +315,12 @@ Input: "N1WZ 9E731-D\\nML3Z 9E731-E\\nSENSOR ASSY"
 Output: { "partName": "Radar Sensor", "partNumber": "N1WZ9E731D,ML3Z9E731E", "context": null }
 Note: Multiple Ford supersessions, both complete prefixes included, comma-separated
 
-Mercedes Examples (CRITICAL - Study These Carefully):
-Input: "A 246 500 04 54\\nREFRIGERANT CONDENSER"
-Output: { "partName": "Condenser", "partNumber": "A2465000454", "context": null }
-Note: "A" is MANDATORY. Do NOT return "2465000454"
-
 Input: "A 246 500 04 54\\nREFRIGERANT CONDENSER\\nA 246 500 00 54\\nCONDENSOR"
 Output: [
   { "partName": "Condenser", "partNumber": "A2465000454", "context": null },
   { "partName": "Condenser", "partNumber": "A2465000054", "context": null }
 ]
-REMEMBER, PART NUM DOESN'T INCLUDE $. IF ITS $ ITS PRICE NOT PART NUMBER;
+REMEMBER, PART NUM DOESN'T INCLUDE $. IF ITS $ ITS PRICE NOT PART NUMBER. A IS ALWAYS FOLLOWED BY A NUMBER IN MERCEDES. IF THIS ALPHABET OR OTHER CHARS, THATS NOT A PART NUMBER.
 
 Input: "B 123 456 78 90\\nRadiator"
 Output: { "partName": "Radiator", "partNumber": "B1234567890", "context": null }

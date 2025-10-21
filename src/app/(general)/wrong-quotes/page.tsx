@@ -29,6 +29,36 @@ function WrongQuotesContent() {
     created_by: user?.id 
   });
 
+  // Set up real-time subscription for wrong quotes
+  React.useEffect(() => {
+    if (!user?.id) return;
+
+    const subscription = supabase
+      .channel('wrong_quotes_realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'quotes',
+          filter: `created_by=eq.${user.id}`,
+        },
+        (payload) => {
+          console.log('🔔 Real-time update received:', payload);
+          
+          // Invalidate and refetch the wrong quotes query
+          const specificQueryKey = queryKeys.quotes(1, 100, { status: 'wrong', created_by: user.id });
+          queryClient.invalidateQueries({ queryKey: specificQueryKey });
+          queryClient.refetchQueries({ queryKey: specificQueryKey });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [user?.id, queryClient]);
+
   // Fetch parts for the quotes being displayed
   const { data: parts } = useAllQuoteParts(quotesData?.quotes || []);
 

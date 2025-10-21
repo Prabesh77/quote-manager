@@ -44,7 +44,6 @@ function WrongQuotesContent() {
           filter: `created_by=eq.${user.id}`,
         },
         (payload) => {
-          console.log('🔔 Real-time update received:', payload);
           
           // Invalidate and refetch the wrong quotes query
           const specificQueryKey = queryKeys.quotes(1, 100, { status: 'wrong', created_by: user.id });

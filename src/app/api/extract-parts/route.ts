@@ -146,7 +146,7 @@ INSTRUCTIONS:
      * "99110P1000\\nUNIT ASSY-FRONT RADAR" → Part Number: 99110P1000, Part Name: Radar Sensor
    - Supersession example: "JB3B13D154AD\\nJB3Z13008A\\nHEADLAMP" → Part Numbers: JB3B13D154AD,JB3Z13008A
 
-6. Extract prices when available. Look for prices with $ signs (e.g., $125.50, $89.99, A$855.86). Handle various currency formats including A$ (Australian dollars).
+6. Extract prices when available. Look for prices with $ signs (e.g., $125.50, $89.99, A$855.86). Handle various currency formats including A$ (Australian dollars). Remember, A followed by $ is a price, not part number.
 
 7. Left/Right Detection (CHECK IN THIS ORDER - HIGHEST PRIORITY FIRST):
    - If text contains "(R)" anywhere (beginning, middle, or end) → Right

@@ -395,6 +395,8 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
         'Right Headlamp': 'Left Headlamp',
         'Left DayLight': 'Right DayLight',
         'Right DayLight': 'Left DayLight',
+        'Left Rear Lamp': 'Right Rear Lamp',
+        'Right Rear Lamp': 'Left Rear Lamp',
         'Left Blindspot Sensor': 'Right Blindspot Sensor',
         'Right Blindspot Sensor': 'Left Blindspot Sensor'
       };

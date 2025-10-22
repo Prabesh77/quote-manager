@@ -3,6 +3,13 @@ import supabase from '@/utils/supabase';
 /**
  * Finds an existing part by part number and name, or creates a new one
  * Returns the part ID to use in quotes
+ * 
+ * Special handling for placeholder part numbers (< 5 chars):
+ * - Part numbers like "AAA", "aaa", "R", "L" are considered placeholders
+ * - These are standardized to "AAA" as the part number
+ * - The actual part name (e.g., "Left Headlamp") is preserved
+ * - Example: Input "R" + "Left Headlamp" → Stored as "AAA" + "Left Headlamp"
+ * - No price history is saved for these placeholder parts
  */
 export const findOrCreatePart = async (
   partData: {
@@ -14,6 +21,56 @@ export const findOrCreatePart = async (
   vehicleId?: string
 ): Promise<{ partId: string; isNew: boolean; error: string | null }> => {
   try {
+    // Check if this is a placeholder part number (< 5 chars)
+    const isPlaceholder = partData.number && partData.number.length < 5;
+    
+    if (isPlaceholder) {
+      // For placeholder part numbers, use "AAA" as the standardized placeholder number
+      // but keep the actual part name (e.g., "Left Headlamp")
+      console.log(`⚠️ Placeholder part number detected: ${partData.number} (< 5 chars) for ${partData.name}, using "AAA" as standardized placeholder`);
+      
+      // Check if a part with this name and "AAA" as number already exists
+      const { data: existingPart, error: checkError } = await supabase
+        .from('parts')
+        .select('id, part_name, part_number')
+        .eq('part_name', partData.name)
+        .eq('part_number', 'AAA')
+        .limit(1);
+      
+      if (checkError) {
+        console.error('Error checking for existing placeholder part:', checkError);
+        return { partId: '', isNew: false, error: checkError.message };
+      }
+      
+      if (existingPart && existingPart.length > 0) {
+        // Reuse existing part with "AAA" placeholder
+        console.log(`✓ Reusing existing part with AAA placeholder: ${partData.name} (ID: ${existingPart[0].id})`);
+        return { partId: existingPart[0].id, isNew: false, error: null };
+      }
+      
+      // Create new part with "AAA" as placeholder number
+      const { data: newPart, error: createError } = await supabase
+        .from('parts')
+        .insert({
+          vehicle_id: vehicleId || null,
+          part_name: partData.name,
+          part_number: 'AAA',
+          price: partData.price || null,
+          note: partData.note || null,
+        })
+        .select('id')
+        .single();
+      
+      if (createError) {
+        console.error('Error creating part with AAA placeholder:', createError);
+        return { partId: '', isNew: true, error: createError.message };
+      }
+      
+      console.log(`✓ Created new part with AAA placeholder: ${partData.name} (ID: ${newPart.id})`);
+      return { partId: newPart.id, isNew: true, error: null };
+    }
+    
+    // Normal handling for valid part numbers (≥ 5 chars)
     // Check if a part with the same number and name already exists
     if (partData.number && partData.name) {
       const { data: existingParts, error: checkError } = await supabase

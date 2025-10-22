@@ -1,23 +1,62 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const SUPABASE_URL = 'https://ofpvxrsvnmgktypwluoo.supabase.co';
-const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || '';
+const SUPABASE_URL = "https://ofpvxrsvnmgktypwluoo.supabase.co";
+const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || "";
 
 const CORS_HEADERS = {
-  'Access-Control-Allow-Origin': '*', // Or restrict to your domain
-  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type',
-  'Content-Type': 'application/json',
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "POST, GET, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type",
+  "Content-Type": "application/json",
 };
 
 export async function OPTIONS() {
-  return NextResponse.json({}, { status: 200, headers: CORS_HEADERS });
+  return NextResponse.json({}, { headers: CORS_HEADERS });
 }
 
-/**
- * 🟢 GET /api/tampermonkey/opened?quote_ref=A12345
- * Returns: { quote_ref, opened_by } if found, else 404
- */
+// ✅ POST: insert or update record for quote_ref
+export async function POST(req: NextRequest) {
+  try {
+    const { quote_ref, opened_by } = await req.json();
+
+    if (!quote_ref || !opened_by) {
+      return NextResponse.json(
+        { error: "quote_ref and opened_by are required" },
+        { status: 400, headers: CORS_HEADERS }
+      );
+    }
+
+    const payload = [{ quote_ref, opened_by }];
+
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/order_track`, {
+      method: "POST",
+      headers: {
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+        "Content-Type": "application/json",
+        Prefer: "resolution=merge-duplicates,return=representation",
+      },
+      body: JSON.stringify(payload),
+    });
+
+    const text = await res.text();
+    if (!res.ok) {
+      throw new Error(`Supabase insert failed: ${text}`);
+    }
+
+    const data = text ? JSON.parse(text) : {};
+    return NextResponse.json(data, { headers: CORS_HEADERS });
+
+  } catch (err) {
+    console.error("POST /ordertrack error:", err);
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : "Unknown error" },
+      { status: 500, headers: CORS_HEADERS }
+    );
+  }
+}
+
+// ✅ GET: fetch opened_by by quote_ref
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
@@ -25,13 +64,15 @@ export async function GET(req: NextRequest) {
 
     if (!quote_ref) {
       return NextResponse.json(
-        { error: "Missing quote_ref" },
+        { error: "quote_ref is required" },
         { status: 400, headers: CORS_HEADERS }
       );
     }
 
     const res = await fetch(
-      `${SUPABASE_URL}/rest/v1/opened_quotes?select=quote_ref,opened_by&quote_ref=eq.${encodeURIComponent(quote_ref)}`,
+      `${SUPABASE_URL}/rest/v1/order_track?quote_ref=eq.${encodeURIComponent(
+        quote_ref
+      )}&select=opened_by`,
       {
         headers: {
           apikey: SUPABASE_ANON_KEY,
@@ -44,60 +85,15 @@ export async function GET(req: NextRequest) {
 
     if (!Array.isArray(data) || data.length === 0) {
       return NextResponse.json(
-        { error: "Quote not found" },
-        { status: 404, headers: CORS_HEADERS }
+        { opened_by: null },
+        { status: 200, headers: CORS_HEADERS }
       );
     }
 
-    return NextResponse.json(data[0], { headers: CORS_HEADERS });
+    return NextResponse.json({ opened_by: data[0].opened_by }, { headers: CORS_HEADERS });
+
   } catch (err) {
-    console.error("GET /opened error:", err);
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Unknown error" },
-      { status: 500, headers: CORS_HEADERS }
-    );
-  }
-}
-
-/**
- * 🟠 POST /api/tampermonkey/opened
- * Body: { quote_ref: string, opened_by: string }
- * Saves or updates record in DB.
- */
-export async function POST(req: NextRequest) {
-  try {
-    const { quote_ref, opened_by } = await req.json();
-
-    if (!quote_ref || !opened_by) {
-      return NextResponse.json(
-        { error: "quote_ref and opened_by are required" },
-        { status: 400, headers: CORS_HEADERS }
-      );
-    }
-
-    // Upsert (insert or update if quote_ref already exists)
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/opened_quotes`, {
-      method: "POST",
-      headers: {
-        apikey: SUPABASE_ANON_KEY,
-        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-        "Content-Type": "application/json",
-        Prefer: "resolution=merge-duplicates",
-      },
-      body: JSON.stringify([{ quote_ref, opened_by }]),
-    });
-
-    if (!res.ok) {
-      const text = await res.text();
-      throw new Error(`Supabase insert failed: ${text}`);
-    }
-
-    return NextResponse.json(
-      { success: true, quote_ref, opened_by },
-      { headers: CORS_HEADERS }
-    );
-  } catch (err) {
-    console.error("POST /opened error:", err);
+    console.error("GET /ordertrack error:", err);
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Unknown error" },
       { status: 500, headers: CORS_HEADERS }

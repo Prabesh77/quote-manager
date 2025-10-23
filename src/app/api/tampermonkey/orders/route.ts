@@ -56,7 +56,7 @@ export async function POST(req: NextRequest) {
   }
 }
 
-// ✅ GET: fetch opened_by by quote_ref
+// ✅ GET: fetch opened_by by quote_ref + total count for that opened_by
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
@@ -69,6 +69,7 @@ export async function GET(req: NextRequest) {
       );
     }
 
+    // 1️⃣ Fetch opened_by for the given quote_ref
     const res = await fetch(
       `${SUPABASE_URL}/rest/v1/order_track?quote_ref=eq.${encodeURIComponent(
         quote_ref
@@ -83,14 +84,36 @@ export async function GET(req: NextRequest) {
 
     const data = await res.json();
 
-    if (!Array.isArray(data) || data.length === 0) {
+    if (!Array.isArray(data) || data.length === 0 || !data[0].opened_by) {
       return NextResponse.json(
-        { opened_by: null },
+        { opened_by: null, total_count: 0 },
         { status: 200, headers: CORS_HEADERS }
       );
     }
 
-    return NextResponse.json({ opened_by: data[0].opened_by }, { headers: CORS_HEADERS });
+    const opened_by = data[0].opened_by;
+
+    // 2️⃣ Fetch total count of rows by that opened_by
+    const countRes = await fetch(
+      `${SUPABASE_URL}/rest/v1/order_track?opened_by=eq.${encodeURIComponent(
+        opened_by
+      )}&select=quote_ref`,
+      {
+        headers: {
+          apikey: SUPABASE_ANON_KEY,
+          Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+          Prefer: "count=exact", // ✅ Ask Supabase to return count in headers
+        },
+      }
+    );
+
+    const totalCount = Number(countRes.headers.get("content-range")?.split("/")[1]) || 0;
+
+    // 3️⃣ Respond with both values
+    return NextResponse.json(
+      { opened_by, total_count: totalCount },
+      { headers: CORS_HEADERS }
+    );
 
   } catch (err) {
     console.error("GET /ordertrack error:", err);

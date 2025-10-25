@@ -2682,7 +2682,6 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                           {quotesOpenByOthers.has(quote.id) && (
                             <div className="px-2 py-0.5 text-xs font-semibold border shadow-sm rounded bg-orange-100 text-orange-700 border-orange-200 flex items-center space-x-1">
                               <div className="w-2 h-2 bg-orange-400 rounded-full animate-pulse"></div>
-                              <span>Working</span>
                             </div>
                           )}
 

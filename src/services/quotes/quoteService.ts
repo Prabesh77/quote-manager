@@ -46,7 +46,8 @@ export class QuoteService {
         .select(`
           *,
           customer:customers(*),
-          vehicle:vehicles(*)
+          vehicle:vehicles(*),
+          opened_by_user:opened_by
         `)
         .order('created_at', { ascending: false });
 

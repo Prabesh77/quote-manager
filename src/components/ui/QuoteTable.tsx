@@ -93,7 +93,6 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
 
   const [filter, setFilter] = useState<FilterType>(defaultFilter);
   const [searchTerm, setSearchTerm] = useState('');
-  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const [singleQuoteMode, setSingleQuoteMode] = useState(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('single-quote-mode');
@@ -105,23 +104,166 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
   // Use external search term when server-side search is enabled
   const effectiveSearchTerm = useServerSideSearch ? externalSearchTerm || '' : searchTerm;
 
-  // Initialize expanded rows - only expand the first quote in the list
+  // Use client-side state for immediate UI updates, but sync with server
+  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+  const [quotesOpenByOthers, setQuotesOpenByOthers] = useState<Set<string>>(new Set());
+  
+  // Sync client state with server state when quotes change
   useEffect(() => {
-    const newExpandedRows = new Set<string>();
-
-    // Only expand the first quote in the list to reduce clutter
-    if (quotes.length > 0) {
-      newExpandedRows.add(quotes[0].id);
-    }
-
-    setExpandedRows(newExpandedRows);
+    const serverExpandedRows = new Set(quotes.filter(quote => quote.isOpen).map(quote => quote.id));
+    setExpandedRows(serverExpandedRows);
+    
+    // Initialize quotes open by others based on current data
+    const openByOthers = new Set(
+      quotes
+        .filter(quote => quote.isOpen && quote.openedBy)
+        .map(quote => quote.id)
+    );
+    setQuotesOpenByOthers(openByOthers);
   }, [quotes]);
+
+  // Real-time subscription for isOpen changes from OTHER users only
+  useEffect(() => {
+    let channel: any = null;
+    
+        const setupRealtime = async () => {
+          try {
+            const { default: supabase } = await import('@/utils/supabase');
+            
+            // Get current user ID to filter out our own changes
+            const { data: { user } } = await supabase.auth.getUser();
+            const currentUserId = user?.id;
+        
+        // Test if real-time is working by listening to all quote changes first
+        channel = supabase
+          .channel('quotes-realtime-test')
+          .on(
+            'postgres_changes',
+            {
+              event: '*',
+              schema: 'public',
+              table: 'quotes'
+            },
+                (payload) => {
+                  // Check if isOpen field changed
+                  const wasOpen = (payload.old as any)?.is_open;
+                  const isNowOpen = (payload.new as any)?.is_open;
+                  const openedBy = (payload.new as any)?.opened_by;
+                  
+                  // Process UPDATE events for isOpen changes
+                  if (payload.eventType === 'UPDATE') {
+                    // Always check current state and update accordingly
+                    if (isNowOpen) {
+                      // If opened by someone else, only add visual indicators (don't expand)
+                      if (openedBy && openedBy !== currentUserId) {
+                        setQuotesOpenByOthers(prev => new Set([...prev, payload.new.id]));
+                        // DON'T expand the accordion for other users
+                      } else if (openedBy === currentUserId) {
+                        // Only expand if it's our own action
+                        setExpandedRows(prev => new Set([...prev, payload.new.id]));
+                      }
+                    } else {
+                      // Always remove visual indicators when quote is closed
+                      setQuotesOpenByOthers(prev => {
+                        const newSet = new Set(prev);
+                        newSet.delete(payload.new.id);
+                        return newSet;
+                      });
+                      
+                      // Check who had it open before (from old data) to determine accordion behavior
+                      const previouslyOpenedBy = (payload.old as any)?.opened_by;
+                      
+                      // Only collapse accordion if it was our own quote
+                      if (previouslyOpenedBy === currentUserId) {
+                        setExpandedRows(prev => {
+                          const newSet = new Set(prev);
+                          newSet.delete(payload.new.id);
+                          return newSet;
+                        });
+                      }
+                    }
+                  }
+                }
+          )
+          .subscribe((status) => {
+            if (status === 'SUBSCRIBED') {
+              console.log('✅ Real-time subscription is active!');
+            } else if (status === 'CHANNEL_ERROR') {
+              console.error('❌ Real-time subscription failed!');
+            }
+          });
+      } catch (error) {
+        console.error('❌ Error setting up real-time subscription:', error);
+      }
+    };
+
+    setupRealtime();
+
+        return () => {
+          if (channel) {
+            channel.unsubscribe();
+          }
+        };
+  }, []);
+
+
+
+  // Function to handle accordion open/close with server-side tracking
+  const handleAccordionChange = async (quoteId: string, isOpen: boolean) => {
+    try {
+      // Import supabase client for direct update
+      const supabase = (await import('@/utils/supabase')).default;
+      
+      // Get current user ID
+      const { data: { user } } = await supabase.auth.getUser();
+      const currentUserId = user?.id;
+      
+      // Update the quote's isOpen status on the server
+      const { error } = await supabase
+        .from('quotes')
+        .update({ 
+          is_open: isOpen,
+          opened_by: isOpen ? currentUserId : null,
+          opened_at: isOpen ? new Date().toISOString() : null
+        })
+        .eq('id', quoteId);
+      
+      if (error) {
+        console.error('❌ Error updating quote accordion state:', error);
+        // Revert client state on error
+        setExpandedRows(prev => {
+          const newSet = new Set(prev);
+          if (isOpen) {
+            newSet.delete(quoteId);
+          } else {
+            newSet.add(quoteId);
+          }
+          return newSet;
+        });
+        return;
+      }
+      
+    } catch (error) {
+      console.error('❌ Error updating quote accordion state:', error);
+      // Revert client state on error
+      setExpandedRows(prev => {
+        const newSet = new Set(prev);
+        if (isOpen) {
+          newSet.delete(quoteId);
+        } else {
+          newSet.add(quoteId);
+        }
+        return newSet;
+      });
+    }
+  };
 
   // Auto-expand single quote when in single quote mode
   useEffect(() => {
     if (singleQuoteMode && quotes.length > 0) {
       // In single quote mode, expand the first quote
       setExpandedRows(new Set([quotes[0].id]));
+      handleAccordionChange(quotes[0].id, true);
     }
   }, [singleQuoteMode, quotes]);
 
@@ -2615,14 +2757,42 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
               type="multiple"
               className="w-full"
               value={Array.from(expandedRows)}
-              onValueChange={(values) => setExpandedRows(new Set(values))}
+              onValueChange={(values) => {
+                // Find quotes that were opened or closed by comparing with current expandedRows
+                const newExpandedSet = new Set(values);
+                const currentExpandedSet = expandedRows;
+                
+                const openedQuotes = values.filter(id => !currentExpandedSet.has(id));
+                const closedQuotes = Array.from(currentExpandedSet).filter(id => !newExpandedSet.has(id));
+                
+                // Update client state immediately for responsive UI
+                setExpandedRows(newExpandedSet);
+                
+                // Update server state for opened quotes
+                openedQuotes.forEach(quoteId => {
+                  handleAccordionChange(quoteId, true);
+                });
+                
+                // Update server state for closed quotes
+                closedQuotes.forEach(quoteId => {
+                  handleAccordionChange(quoteId, false);
+                });
+              }}
             >
               {paginatedQuotes.map((quote) => {
                 const quoteParts = getQuotePartsWithNotesSync(quote.id);
                 const status = getQuoteStatus(quoteParts, quote.status);
 
                 return (
-                  <AccordionItem key={quote.id} value={quote.id} className={`border-b border-gray-100 last:border-b-0 relative transition-all duration-300 ${expandedRows.has(quote.id) ? 'bg-white z-10' : ''}`}>
+                  <AccordionItem 
+                    key={quote.id} 
+                    value={quote.id} 
+                    className={`border-b border-gray-100 last:border-b-0 relative transition-all duration-300 ${
+                      expandedRows.has(quote.id) ? 'bg-white z-10' : ''
+                    } ${
+                      quotesOpenByOthers.has(quote.id) ? 'ring-2 ring-orange-200 bg-orange-50' : ''
+                    }`}
+                  >
 
 
                     {/* Info Icon - Top Right Corner */}
@@ -2650,6 +2820,14 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                       <div className="flex flex-col space-y-1 ml-4">
 
                         <div className="flex items-center  w-full space-x-2">
+                          {/* Working Indicator - Show if quote is open by someone else */}
+                          {quotesOpenByOthers.has(quote.id) && (
+                            <div className="px-2 py-0.5 text-xs font-semibold border shadow-sm rounded bg-orange-100 text-orange-700 border-orange-200 flex items-center space-x-1">
+                              <div className="w-2 h-2 bg-orange-400 rounded-full animate-pulse"></div>
+                              <span>Working</span>
+                            </div>
+                          )}
+
                           {/* RC Indicator or Time Indicator */}
                           {(() => {
                             const { isRepairConnection } = getQuoteRefDisplay(quote.quoteRef || '', quote.source);
@@ -3491,7 +3669,25 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
             type="multiple"
             className="w-full"
             value={Array.from(expandedRows)}
-            onValueChange={(values) => setExpandedRows(new Set(values))}
+            onValueChange={(values) => {
+              // Update client state immediately for responsive UI
+              setExpandedRows(new Set(values));
+              
+              // Find quotes that were opened or closed
+              const currentExpandedRows = new Set(quotes.filter(quote => quote.isOpen).map(quote => quote.id));
+              const openedQuotes = values.filter(id => !currentExpandedRows.has(id));
+              const closedQuotes = Array.from(currentExpandedRows).filter(id => !values.includes(id));
+              
+              // Update server state for opened quotes
+              openedQuotes.forEach(quoteId => {
+                handleAccordionChange(quoteId, true);
+              });
+              
+              // Update server state for closed quotes
+              closedQuotes.forEach(quoteId => {
+                handleAccordionChange(quoteId, false);
+              });
+            }}
           >
             {paginatedQuotes.map((quote) => {
               const quoteParts = getQuotePartsWithNotesSync(quote.id);

@@ -119,6 +119,9 @@ export interface Quote {
   taxInvoiceNumber?: string; // Tax invoice number for orders
   source?: 'partscheck' | 'repairconnection' | 'unknown'; // Source platform for the quote
   pc_parts?: string; // PartsCheck format parts (comma-separated from PC paste)
+  isOpen?: boolean; // Track if quote accordion is open (server-side)
+  openedBy?: string; // Track which user opened the quote
+  openedAt?: string; // Track when the quote was opened
   [key: string]: any; // Allow string indexing
 }
 
@@ -189,7 +192,8 @@ export const useQuotes = () => {
         .select(`
           *,
           customer:customers(*),
-          vehicle:vehicles(*)
+          vehicle:vehicles(*),
+          opened_by_user:opened_by
         `)
         .order('created_at', { ascending: false });
 
@@ -255,6 +259,9 @@ export const useQuotes = () => {
           notes: normalizedQuote.notes || undefined,
           status: normalizedQuote.status as Quote['status'],
           taxInvoiceNumber: normalizedQuote.tax_invoice_number || undefined,
+          isOpen: normalizedQuote.is_open || false,
+          openedBy: normalizedQuote.opened_by || undefined,
+          openedAt: normalizedQuote.opened_at || undefined,
         };
 
         return legacyQuote;

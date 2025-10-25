@@ -17,10 +17,11 @@ interface PartsSectionProps {
   selectedParts: string[];
   onTogglePart: (partName: string) => void;
   partDetails: Record<string, PartDetails>;
-  onUpdatePartDetails: (partName: string, field: keyof PartDetails, value: string | number) => void;
+  onUpdatePartDetails: (partName: string, field: keyof PartDetails, value: string | number | null) => void;
   onTogglePartSide: (partName: string) => void;
   vehicleMake: string;
   isVisible: boolean;
+  quoteRef?: string; // Add quote reference to detect double quotes
 }
 
 // Helper functions for left/right part handling
@@ -32,6 +33,14 @@ const hasLeftRightVariants = (partName: string): boolean => {
     'Left Blindspot Sensor', 'Right Blindspot Sensor'
   ];
   return leftRightParts.includes(partName);
+};
+
+// Helper function to detect double quotes (contains special characters)
+const isDoubleQuote = (quoteRef: string | undefined): boolean => {
+  if (!quoteRef) return false;
+  // Check for special characters that indicate a double quote
+  // Common patterns: quotes with special chars like "225397-A", "225397/2", "225397*", etc.
+  return /[^a-zA-Z0-9]/.test(quoteRef);
 };
 
 const getOppositeSidePart = (partName: string): string => {
@@ -100,7 +109,8 @@ export default function PartsSection({
   onUpdatePartDetails,
   onTogglePartSide,
   vehicleMake,
-  isVisible
+  isVisible,
+  quoteRef
 }: PartsSectionProps) {
   if (!isVisible) {
     return null;
@@ -250,12 +260,40 @@ export default function PartsSection({
                         step="0.01"
                         value={partDetails[partName]?.list_price || ''}
                         onChange={(e) => onUpdatePartDetails(partName, 'list_price', parseFloat(e.target.value) || 0)}
-                        placeholder="Enter list price"
-                        className="w-28 px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="$"
+                        className="w-16 px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 [appearance:textfield] 
+                          [&::-webkit-outer-spin-button]:appearance-none 
+                          [&::-webkit-outer-spin-button]:m-0 
+                          [&::-webkit-inner-spin-button]:appearance-none 
+                          [&::-webkit-inner-spin-button]:m-0"
                       />
                     </div>
 
-                    {/* Price and Notes fields hidden in quote creation - will be added during pricing workflow */}
+                    {/* Price field - only visible for double quotes (pricing already done) */}
+                    {isDoubleQuote(quoteRef) && (
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-2">
+                          Price
+                        </label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={partDetails[partName]?.price || ''}
+                          onChange={(e) => {
+                            const value = e.target.value ? parseFloat(e.target.value) : null;
+                            onUpdatePartDetails(partName, 'price', value);
+                          }}
+                          placeholder="$"
+                          className="w-16 px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 [appearance:textfield] 
+                            [&::-webkit-outer-spin-button]:appearance-none 
+                            [&::-webkit-outer-spin-button]:m-0 
+                            [&::-webkit-inner-spin-button]:appearance-none 
+                            [&::-webkit-inner-spin-button]:m-0"
+                        />
+                      </div>
+                    )}
+
+                    {/* Notes field hidden in quote creation - will be added during pricing workflow */}
                   </div>
                 </div>
               );

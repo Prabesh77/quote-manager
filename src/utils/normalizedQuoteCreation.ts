@@ -268,13 +268,13 @@ export const createNormalizedQuote = async (quoteData: QuoteData) => {
       finalPartsRequested.push({
         part_id: partId,
         note: partData.note || '',
-        final_price: null, // Initially null, will be set during pricing
+        final_price: partData.price || null, // Use price from form data (for double quotes)
         list_price: listPriceToUse,
         variants: [{
           id: `variant_${Date.now()}_${i}`,
           number: partData.number || '',
           note: partData.note || '',
-          final_price: null,
+          final_price: partData.price || null, // Use price from form data (for double quotes)
           list_price: listPriceToUse,
           af: partData.af || false,
           created_at: new Date().toISOString(),

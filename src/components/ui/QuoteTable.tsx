@@ -39,6 +39,7 @@ import QuickFillInput from './QuickFillInput';
 import QuoteInfoPopup from '../QuoteInfoPopup';
 import { useSnackbar } from '@/components/ui/Snackbar';
 import RealtimeToggle from './RealtimeToggle';
+import { useServerSideAccordion } from '@/hooks/useServerSideAccordion';
 
 
 interface QuoteTableProps {
@@ -93,7 +94,6 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
 
   const [filter, setFilter] = useState<FilterType>(defaultFilter);
   const [searchTerm, setSearchTerm] = useState('');
-  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const [singleQuoteMode, setSingleQuoteMode] = useState(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('single-quote-mode');
@@ -105,23 +105,20 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
   // Use external search term when server-side search is enabled
   const effectiveSearchTerm = useServerSideSearch ? externalSearchTerm || '' : searchTerm;
 
-  // Initialize expanded rows - only expand the first quote in the list
-  useEffect(() => {
-    const newExpandedRows = new Set<string>();
-
-    // Only expand the first quote in the list to reduce clutter
-    if (quotes.length > 0) {
-      newExpandedRows.add(quotes[0].id);
-    }
-
-    setExpandedRows(newExpandedRows);
-  }, [quotes]);
+  // Use custom hook for server-side accordion functionality
+  const {
+    expandedRows,
+    setExpandedRows,
+    quotesOpenByOthers,
+    handleAccordionChange
+  } = useServerSideAccordion({ quotes, currentPageName });
 
   // Auto-expand single quote when in single quote mode
   useEffect(() => {
     if (singleQuoteMode && quotes.length > 0) {
       // In single quote mode, expand the first quote
       setExpandedRows(new Set([quotes[0].id]));
+      handleAccordionChange(quotes[0].id, true);
     }
   }, [singleQuoteMode, quotes]);
 
@@ -931,7 +928,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                 newPartEditData[part.id] = {};
               }
               newPartEditData[part.id][variant.id] = {
-                number: variant.number || part.number || '',
+                number: part.number || '', // Always use standardized part number from parts table
                 note: variant.note || '',
                 final_price: variant.final_price ?? null,
                 list_price: variant.list_price ?? null,
@@ -942,7 +939,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
             // Only create default variant for parts that truly have no variants
             newPartEditData[part.id] = {
               'default': {
-                number: part.number || '',
+                number: part.number || '', // Always use standardized part number from parts table
                 note: part.note || '',
                 final_price: part.price ?? null,
                 list_price: part.list_price ?? null,
@@ -2615,14 +2612,45 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
               type="multiple"
               className="w-full"
               value={Array.from(expandedRows)}
-              onValueChange={(values) => setExpandedRows(new Set(values))}
+              onValueChange={(values) => {
+                // Find quotes that were opened or closed by comparing with current expandedRows
+                const newExpandedSet = new Set(values);
+                const currentExpandedSet = expandedRows;
+                
+                const openedQuotes = values.filter(id => !currentExpandedSet.has(id));
+                const closedQuotes = Array.from(currentExpandedSet).filter(id => !newExpandedSet.has(id));
+                
+                // Update client state immediately for responsive UI
+                setExpandedRows(newExpandedSet);
+                
+                // Only update server state for priced page
+                if (currentPageName == 'priced') {
+                  // Update server state for opened quotes
+                  openedQuotes.forEach(quoteId => {
+                    handleAccordionChange(quoteId, true);
+                  });
+                  
+                  // Update server state for closed quotes
+                  closedQuotes.forEach(quoteId => {
+                    handleAccordionChange(quoteId, false);
+                  });
+                }
+              }}
             >
               {paginatedQuotes.map((quote) => {
                 const quoteParts = getQuotePartsWithNotesSync(quote.id);
                 const status = getQuoteStatus(quoteParts, quote.status);
 
                 return (
-                  <AccordionItem key={quote.id} value={quote.id} className={`border-b border-gray-100 last:border-b-0 relative transition-all duration-300 ${expandedRows.has(quote.id) ? 'bg-white z-10' : ''}`}>
+                  <AccordionItem 
+                    key={quote.id} 
+                    value={quote.id} 
+                    className={`border-b border-gray-100 last:border-b-0 relative transition-all duration-300 ${
+                      expandedRows.has(quote.id) ? 'bg-white z-10' : ''
+                    } ${
+                      quotesOpenByOthers.has(quote.id) ? 'ring-2 ring-orange-200 bg-orange-50' : ''
+                    }`}
+                  >
 
 
                     {/* Info Icon - Top Right Corner */}
@@ -2650,6 +2678,13 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                       <div className="flex flex-col space-y-1 ml-4">
 
                         <div className="flex items-center  w-full space-x-2">
+                          {/* Working Indicator - Show if quote is open by someone else */}
+                          {quotesOpenByOthers.has(quote.id) && (
+                            <div className="px-2 py-0.5 text-xs font-semibold border shadow-sm rounded bg-orange-100 text-orange-700 border-orange-200 flex items-center space-x-1">
+                              <div className="w-2 h-2 bg-orange-400 rounded-full animate-pulse"></div>
+                            </div>
+                          )}
+
                           {/* RC Indicator or Time Indicator */}
                           {(() => {
                             const { isRepairConnection } = getQuoteRefDisplay(quote.quoteRef || '', quote.source);
@@ -3491,7 +3526,25 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
             type="multiple"
             className="w-full"
             value={Array.from(expandedRows)}
-            onValueChange={(values) => setExpandedRows(new Set(values))}
+            onValueChange={(values) => {
+              // Update client state immediately for responsive UI
+              setExpandedRows(new Set(values));
+              
+              // Find quotes that were opened or closed
+              const currentExpandedRows = new Set(quotes.filter(quote => quote.isOpen).map(quote => quote.id));
+              const openedQuotes = values.filter(id => !currentExpandedRows.has(id));
+              const closedQuotes = Array.from(currentExpandedRows).filter(id => !values.includes(id));
+              
+              // Update server state for opened quotes
+              openedQuotes.forEach(quoteId => {
+                handleAccordionChange(quoteId, true);
+              });
+              
+              // Update server state for closed quotes
+              closedQuotes.forEach(quoteId => {
+                handleAccordionChange(quoteId, false);
+              });
+            }}
           >
             {paginatedQuotes.map((quote) => {
               const quoteParts = getQuotePartsWithNotesSync(quote.id);
@@ -3946,7 +3999,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                                 {isPartEditing ? (
                                                   <input
                                                     type="text"
-                                                value={partEditData[part.id]?.number ?? part.number ?? ''}
+                                                value={part.number ?? ''}
                                                     onChange={(e) => handlePartEditChange(part.id, 'number', e.target.value)}
                                                 className="flex-1 px-2 py-1 border border-gray-300 rounded-md text-sm focus:ring-1 focus:ring-red-500 focus:border-transparent"
                                                   />

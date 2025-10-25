@@ -377,7 +377,7 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
     });
   };
 
-  const updatePartDetails = (partName: string, field: keyof PartDetails, value: string | number) => {
+  const updatePartDetails = (partName: string, field: keyof PartDetails, value: string | number | null) => {
     setPartDetails(prev => ({
       ...prev,
       [partName]: {
@@ -953,6 +953,7 @@ export const QuoteForm = ({ onSubmit }: QuoteFormProps) => {
           onTogglePartSide={togglePartSide}
           vehicleMake={fields.make}
           isVisible={showPartsSection}
+          quoteRef={fields.quoteRef}
         />
       </div>
 

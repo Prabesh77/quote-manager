@@ -16,6 +16,7 @@ export const getQuotePartsFromJson = (quote: Quote, allParts: Part[]): Part[] =>
     // Find the base part data
     const basePart = allParts.find(p => p.id === quotePart.part_id);
     
+    
     if (!basePart) {
       // Create a placeholder if part not found
       // Handle both old structure (direct note/final_price) and new structure (variants array)
@@ -58,8 +59,11 @@ export const getQuotePartsFromJson = (quote: Quote, allParts: Part[]): Part[] =>
     }
 
     // Merge base part data with quote-specific data
+    // CRITICAL: Always use part number from parts table (source of truth)
+    // Use other details (price, notes, etc.) from parts_requested JSON
     return {
       ...basePart,
+      number: basePart.number, // Always use standardized part number from parts table
       price: finalPrice,
       list_price: listPrice,
       af: af,

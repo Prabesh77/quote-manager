@@ -931,7 +931,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                 newPartEditData[part.id] = {};
               }
               newPartEditData[part.id][variant.id] = {
-                number: variant.number || part.number || '',
+                number: part.number || '', // Always use standardized part number from parts table
                 note: variant.note || '',
                 final_price: variant.final_price ?? null,
                 list_price: variant.list_price ?? null,
@@ -942,7 +942,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
             // Only create default variant for parts that truly have no variants
             newPartEditData[part.id] = {
               'default': {
-                number: part.number || '',
+                number: part.number || '', // Always use standardized part number from parts table
                 note: part.note || '',
                 final_price: part.price ?? null,
                 list_price: part.list_price ?? null,
@@ -3946,7 +3946,7 @@ export default function QuoteTable({ quotes, parts, onUpdateQuote, onDeleteQuote
                                                 {isPartEditing ? (
                                                   <input
                                                     type="text"
-                                                value={partEditData[part.id]?.number ?? part.number ?? ''}
+                                                value={part.number ?? ''}
                                                     onChange={(e) => handlePartEditChange(part.id, 'number', e.target.value)}
                                                 className="flex-1 px-2 py-1 border border-gray-300 rounded-md text-sm focus:ring-1 focus:ring-red-500 focus:border-transparent"
                                                   />

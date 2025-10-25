@@ -321,7 +321,7 @@ export const useQuotePartsFromJson = (quoteId: string) => {
         const legacyPart = {
           id: partItem.part_id,
           name: partData?.part_name || '',
-          number: partData?.part_number || '',
+          number: partData?.part_number || '', // Always use part number from parts table (source of truth)
           price: defaultVariant?.final_price || null,
           note: defaultVariant?.note || '',
           createdAt: partData?.created_at || new Date().toISOString(),

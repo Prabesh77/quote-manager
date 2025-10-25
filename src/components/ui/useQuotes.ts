@@ -294,6 +294,7 @@ export const useQuotes = () => {
         createdAt: part.created_at,
       }));
 
+
       setParts(legacyParts);
     } catch (error) {
       console.error('Error fetching normalized parts:', error);
